@@ -701,12 +701,23 @@ input[type='range'] { -webkit-appearance: none; appearance: none; height: 18px; 
 input[type='range']::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: var(--active); }
 input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
 
-.segmented { display: inline-flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--input); border: 1px solid var(--border-strong); max-width: 100%; }
-.segmented.full { display: flex; width: 100%; }
+/* A grid sizes each option by its label and shares spare room evenly; when
+   room is short, it shortens the longest labels first (long translations). */
+.segmented {
+  display: inline-grid;
+  grid-auto-flow: column;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 7px;
+  background: var(--input);
+  border: 1px solid var(--border-strong);
+  max-width: 100%;
+}
+.segmented.full { display: grid; width: 100%; }
 .segmented button {
-  flex: 1;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 28px;
   height: 24px;
   padding: 0 8px;
@@ -722,6 +733,9 @@ input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 .segmented button:hover { color: var(--text); background: var(--hover); }
 .segmented button.active { background: var(--panel-2); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), inset 0 0 0 1px var(--border-strong); }
 :root[data-ui='light'] .segmented button.active { background: #fff; }
+/* Full-width rows share out their spare room, so labels need less padding. */
+.segmented.full button { padding: 0 4px; }
+.segmented button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .toggle { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; }
 .toggle input { position: absolute; opacity: 0; pointer-events: none; }

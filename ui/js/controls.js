@@ -156,7 +156,7 @@ export function Segmented({ value, options, onChange, full }) {
         onMouseDown=${(e) => o.keepFocus && e.preventDefault()}
         onClick=${() => onChange(o.value)}
       >
-        ${o.icon ? html`<${Icon} name=${o.icon} size=${16} />` : o.label}
+        ${o.icon ? html`<${Icon} name=${o.icon} size=${16} />` : html`<span>${o.label}</span>`}
       </button>`,
     )}
   </div>`;
