@@ -4,7 +4,7 @@ import { html, render } from './lib.js';
 import { App } from './app.js';
 import { invoke, currentWindow, currentWebview } from './api.js';
 import { state, set, boot, toast, confirmDiscard, openPath, stepSlide } from './store.js';
-import { commandForKey } from './commands.js';
+import { COMMANDS, commandForKey } from './commands.js';
 import * as A from './actions.js';
 import { canvasApi } from './canvas.js';
 import { beginTextEdit, endAllEditing } from './textedit.js';
@@ -13,12 +13,15 @@ import { IMAGE_EXTS, VIDEO_EXTS } from './api.js';
 import { subscribe } from './store.js';
 import { ensureDiagrams } from './diagrams.js';
 import { insertPicked, checkClipboardLink, openInSystemBrowser } from './media.js';
-import { events } from './api.js';
 import { t } from './i18n.js';
 
+// Events Rust sends to this window. (A global listener would also get the
+// ones meant for other windows.)
+const listen = (name, handler) => currentWindow().listen(name, handler).catch(() => {});
+
 // Media chosen in a provider's website (Browse mode).
-events.listen('cz-media-picked', (e) => insertPicked(e.payload));
-events.listen('cz-media-browser-closed', (e) => {
+listen('cz-media-picked', (e) => insertPicked(e.payload));
+listen('cz-media-browser-closed', (e) => {
   const name = { youtube: 'YouTube', vimeo: 'Vimeo', giphy: 'GIPHY', unsplash: 'Unsplash' }[e.payload?.provider];
   const message = name
     ? t('{name} closed unexpectedly (a problem in the system web engine). Your presentation is safe.', { name })
@@ -112,6 +115,14 @@ window.addEventListener('keydown', (e) => {
     const next = slide.elements[(i + (e.shiftKey ? -1 : 1) + n) % n];
     set({ selection: [next.id] });
   }
+});
+
+// Commands chosen in the macOS menu bar (app_menu.rs). Like their shortcuts,
+// they wait while a dialog or menu is open.
+listen('cz-command', (e) => {
+  if (state.modal || state.menu) return;
+  const cmd = COMMANDS.find((c) => c.id === e.payload);
+  if (cmd && (!cmd.when || cmd.when())) cmd.run();
 });
 
 // ---------------------------------------------------------------------------

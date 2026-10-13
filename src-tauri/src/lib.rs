@@ -5,6 +5,8 @@
 //! exports and window management. The UI (in `ui/`) runs in the system
 //! webview and talks to it through the commands defined here.
 
+#[cfg(target_os = "macos")]
+mod app_menu;
 pub mod browse;
 pub mod chart;
 pub mod clipboard;
@@ -144,13 +146,20 @@ fn app_info(state: State<AppState>) -> CmdResult<AppInfo> {
 }
 
 #[tauri::command]
-fn settings_update(state: State<AppState>, patch: Value) -> CmdResult<Settings> {
-    let mut s = state.settings.lock().map_err(err)?;
-    let mut v = serde_json::to_value(&*s).map_err(err)?;
-    ops::merge_patch(&mut v, &patch);
-    *s = serde_json::from_value(v).map_err(err)?;
-    s.save(&state.settings_path).map_err(err)?;
-    Ok(s.clone())
+fn settings_update(app: AppHandle, state: State<AppState>, patch: Value) -> CmdResult<Settings> {
+    let (updated, language_changed) = {
+        let mut s = state.settings.lock().map_err(err)?;
+        let language = s.language.clone();
+        let mut v = serde_json::to_value(&*s).map_err(err)?;
+        ops::merge_patch(&mut v, &patch);
+        *s = serde_json::from_value(v).map_err(err)?;
+        s.save(&state.settings_path).map_err(err)?;
+        (s.clone(), s.language != language)
+    };
+    if language_changed {
+        refresh_app_menu(&app);
+    }
+    Ok(updated)
 }
 
 #[tauri::command]
@@ -732,7 +741,6 @@ fn stop_browser(app: &AppHandle, owner: &str) {
     }
 }
 
-/// Entry point of the `--media-browser` helper process.
 /// Interface text in `lang` from the UI's catalogs (ui/locales), for the few
 /// strings Rust shows itself.
 fn translator(app: &AppHandle, lang: &str) -> impl Fn(&str) -> String + use<> {
@@ -752,6 +760,7 @@ fn tr(text: &dyn Fn(&str) -> String, key: &str) -> String {
     text(key)
 }
 
+/// Entry point of the `--media-browser` helper process.
 fn run_media_browser(context: tauri::Context<tauri::Wry>, provider: String, lang: String, safe: bool) {
     let Some(start) = browse::start_url(&provider) else { std::process::exit(2) };
     let name = match provider.as_str() {
@@ -1103,8 +1112,57 @@ fn files_from_args<I: IntoIterator<Item = String>>(args: I, cwd: &Path) -> Vec<P
             let p = PathBuf::from(&a);
             if p.is_absolute() { p } else { cwd.join(p) }
         })
-        .filter(|p| p.extension().map(|e| e == package::EXTENSION).unwrap_or(false) && p.exists())
+        .filter(|p| is_presentation(p))
         .collect()
+}
+
+fn is_presentation(path: &Path) -> bool {
+    path.extension().is_some_and(|e| e == package::EXTENSION) && path.exists()
+}
+
+/// Files the system asked to open while Cadenza was starting (macOS sends
+/// them as events, before setup has run); `None` once it has started.
+static STARTUP_FILES: Mutex<Option<Vec<PathBuf>>> = Mutex::new(Some(Vec::new()));
+
+/// Opens presentations in new windows, or keeps them for startup.
+fn open_files(app: &AppHandle, files: Vec<PathBuf>) {
+    if let Ok(mut startup) = STARTUP_FILES.lock() {
+        if let Some(pending) = startup.as_mut() {
+            pending.extend(files);
+            return;
+        }
+    }
+    for f in files {
+        let _ = open_editor_window(app, Some(f));
+    }
+}
+
+/// Builds the macOS menu bar in the interface language.
+fn refresh_app_menu(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let language = app.state::<AppState>().settings.lock().map(|s| s.language.clone()).unwrap_or_default();
+        match app_menu::build(app, &language) {
+            Ok(menu) => {
+                let _ = app.set_menu(menu);
+            }
+            Err(e) => eprintln!("Could not build the menu bar: {e}"),
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+/// Quitting with presentations still open (Quit in the macOS Dock, logging
+/// out): unsaved work is kept for recovery at the next start.
+fn keep_unsaved_work(app: &AppHandle) {
+    if let Some(state) = app.try_state::<AppState>() {
+        if let Ok(mut docs) = state.docs.lock() {
+            for doc in docs.values_mut() {
+                doc.maybe_write_recovery(true);
+            }
+        }
+    }
 }
 
 /// `CADENZA_DATA_DIR` gives Cadenza an isolated profile (settings and
@@ -1144,10 +1202,12 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                     let _ = open_editor_window(app, None);
                 }
             }
-            for f in files {
-                let _ = open_editor_window(app, Some(f));
-            }
+            open_files(app, files);
         }));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.enable_macos_default_menu(false).on_menu_event(app_menu::on_event);
     }
     builder
         .plugin(tauri_plugin_dialog::init())
@@ -1195,8 +1255,11 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                 }
             });
 
+            refresh_app_menu(app.handle());
+
             let cwd = std::env::current_dir().unwrap_or_default();
-            let files = files_from_args(std::env::args(), &cwd);
+            let mut files = files_from_args(std::env::args(), &cwd);
+            files.extend(STARTUP_FILES.lock().ok().and_then(|mut f| f.take()).unwrap_or_default());
             if files.is_empty() {
                 open_editor_window(app.handle(), None)?;
             }
@@ -1278,8 +1341,18 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             window_new,
             window_focus_document,
         ])
-        .run(context)
-        .expect("error while running Cadenza");
+        .build(context)
+        .expect("error while running Cadenza")
+        .run(|app, event| match event {
+            // macOS opens files from Finder and the Dock with events.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Opened { urls } => {
+                let files = urls.iter().filter_map(|u| u.to_file_path().ok()).filter(|p| is_presentation(p)).collect();
+                open_files(app, files);
+            }
+            tauri::RunEvent::Exit => keep_unsaved_work(app),
+            _ => {}
+        });
 }
 
 #[cfg(test)]
