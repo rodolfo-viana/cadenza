@@ -1,7 +1,7 @@
 // Editor actions shared by the toolbar, menus, shortcuts and the command
 // palette.
 
-import { invoke, importBytes, dialog, opener, IMAGE_EXTS, VIDEO_EXTS } from './api.js';
+import { invoke, importBytes, dialog, opener, clipboard, IMAGE_EXTS, VIDEO_EXTS } from './api.js';
 import {
   state,
   set,
@@ -17,6 +17,7 @@ import {
   copyElements,
   copySlides,
   readClip,
+  pasteClip,
   goToSlide,
   ingestView,
   deckTitle,
@@ -29,11 +30,12 @@ import { fileExt, fileName, textToHtml, bounds, unionBounds } from './util.js';
 // ---------------------------------------------------------------------------
 
 /** Adds an element of a kind (and variant: shape id, chart type, text role). */
-export async function insert(kind, variant = '', props = null) {
-  if (!state.doc || !state.slideId) return null;
-  await flushEdits();
+export async function insert(kind, variant = '', props = null, target = { docId: state.doc?.docId, slideId: state.slideId }) {
+  if (!target.docId || state.doc?.docId !== target.docId || !target.slideId) return null;
+  if (!(await flushEdits())) return null;
+  if (state.doc?.docId !== target.docId || !deck().slides.some((s) => s.id === target.slideId)) return null;
   set({ editing: null, editingTable: null });
-  const out = await apply({ op: 'addElement', slide: state.slideId, kind, variant, props });
+  const out = await apply({ op: 'addElement', slide: target.slideId, kind, variant, props }, { docId: target.docId });
   return out?.created?.[0] || null;
 }
 
@@ -43,9 +45,9 @@ function fitInto(w, h, maxW, maxH) {
 }
 
 /** Creates an element for an imported asset, centered at `at` if given. */
-export async function insertAsset(asset, at = null, offset = 0, extra = {}) {
+export async function insertAsset(asset, at = null, offset = 0, extra = {}, target = { docId: state.doc?.docId, slideId: state.slideId }) {
   const d = deck();
-  if (!d) return null;
+  if (!d || state.doc.docId !== target.docId) return null;
   let kind;
   let size;
   let content;
@@ -71,7 +73,7 @@ export async function insertAsset(asset, at = null, offset = 0, extra = {}) {
     name: kind === 'image' ? N_('Image') : N_('Video'),
     content,
   };
-  return insert(kind, '', props);
+  return insert(kind, '', props, target);
 }
 
 export async function importPaths(paths, at = null) {
@@ -223,7 +225,7 @@ export function resetImageSize(el) {
 
 export async function addSlide(layout = null) {
   if (!state.doc) return;
-  await flushEdits();
+  if (!(await flushEdits())) return;
   const cur = currentSlide();
   const l = layout || (cur && cur.layout === 'title' ? 'title-content' : cur?.layout || 'title-content');
   await apply({ op: 'addSlide', after: state.slideId, layout: l });
@@ -231,13 +233,13 @@ export async function addSlide(layout = null) {
 
 export async function duplicateSlides(ids = state.selectedSlides) {
   if (!ids.length) return;
-  await flushEdits();
+  if (!(await flushEdits())) return;
   await apply({ op: 'duplicateSlides', ids });
 }
 
 export async function deleteSlides(ids = state.selectedSlides) {
   if (!ids.length) return;
-  await flushEdits();
+  if (!(await flushEdits())) return;
   set({ selection: [], editing: null });
   await apply({ op: 'deleteSlides', ids });
 }
@@ -265,54 +267,86 @@ export async function moveSlides(ids, to) {
 
 let pasteCount = 0;
 let lastCopySlide = null;
+let copyChain = Promise.resolve();
+let copying = 0;
 
 /** Handles the DOM `copy`/`cut` events outside text fields. */
 export function onCopy(e, cut = false) {
-  if (state.focus === 'slides' && state.selectedSlides.length) {
-    const slides = deck().slides.filter((s) => state.selectedSlides.includes(s.id));
-    e.clipboardData.setData('text/plain', copySlides(slides));
-    e.preventDefault();
-    if (cut) deleteSlides();
-    return;
-  }
-  const els = selectedElements();
-  if (!els.length) return;
-  e.clipboardData.setData('text/plain', copyElements(els));
+  const slides = state.focus === 'slides';
+  const ids = [...(slides ? state.selectedSlides : state.selection)];
+  if (!state.doc || !ids.length) return;
+  const docId = state.doc.docId;
+  const slide = state.slideId;
+  // The backend snapshots and writes the clipboard under one lock shared by
+  // all windows. Never cut until that complete operation succeeds.
   e.preventDefault();
-  lastCopySlide = state.slideId;
-  pasteCount = 0;
-  if (cut) deleteSelection();
+  copying++;
+  const copy = async () => {
+    try {
+      if (!(await flushEdits())) return;
+      if (state.doc?.docId !== docId) return;
+      await (slides
+        ? copySlides(deck().slides.filter((s) => ids.includes(s.id)))
+        : copyElements((deck().slides.find((s) => s.id === slide)?.elements || []).filter((el) => ids.includes(el.id))));
+      lastCopySlide = slide;
+      pasteCount = 0;
+      if (cut && state.doc?.docId === docId) {
+        await apply(slides ? { op: 'deleteSlides', ids } : { op: 'deleteElements', slide, ids });
+      }
+    } catch (err) {
+      toast(String(err), 'error');
+    } finally {
+      copying--;
+    }
+  };
+  copyChain = copyChain.then(copy, copy);
+  return copyChain;
 }
 
 /** Handles the DOM `paste` event outside text fields. */
 export async function onPaste(e) {
   if (!state.doc) return;
+  const docId = state.doc.docId;
+  const target = state.slideId;
   const dt = e.clipboardData;
   e.preventDefault();
-  await pasteData([...(dt?.files || [])], dt?.getData('text/plain') || '');
+  const files = [...(dt?.files || [])];
+  let text = dt?.getData('text/plain') || '';
+  if (copying) {
+    await copyChain;
+    try {
+      text = await clipboard.readText();
+    } catch {
+      text = null;
+    }
+  }
+  if (state.doc?.docId === docId) await pasteData(files, text, target, docId);
 }
 
 /** "Paste" chosen from a menu: webviews block execCommand('paste'). */
 export async function pasteFromMenu() {
+  const docId = state.doc?.docId;
+  const target = state.slideId;
+  await copyChain;
   let text = null;
   try {
-    text = await navigator.clipboard.readText();
+    text = await clipboard.readText();
   } catch {
     text = null;
   }
-  await pasteData([], text);
+  if (docId && state.doc?.docId === docId) await pasteData([], text, target, docId);
 }
 
-async function pasteData(files, text) {
+async function pasteData(files, text, target, docId) {
   // `text === null` means the system clipboard is unreadable: use ours.
   const clip = readClip(text);
   if (clip?.type === 'elements') {
-    pasteCount = lastCopySlide === state.slideId ? pasteCount + 1 : 0;
-    await apply({ op: 'insertElements', slide: state.slideId, elements: clip.elements, offset: 24 * pasteCount });
+    pasteCount = lastCopySlide === target ? pasteCount + 1 : 0;
+    await pasteClip(clip, target, 24 * pasteCount);
     return;
   }
   if (clip?.type === 'slides') {
-    await apply({ op: 'insertSlides', after: state.slideId, slides: clip.slides });
+    await pasteClip(clip, target);
     return;
   }
   const images = files.filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'));
@@ -321,8 +355,11 @@ async function pasteData(files, text) {
     for (const f of images) {
       try {
         const ext = (f.name && fileExt(f.name)) || f.type.split('/')[1] || '';
-        const a = await importBytes(new Uint8Array(await f.arrayBuffer()), ext);
-        await insertAsset(a, null, 24 * i++);
+        const bytes = new Uint8Array(await f.arrayBuffer());
+        if (state.doc?.docId !== docId) return;
+        const a = await importBytes(bytes, ext, docId);
+        if (state.doc?.docId !== docId) return;
+        await insertAsset(a, null, 24 * i++, {}, { docId, slideId: target });
       } catch (err) {
         toast(String(err), 'error');
       }
@@ -332,10 +369,10 @@ async function pasteData(files, text) {
   if (text && text.trim()) {
     const txt = text.trim();
     if (/^https?:\/\/\S+$/i.test(txt) && /youtube\.com|youtu\.be|vimeo\.com/i.test(txt)) {
-      await insert('video', '', { name: N_('Video'), content: { kind: 'video', src: txt, autoplay: false } });
+      await insert('video', '', { name: N_('Video'), content: { kind: 'video', src: txt, autoplay: false } }, { docId, slideId: target });
       return;
     }
-    await insert('text', 'body', { content: { kind: 'text', html: textToHtml(txt) } });
+    await insert('text', 'body', { content: { kind: 'text', html: textToHtml(txt) } }, { docId, slideId: target });
   }
 }
 
@@ -362,7 +399,7 @@ export async function importMarkdown() {
     replace = choice === 'replace';
   }
   try {
-    await flushEdits();
+    if (!(await flushEdits())) return;
     ingestView(await invoke('import_markdown', { path, replace }));
     toast(t('Imported {name}', { name: fileName(path) }));
   } catch (e) {
@@ -376,7 +413,7 @@ function safeTitle() {
 
 export async function exportHtml(single) {
   if (!state.doc) return;
-  await flushEdits();
+  if (!(await flushEdits())) return;
   const path = single
     ? await dialog.save({ title: t('Export as Single HTML File'), defaultPath: `${safeTitle()}.html`, filters: [{ name: t('Web Page'), extensions: ['html'] }] })
     : await dialog.save({ title: t('Export as Website Folder (name the new folder)'), defaultPath: safeTitle() });
@@ -397,7 +434,7 @@ export async function exportHtml(single) {
 
 export async function exportPdf() {
   if (!state.doc) return;
-  await flushEdits();
+  if (!(await flushEdits())) return;
   try {
     await invoke('export_pdf');
   } catch (e) {

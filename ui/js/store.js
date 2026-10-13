@@ -119,8 +119,17 @@ export function registerFlush(fn) {
   return () => flushers.delete(fn);
 }
 export async function flushEdits() {
-  for (const fn of [...flushers]) await fn();
-  await chain;
+  const docId = state.doc?.docId;
+  try {
+    for (const fn of [...flushers]) {
+      if ((await fn()) === false || state.doc?.docId !== docId) return false;
+    }
+    await chain;
+    return state.doc?.docId === docId;
+  } catch (e) {
+    toast(String(e), 'error');
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +177,9 @@ export function updateWindowTitle() {
 
 function ingest(view, { navigate = true } = {}) {
   const prev = state.doc;
+  const sameDoc = prev?.docId === view.docId;
+  if (sameDoc && view.revision != null && prev.revision != null && view.revision <= prev.revision) return false;
+  const missedView = sameDoc && !view.full && view.revision > prev.revision + 1;
   const slides = view.full || !prev ? {} : { ...prev.slides };
   Object.assign(slides, view.slides);
   const ids = view.deck.slides.map((s) => s.id);
@@ -194,6 +206,9 @@ function ingest(view, { navigate = true } = {}) {
   set({ doc, slideId, selection, selectedSlides, editing });
   applyDeckStyles(view);
   updateWindowTitle();
+  // Incremental renderings depend on the previous view having arrived.
+  if (missedView) refreshDocument();
+  return true;
 }
 
 /** Ingests a view returned by a command other than `doc_apply`. */
@@ -210,6 +225,7 @@ function loadView(view) {
     selectedSlides: [],
     editing: null,
     editingTable: null,
+    ai: null,
     zoom: 'fit',
     tab: 'format',
   });
@@ -228,20 +244,39 @@ let chain = Promise.resolve();
  * Resolves with the outcome, or null when the operation failed.
  */
 export function apply(op, opts = {}) {
+  return enqueue('doc_apply', { op, coalesce: opts.coalesce || null }, opts);
+}
+
+function enqueue(command, args, opts = {}) {
+  const docId = opts.docId ?? state.doc?.docId;
   const run = async () => {
-    if (!state.doc) return null;
+    if (!docId || state.doc?.docId !== docId) return null;
     try {
-      const view = await invoke('doc_apply', { op, coalesce: opts.coalesce || null });
+      const view = await invoke(command, { ...args, docId });
+      if (state.doc?.docId !== docId) return null;
       ingest(view, opts);
       return view.outcome;
     } catch (e) {
-      console.error('operation failed', op, e);
+      console.error('operation failed', command, e);
       toast(String(e), 'error');
       return null;
     }
   };
   chain = chain.then(run, run);
   return chain;
+}
+
+export const pasteClip = (clip, target, offset = 0) => enqueue('clipboard_paste', { clip, target, offset });
+
+const refreshes = new Map();
+export function refreshDocument() {
+  const docId = state.doc?.docId;
+  if (!docId) return Promise.resolve(null);
+  if (refreshes.has(docId)) return refreshes.get(docId);
+  const pending = enqueue('doc_refresh', {}, { navigate: false });
+  refreshes.set(docId, pending);
+  pending.finally(() => refreshes.delete(docId));
+  return pending;
 }
 
 export const updateElements = (ids, patch, coalesce) =>
@@ -262,7 +297,7 @@ export const updateCurrentSlide = (patch, coalesce) => updateSlides([state.slide
 export const updateDeck = (patch, coalesce) => apply({ op: 'updateDeck', patch }, { coalesce, navigate: false });
 
 export async function undo() {
-  await flushEdits();
+  if (!(await flushEdits())) return;
   if (!state.doc?.canUndo) return;
   try {
     ingest(await invoke('doc_undo'));
@@ -272,7 +307,7 @@ export async function undo() {
 }
 
 export async function redo() {
-  await flushEdits();
+  if (!(await flushEdits())) return;
   if (!state.doc?.canRedo) return;
   try {
     ingest(await invoke('doc_redo'));
@@ -323,7 +358,9 @@ export async function openPath(path) {
   if (!path) return;
   try {
     if (await invoke('window_focus_document', { path })) return;
-    // Keep the current presentation: open the file in a new window.
+    // Keep the current presentation: open the file in a new window. Pending
+    // edits count, so commit them before deciding.
+    if (!(await flushEdits())) return;
     if (state.doc && (state.doc.dirty || state.doc.path)) {
       await invoke('window_new', { path });
       return;
@@ -364,7 +401,7 @@ function suggestedName() {
 /** Saves; returns true on success. */
 export async function save({ as = false } = {}) {
   if (!state.doc) return false;
-  await flushEdits();
+  if (!(await flushEdits())) return false;
   let path = as ? null : state.doc.path;
   if (!path) {
     path = await dialog.save({ title: as ? t('Save Presentation As') : t('Save Presentation'), defaultPath: suggestedName(), filters: presentationFilter() });
@@ -386,8 +423,7 @@ export async function save({ as = false } = {}) {
 
 /** Asks what to do with unsaved changes. Returns false to cancel. */
 export async function confirmDiscard() {
-  if (!state.doc?.dirty) return true;
-  await flushEdits();
+  if (!(await flushEdits())) return false;
   if (!state.doc?.dirty) return true;
   const choice = await ask('unsaved', { name: displayName() });
   if (choice === 'save') return save();
@@ -396,8 +432,13 @@ export async function confirmDiscard() {
 
 export async function closeDocument() {
   if (!(await confirmDiscard())) return;
-  await invoke('doc_close').catch(() => {});
-  set({ doc: null, slideId: null, selection: [], selectedSlides: [], editing: null });
+  try {
+    await invoke('doc_close');
+  } catch (e) {
+    toast(String(e), 'error');
+    return;
+  }
+  set({ doc: null, slideId: null, selection: [], selectedSlides: [], editing: null, editingTable: null, ai: null });
   updateWindowTitle();
   refreshRecent();
 }
@@ -441,7 +482,7 @@ export function applyUiTheme() {
 
 export async function play(fromCurrent = false) {
   if (!state.doc) return;
-  await flushEdits();
+  if (!(await flushEdits())) return;
   set({ editing: null, menu: null });
   try {
     await invoke('present_start', { fromSlide: fromCurrent ? state.slideId : null, presenter: null });
@@ -458,12 +499,15 @@ export const CLIP_MARKER = 'application/x-cadenza+json:';
 let clip = null;
 
 export function copyElements(elements) {
-  clip = { type: 'elements', elements: clone(elements) };
-  return CLIP_MARKER + JSON.stringify(clip);
+  return captureClip({ type: 'elements', elements: clone(elements) });
 }
 
 export function copySlides(slides) {
-  clip = { type: 'slides', slides: clone(slides) };
+  return captureClip({ type: 'slides', slides: clone(slides) });
+}
+
+async function captureClip(selection) {
+  clip = await invoke('clipboard_copy', { docId: state.doc?.docId, selection });
   return CLIP_MARKER + JSON.stringify(clip);
 }
 

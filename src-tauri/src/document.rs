@@ -33,6 +33,8 @@ pub struct Document {
     saved: Deck,
     /// Last rendering sent to the UI, used to send only what changed.
     rendered: HashMap<String, SlideRender>,
+    /// Monotonic view order, including saves and other changes to UI metadata.
+    view_revision: u64,
     last_recovery: u64,
     /// Restored from a crash: unsaved until the next save.
     recovered: bool,
@@ -43,6 +45,7 @@ pub struct Document {
 #[serde(rename_all = "camelCase")]
 pub struct DocView {
     pub doc_id: String,
+    pub revision: u64,
     pub deck: Deck,
     /// Renderings of slides that changed (all slides when `full`).
     pub slides: HashMap<String, SlideRender>,
@@ -115,6 +118,7 @@ impl Document {
             work_dir,
             history: History::default(),
             rendered: HashMap::new(),
+            view_revision: 0,
             last_recovery: 0,
             recovered: false,
         })
@@ -122,6 +126,7 @@ impl Document {
 
     pub fn new(sessions_root: &Path, mut deck: Deck) -> anyhow::Result<Self> {
         deck.normalize();
+        crate::sanitize::deck(&mut deck);
         Self::with_deck(sessions_root, uuid::Uuid::new_v4().to_string(), deck, None)
     }
 
@@ -147,6 +152,7 @@ impl Document {
         let rec: RecoveryFile = serde_json::from_slice(&fs::read(dir.join(RECOVERY_FILE))?)?;
         let mut deck = rec.deck;
         deck.normalize();
+        crate::sanitize::deck(&mut deck);
         let mut doc = Self::with_deck(sessions_root, session_id.to_string(), deck, rec.path.clone())?;
         doc.recovered = true;
         Ok(doc)
@@ -160,6 +166,14 @@ impl Document {
 
     pub fn assets_dir(&self) -> PathBuf {
         self.work_dir.join("assets")
+    }
+
+    /// Rejects work requested for a document that has since been replaced.
+    pub fn ensure_id(&self, expected: &str) -> anyhow::Result<()> {
+        if self.id != expected {
+            anyhow::bail!("The presentation changed while the operation was running.");
+        }
+        Ok(())
     }
 
     pub fn is_dirty(&self) -> bool {
@@ -197,6 +211,7 @@ impl Document {
     /// Builds the view for the UI. With `full`, every slide is included;
     /// otherwise only slides whose rendering changed since the last view.
     pub fn view(&mut self, full: bool, outcome: Option<OpOutcome>) -> DocView {
+        self.view_revision += 1;
         let all = self.render_all();
         let slides = if full {
             all.clone()
@@ -209,6 +224,7 @@ impl Document {
         self.rendered = all;
         DocView {
             doc_id: self.id.clone(),
+            revision: self.view_revision,
             deck: self.deck.clone(),
             slides,
             full,
@@ -528,5 +544,174 @@ mod tests {
         let _doc = new_doc(dir.path());
         assert!(list_recoverable(dir.path()).is_empty());
         let _ = Content::default();
+    }
+
+    #[test]
+    fn opened_and_recovered_documents_sanitize_all_rich_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let markup = "<p><em>Keep</em> $x$<img src=x onerror=alert(1)><script>alert(1)</script></p>";
+        let deck: Deck = serde_json::from_value(json!({"slides": [{"elements": [
+            {"content": {"kind": "text", "html": markup}},
+            {"content": {"kind": "shape", "text": {"html": markup}}},
+            {"content": {"kind": "table", "rows": [[markup]]}}
+        ]}]}))
+        .unwrap();
+        let path = dir.path().join("untrusted.cadenza");
+        package::write(&path, &deck, dir.path()).unwrap();
+        let opened = Document::open(dir.path(), &path).unwrap();
+        assert!(!opened.is_dirty());
+        let mut recovery = new_doc(dir.path());
+        recovery.deck = deck;
+        recovery.maybe_write_recovery(true);
+        let recovered = Document::recover(dir.path(), &recovery.id).unwrap();
+        assert!(recovered.is_dirty());
+        for mut doc in [opened, recovered] {
+            for el in &doc.deck.slides[0].elements {
+                let html = match &el.content {
+                    Content::Table(t) => &t.rows[0][0],
+                    _ => &el.content.text().unwrap().html,
+                };
+                assert_eq!(html, "<p><em>Keep</em> $x$</p>");
+            }
+            let view = doc.view(true, None);
+            let html = &view.slides.values().next().unwrap().html;
+            assert!(!html.contains("onerror") && !html.contains("<script"));
+            assert!(html.contains("cz-math-inline"));
+        }
+    }
+
+    #[test]
+    fn missing_media_does_not_overwrite_saved_file_or_clear_dirty_state() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut doc = new_doc(dir.path());
+        let file = dir.path().join("saved.cadenza");
+        doc.save(&file).unwrap();
+        let previous = fs::read(&file).unwrap();
+        doc.apply(
+            Op::AddElement {
+                slide: doc.deck.slides[0].id.clone(),
+                kind: "image".into(),
+                variant: String::new(),
+                props: Some(json!({"content": {"src": "missing.png"}})),
+            },
+            None,
+        )
+        .unwrap();
+        let failure = doc.save(&file).unwrap_err();
+        let missing = failure.downcast_ref::<package::MissingMedia>().unwrap();
+        assert_eq!((missing.slides.as_slice(), missing.fonts.len()), (&[1][..], 0));
+        assert!(failure.to_string().contains("slides: 1."));
+        // The message is built from translated templates.
+        assert_eq!(missing.message(&|_| "<{slides}>".to_string()), "<1>");
+        assert!(doc.is_dirty());
+        assert_eq!(fs::read(&file).unwrap(), previous);
+        assert!(
+            !fs::read_dir(dir.path())
+                .unwrap()
+                .flatten()
+                .any(|e| e.path().extension().is_some_and(|x| x == "tmp"))
+        );
+    }
+
+    #[test]
+    fn links_that_are_not_asset_names_do_not_block_saving() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut doc = new_doc(dir.path());
+        let slide = doc.deck.slides[0].id.clone();
+        for src in ["youtu.be/dQw4w9WgXcQ", "www.youtube.com/watch?v=dQw4w9WgXcQ", "vimeo.com/76979871"] {
+            let props = Some(json!({"content": {"src": src}}));
+            doc.apply(
+                Op::AddElement {
+                    slide: slide.clone(),
+                    kind: "video".into(),
+                    variant: String::new(),
+                    props,
+                },
+                None,
+            )
+            .unwrap();
+        }
+        doc.save(&dir.path().join("links.cadenza")).unwrap();
+        assert!(!doc.is_dirty());
+    }
+
+    #[test]
+    fn replacing_missing_background_media_allows_saving_and_undo_restores_the_warning() {
+        let dir = tempfile::tempdir().unwrap();
+        for kind in ["image", "video"] {
+            let mut doc = new_doc(dir.path());
+            let id = doc.deck.slides[0].id.clone();
+            doc.apply(
+                Op::UpdateSlides {
+                    ids: vec![id.clone()],
+                    patch: json!({"background": {"kind": kind, "image": "missing.png", "video": "missing.mp4"}}),
+                },
+                None,
+            )
+            .unwrap();
+            let path = dir.path().join(format!("{kind}.cadenza"));
+            assert!(doc.save(&path).is_err());
+            doc.apply(
+                Op::UpdateSlides {
+                    ids: vec![id],
+                    patch: json!({"background": {"kind": "color", "color": "#ffffff"}}),
+                },
+                None,
+            )
+            .unwrap();
+            doc.save(&path).unwrap();
+            let reopened = Document::open(dir.path(), &path).unwrap();
+            assert_eq!(reopened.deck.slides[0].background.kind, "color");
+            assert!(reopened.deck.referenced_assets().is_empty());
+            doc.undo();
+            assert!(doc.save(&path).is_err());
+        }
+    }
+
+    #[test]
+    fn views_are_ordered_even_when_the_deck_does_not_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut doc = new_doc(dir.path());
+        let first = doc.view(true, None);
+        let second = doc.view(false, None);
+        doc.save(&dir.path().join("saved.cadenza")).unwrap();
+        let saved = doc.view(false, None);
+        assert!(first.revision < second.revision && second.revision < saved.revision);
+        assert_eq!(first.deck, second.deck);
+        assert!(second.slides.is_empty());
+    }
+
+    #[test]
+    fn saving_preserves_available_inactive_backgrounds() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut doc = new_doc(dir.path());
+        for name in ["photo.png", "clip.mp4"] {
+            fs::write(doc.assets_dir().join(name), name.as_bytes()).unwrap();
+        }
+        doc.apply(
+            Op::UpdateSlides {
+                ids: vec![doc.deck.slides[0].id.clone()],
+                patch: json!({"background": {"kind": "color", "image": "photo.png", "video": "clip.mp4"}}),
+            },
+            None,
+        )
+        .unwrap();
+        let path = dir.path().join("backgrounds.cadenza");
+        doc.save(&path).unwrap();
+        doc.dispose();
+        let mut reopened = Document::open(dir.path(), &path).unwrap();
+        for (kind, name) in [("image", "photo.png"), ("video", "clip.mp4")] {
+            assert_eq!(fs::read(reopened.assets_dir().join(name)).unwrap(), name.as_bytes());
+            reopened
+                .apply(
+                    Op::UpdateSlides {
+                        ids: vec![reopened.deck.slides[0].id.clone()],
+                        patch: json!({"background": {"kind": kind}}),
+                    },
+                    None,
+                )
+                .unwrap();
+            reopened.save(&path).unwrap();
+        }
     }
 }

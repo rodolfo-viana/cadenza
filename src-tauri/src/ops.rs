@@ -9,7 +9,7 @@ use serde_json::{Map, Value};
 
 use crate::layouts;
 use crate::model::*;
-use crate::sanitize;
+pub use crate::sanitize::element as sanitize_element;
 use crate::util::new_id;
 
 #[derive(Deserialize, Debug, Clone)]
@@ -162,23 +162,6 @@ fn patched<T: serde::Serialize + serde::de::DeserializeOwned>(item: &T, patch: &
     let mut v = serde_json::to_value(item)?;
     merge_patch(&mut v, patch);
     Ok(serde_json::from_value(v)?)
-}
-
-/// Sanitizes user-provided markup inside an element.
-pub fn sanitize_element(el: &mut Element) {
-    if let Some(t) = el.content.text_mut() {
-        t.html = sanitize::rich_text(&t.html);
-    }
-    if let Content::Table(t) = &mut el.content {
-        for row in &mut t.rows {
-            for cell in row.iter_mut() {
-                *cell = sanitize::rich_text(cell);
-            }
-        }
-        if t.rows.is_empty() {
-            t.rows.push(vec![String::new()]);
-        }
-    }
 }
 
 fn find_slide<'a>(deck: &'a mut Deck, id: &str) -> anyhow::Result<&'a mut Slide> {

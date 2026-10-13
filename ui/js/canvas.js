@@ -503,8 +503,8 @@ export function Canvas() {
     if (editNode && editNode.contains(target)) return;
     const tbl = tableNode();
     if (tbl && tbl.contains(target)) return;
-    if (isEditing()) await endTextEdit();
-    if (isEditingTable()) await endTableEdit();
+    if (isEditing() && !(await endTextEdit())) return;
+    if (isEditingTable() && !(await endTableEdit())) return;
     if (document.activeElement && document.activeElement !== document.body && !wrapRef.current.contains(document.activeElement)) {
       document.activeElement.blur();
     }

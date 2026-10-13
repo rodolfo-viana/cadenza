@@ -1167,6 +1167,40 @@ pub fn image_queries(plan: &Plan) -> Vec<String> {
     out
 }
 
+/// Applies a completed request only to its original, still-open document.
+/// The caller holds the document lock through this check and the mutation.
+pub fn apply_edit(
+    doc: &mut crate::document::Document,
+    doc_id: &str,
+    cancel: &AtomicBool,
+    plan: &Plan,
+    images: &HashMap<String, FoundImage>,
+    theme_ok: &dyn Fn(&str) -> bool,
+) -> anyhow::Result<(Summary, Option<crate::document::DocView>)> {
+    if cancel.load(Ordering::SeqCst) || doc.id != doc_id {
+        bail!(CANCELLED);
+    }
+    // Keep unrelated edits made while the request was running.
+    let mut deck = doc.deck.clone();
+    let summary = apply_plan(&mut deck, plan, images, theme_ok);
+    if summary.is_empty() {
+        return Ok((summary, None));
+    }
+    let mut out = doc.apply(
+        crate::ops::Op::ReplaceDeck {
+            deck: Box::new(deck),
+            label: Some("AI Edit".into()),
+        },
+        None,
+    )?;
+    out.slide = summary.slide.clone().or(out.slide);
+    out.created = summary.created.clone();
+    // An AI response can race with ordinary editing commands. A full view
+    // remains usable even if an earlier response was cancelled or superseded.
+    let view = doc.view(true, Some(out));
+    Ok((summary, Some(view)))
+}
+
 /// Applies the plan to `deck`. `theme_ok` tells which theme ids may be set.
 pub fn apply_plan(deck: &mut Deck, plan: &Plan, images: &HashMap<String, FoundImage>, theme_ok: &dyn Fn(&str) -> bool) -> Summary {
     let (w, h) = (deck.width, deck.height);
@@ -1200,6 +1234,8 @@ pub fn apply_plan(deck: &mut Deck, plan: &Plan, images: &HashMap<String, FoundIm
                 };
                 let mut slide = build(s);
                 let old = &deck.slides[i];
+                // Links and later actions in this plan still address this slide.
+                slide.id = old.id.clone();
                 slide.nested = old.nested;
                 slide.hidden = old.hidden;
                 slide.transition = old.transition.clone();
@@ -1454,5 +1490,90 @@ mod tests {
     #[test]
     fn plain_text_of_lists() {
         assert_eq!(plain_text("<p>Hi &amp; bye</p><ul><li>One</li><li>Two</li></ul>"), "Hi & bye\n• One\n• Two");
+    }
+
+    #[test]
+    fn replacement_preserves_links_and_followup_action_targets() {
+        let mut deck = layouts::starter_deck("black", 1280, 720);
+        let id = deck.slides[0].id.clone();
+        let mut linked = Slide::default();
+        linked.elements.push(Element {
+            action: crate::model::Action {
+                kind: "slide".into(),
+                slide: id.clone(),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        deck.slides.push(linked);
+        let plan = Plan {
+            actions: vec![
+                Action {
+                    action: "replace".into(),
+                    slide_id: Some(id.clone()),
+                    slides: vec![slide("bullets")],
+                    ..Default::default()
+                },
+                Action {
+                    action: "notes".into(),
+                    slide_id: Some(id.clone()),
+                    value: Some("Updated notes".into()),
+                    ..Default::default()
+                },
+                Action {
+                    action: "insert".into(),
+                    slide_id: Some(id.clone()),
+                    slides: vec![slide("quote")],
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let summary = apply_plan(&mut deck, &plan, &HashMap::new(), &|_| true);
+        assert_eq!((summary.replaced, summary.notes, summary.inserted), (1, 1, 1));
+        assert_eq!(deck.slides[0].id, id);
+        assert_eq!(deck.slides[0].notes, "Updated notes");
+        assert_eq!(deck.slides[1].layout, "quote");
+        assert_eq!(deck.slides[2].elements[0].action.slide, id);
+    }
+
+    #[test]
+    fn delayed_edit_rejects_replacement_and_cancelled_documents() {
+        use crate::document::Document;
+        let dir = tempfile::tempdir().unwrap();
+        let original = Document::new(dir.path(), layouts::starter_deck("black", 1280, 720)).unwrap();
+        let old_id = original.id.clone();
+        original.dispose();
+        let mut current = Document::new(dir.path(), layouts::starter_deck("black", 1280, 720)).unwrap();
+        let current_id = current.id.clone();
+        let before = current.deck.clone();
+        let plan = Plan {
+            actions: vec![Action {
+                action: "set_title".into(),
+                value: Some("AI title".into()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        for (id, stopped) in [(&old_id, false), (&current_id, true)] {
+            assert!(apply_edit(&mut current, id, &AtomicBool::new(stopped), &plan, &HashMap::new(), &|_| true).is_err());
+            assert_eq!(current.deck, before);
+            assert!(!current.is_dirty());
+            assert!(current.history.undo_label().is_none());
+        }
+        current
+            .apply(
+                crate::ops::Op::UpdateDeck {
+                    patch: json!({"author": "Concurrent edit"}),
+                },
+                None,
+            )
+            .unwrap();
+        let (_, view) = apply_edit(&mut current, &current_id, &AtomicBool::new(false), &plan, &HashMap::new(), &|_| true).unwrap();
+        assert_eq!(view.unwrap().deck.title, "AI title");
+        assert_eq!(current.deck.author, "Concurrent edit");
+        current.undo();
+        assert_eq!(current.deck.title, before.title);
+        assert_eq!(current.deck.author, "Concurrent edit");
     }
 }

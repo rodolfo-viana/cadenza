@@ -149,6 +149,12 @@ pub fn is_remote(src: &str) -> bool {
     l.starts_with("http://") || l.starts_with("https://") || l.starts_with("data:")
 }
 
+/// Whether a media reference names a bundled asset. Anything else (a web
+/// address, or a video link typed without "https://") is not a file to save.
+pub fn is_asset_ref(src: &str) -> bool {
+    !is_remote(src) && is_valid_asset_name(src)
+}
+
 /// Current time in milliseconds since the Unix epoch.
 pub fn now_ms() -> u64 {
     std::time::SystemTime::now()

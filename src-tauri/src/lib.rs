@@ -8,6 +8,7 @@
 pub mod ai;
 pub mod browse;
 pub mod chart;
+pub mod clipboard;
 pub mod custom_theme;
 pub mod document;
 pub mod export;
@@ -36,6 +37,7 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, Window, WindowEvent};
+use tauri_plugin_clipboard_manager::ClipboardExt;
 
 use document::{AssetInfo, DocView, Document, RecoveryInfo};
 use ops::Op;
@@ -66,6 +68,8 @@ pub struct AppState {
     browsers: Mutex<HashMap<String, (u64, std::process::Child)>>,
     /// Cancel flags of running AI requests, per editor window.
     ai_runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// Media of the latest copy, shared by every window.
+    clipboard: clipboard::Store,
 }
 
 impl AppState {
@@ -73,6 +77,21 @@ impl AppState {
         let mut docs = self.docs.lock().map_err(err)?;
         let doc = docs.get_mut(label).ok_or("No presentation is open in this window")?;
         f(doc).map_err(err)
+    }
+
+    fn with_doc_id<T>(&self, label: &str, doc_id: &str, f: impl FnOnce(&mut Document) -> anyhow::Result<T>) -> CmdResult<T> {
+        self.with_doc(label, |doc| {
+            doc.ensure_id(doc_id)?;
+            f(doc)
+        })
+    }
+
+    fn cancel_ai(&self, label: &str) {
+        if let Ok(mut runs) = self.ai_runs.lock() {
+            if let Some(cancel) = runs.remove(label) {
+                cancel.store(true, Ordering::SeqCst);
+            }
+        }
     }
 
     fn remember_recent(&self, path: &Path) {
@@ -175,6 +194,7 @@ fn theme_css(theme: String) -> String {
 fn install_doc(state: &AppState, label: &str, mut doc: Document) -> CmdResult<DocView> {
     let view = doc.view(true, None);
     let mut docs = state.docs.lock().map_err(err)?;
+    state.cancel_ai(label);
     if let Some(old) = docs.insert(label.to_string(), doc) {
         old.dispose();
     }
@@ -371,11 +391,20 @@ fn doc_state(window: Window, state: State<AppState>) -> CmdResult<Value> {
     }
 }
 
+/// Resynchronizes one presentation after responses arrive out of order.
+#[tauri::command]
+fn doc_refresh(window: Window, state: State<AppState>, doc_id: String) -> CmdResult<DocView> {
+    state.with_doc_id(window.label(), &doc_id, |doc| Ok(doc.view(true, None)))
+}
+
 /// Applies an editing operation. `track: false` skips undo history (used
 /// for derived data such as cached diagram renderings).
 #[tauri::command]
-fn doc_apply(window: Window, state: State<AppState>, op: Op, coalesce: Option<String>, track: Option<bool>) -> CmdResult<DocView> {
+fn doc_apply(window: Window, state: State<AppState>, op: Op, coalesce: Option<String>, track: Option<bool>, doc_id: Option<String>) -> CmdResult<DocView> {
     state.with_doc(window.label(), |doc| {
+        if let Some(id) = doc_id {
+            doc.ensure_id(&id)?;
+        }
         let out = if track == Some(false) {
             doc.apply_untracked(op)?
         } else {
@@ -427,7 +456,14 @@ async fn doc_save(window: Window, state: State<'_, AppState>, path: Option<Strin
         target
     };
     let view = state.with_doc(&label, |doc| {
-        doc.save(&target)?;
+        doc.save(&target).map_err(|e| match e.downcast_ref::<package::MissingMedia>() {
+            // It names slides and fonts, so it is translated here.
+            Some(missing) => {
+                let lang = state.settings.lock().map(|s| s.language.clone()).unwrap_or_default();
+                anyhow::anyhow!(missing.message(&translator(window.app_handle(), &lang)))
+            }
+            None => e,
+        })?;
         Ok(doc.view(false, None))
     })?;
     state.remember_recent(&target);
@@ -445,7 +481,9 @@ fn doc_checkpoint(window: Window, state: State<AppState>) -> CmdResult<()> {
 
 #[tauri::command]
 fn doc_close(window: Window, state: State<AppState>) -> CmdResult<()> {
-    if let Some(doc) = state.docs.lock().map_err(err)?.remove(window.label()) {
+    let mut docs = state.docs.lock().map_err(err)?;
+    state.cancel_ai(window.label());
+    if let Some(doc) = docs.remove(window.label()) {
         doc.dispose();
     }
     Ok(())
@@ -470,19 +508,49 @@ fn doc_discard_recovery(state: State<AppState>, session_id: String) -> CmdResult
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
+fn clipboard_copy(window: Window, state: State<AppState>, doc_id: String, selection: clipboard::Selection) -> CmdResult<clipboard::Clipboard> {
+    state.with_doc_id(window.label(), &doc_id, |doc| {
+        clipboard::Clipboard::copy(doc, selection, &state.clipboard, |text| {
+            window.clipboard().write_text(text)?;
+            Ok(())
+        })
+    })
+}
+
+#[tauri::command]
+fn clipboard_paste(
+    window: Window,
+    state: State<AppState>,
+    doc_id: String,
+    clip: clipboard::Clipboard,
+    target: Option<String>,
+    offset: f64,
+) -> CmdResult<DocView> {
+    state.with_doc_id(window.label(), &doc_id, |doc| {
+        let out = clip.paste(doc, target, offset, &state.clipboard)?;
+        Ok(doc.view(false, Some(out)))
+    })
+}
+
+#[tauri::command]
 async fn asset_import_file(window: Window, state: State<'_, AppState>, path: String) -> CmdResult<AssetInfo> {
     state.with_doc(window.label(), |doc| doc.import_file(Path::new(&path)))
 }
 
-/// Imports raw bytes (clipboard images). The extension travels in the
-/// `x-ext` header and the body is the raw file.
+/// Imports raw bytes (clipboard images) for the session named by `x-doc-id`.
+/// The extension travels in `x-ext` and the body is the raw file.
 #[tauri::command]
 fn asset_import_bytes(window: Window, state: State<AppState>, request: tauri::ipc::Request<'_>) -> CmdResult<AssetInfo> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err("Expected binary data".into());
     };
     let ext = request.headers().get("x-ext").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
-    state.with_doc(window.label(), |doc| doc.import_bytes(bytes, &ext))
+    let doc_id = request
+        .headers()
+        .get("x-doc-id")
+        .and_then(|v| v.to_str().ok())
+        .ok_or("No presentation is open")?;
+    state.with_doc_id(window.label(), doc_id, |doc| doc.import_bytes(bytes, &ext))
 }
 
 /// Imports a Markdown file, either replacing the deck or appending slides.
@@ -786,6 +854,9 @@ async fn media_import(window: Window, state: State<'_, AppState>, url: String, p
 struct AiRequest {
     /// "new" (create a presentation) or "edit" (change the open one).
     mode: String,
+    /// Session identity of the presentation the user asked to edit.
+    #[serde(default)]
+    doc_id: Option<String>,
     prompt: String,
     #[serde(default)]
     history: Vec<ai::Message>,
@@ -987,8 +1058,21 @@ async fn ai_run(app: AppHandle, window: Window, state: State<'_, AppState>, req:
     let (provider, want_images) = ai_provider(&state)?;
     let label = window.label().to_string();
     let cancel = Arc::new(AtomicBool::new(false));
-    if let Some(old) = state.ai_runs.lock().map_err(err)?.insert(label.clone(), cancel.clone()) {
-        old.store(true, Ordering::SeqCst);
+    {
+        // Register under the document lock so closing/replacing it cannot
+        // miss cancelling a request that has just started.
+        let docs = state.docs.lock().map_err(err)?;
+        if req.mode == "new" {
+            if docs.contains_key(&label) {
+                return Err("Create the presentation in a new window.".into());
+            }
+        } else {
+            let doc = docs.get(&label).ok_or("No presentation is open in this window")?;
+            doc.ensure_id(req.doc_id.as_deref().ok_or(ai::CANCELLED)?).map_err(err)?;
+        }
+        if let Some(old) = state.ai_runs.lock().map_err(err)?.insert(label.clone(), cancel.clone()) {
+            old.store(true, Ordering::SeqCst);
+        }
     }
     let result = ai_run_inner(&app, &state, &label, req, provider, want_images, &cancel).await;
     if let Ok(mut runs) = state.ai_runs.lock() {
@@ -996,10 +1080,12 @@ async fn ai_run(app: AppHandle, window: Window, state: State<'_, AppState>, req:
             runs.remove(&label);
         }
     }
-    if cancel.load(Ordering::SeqCst) {
-        return Err(ai::CANCELLED.into());
+    match result {
+        // A change that was already made is reported even if Stop came too
+        // late to prevent it, so the window shows what the document holds.
+        Err(_) if cancel.load(Ordering::SeqCst) => Err(ai::CANCELLED.into()),
+        result => result,
     }
-    result
 }
 
 async fn ai_run_inner(
@@ -1024,6 +1110,9 @@ async fn ai_run_inner(
     } else {
         let docs = state.docs.lock().map_err(err)?;
         let doc = docs.get(label).ok_or("No presentation is open in this window")?;
+        if cancel.load(Ordering::SeqCst) || req.doc_id.as_deref() != Some(doc.id.as_str()) {
+            return Err(ai::CANCELLED.into());
+        }
         let ctx = ai::deck_context(&doc.deck, req.current_slide.as_deref(), &req.selected);
         (
             format!("The presentation (JSON):\n{ctx}\n\nRequest: {}", req.prompt.trim()),
@@ -1074,13 +1163,7 @@ async fn ai_run_inner(
         new_doc = Some(doc);
         dir
     } else {
-        state
-            .docs
-            .lock()
-            .map_err(err)?
-            .get(label)
-            .ok_or("No presentation is open in this window")?
-            .assets_dir()
+        state.with_doc_id(label, req.doc_id.as_deref().ok_or(ai::CANCELLED)?, |doc| Ok(doc.assets_dir()))?
     };
 
     // Photos are fetched before touching the presentation.
@@ -1125,7 +1208,16 @@ async fn ai_run_inner(
             None,
         )
         .map_err(err)?;
-        let view = install_doc(state, label, doc)?;
+        let view = {
+            let mut docs = state.docs.lock().map_err(err)?;
+            if cancel.load(Ordering::SeqCst) || docs.contains_key(label) {
+                doc.dispose();
+                return Err(ai::CANCELLED.into());
+            }
+            let view = doc.view(true, None);
+            docs.insert(label.to_string(), doc);
+            view
+        };
         return Ok(AiResponse {
             reply: plan.reply,
             summary,
@@ -1136,23 +1228,7 @@ async fn ai_run_inner(
     let active = custom.as_ref().map(|t| t.id.clone());
     let theme_ok = |t: &str| themes::THEMES.iter().any(|x| x.id == t) || active.as_deref() == Some(t);
     let (summary, view) = state.with_doc(label, |doc| {
-        // Applied to the presentation as it is now, so edits made while the
-        // assistant was working are kept.
-        let mut deck = doc.deck.clone();
-        let summary = ai::apply_plan(&mut deck, &plan, &images, &theme_ok);
-        if summary.is_empty() {
-            return Ok((summary, None));
-        }
-        let mut out = doc.apply(
-            Op::ReplaceDeck {
-                deck: Box::new(deck),
-                label: Some("AI Edit".into()),
-            },
-            None,
-        )?;
-        out.slide = summary.slide.clone().or(out.slide);
-        out.created = summary.created.clone();
-        Ok((summary, Some(doc.view(false, Some(out)))))
+        ai::apply_edit(doc, req.doc_id.as_deref().unwrap_or(""), cancel, &plan, &images, &theme_ok)
     })?;
     Ok(AiResponse {
         reply: plan.reply,
@@ -1505,6 +1581,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                 secrets: secrets::Secrets::new(&config, data_dir_override().is_none()),
                 browsers: Mutex::new(HashMap::new()),
                 ai_runs: Mutex::new(HashMap::new()),
+                clipboard: clipboard::Store::new(cache.join("clipboard")),
             });
             fonts::warm_up();
 
@@ -1529,7 +1606,10 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                     }
                     stop_browser(app, &label);
                     let state = app.state::<AppState>();
-                    let doc = state.docs.lock().ok().and_then(|mut d| d.remove(&label));
+                    let doc = state.docs.lock().ok().and_then(|mut d| {
+                        state.cancel_ai(&label);
+                        d.remove(&label)
+                    });
                     if let Some(doc) = doc {
                         doc.dispose();
                     }
@@ -1550,6 +1630,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             doc_new,
             doc_open,
             doc_state,
+            doc_refresh,
             doc_apply,
             doc_undo,
             doc_redo,
@@ -1559,6 +1640,8 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             doc_close,
             doc_recover,
             doc_discard_recovery,
+            clipboard_copy,
+            clipboard_paste,
             asset_import_file,
             asset_import_bytes,
             font_install,

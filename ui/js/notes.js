@@ -2,7 +2,7 @@
 
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { currentSlide, updateSlides, registerFlush, updateSettings, useStore } from './store.js';
+import { state, currentSlide, apply, registerFlush, updateSettings, useStore } from './store.js';
 import { t } from './i18n.js';
 
 export function NotesPanel() {
@@ -23,10 +23,17 @@ export function NotesPanel() {
   // Stable flush: commits typed notes for the slide they belong to.
   const flush = useRef(async () => {
     clearTimeout(timer.current);
-    const p = pending.current;
-    if (!p) return;
-    pending.current = null;
-    await updateSlides([p.id], { notes: p.value }, `notes:${p.id}`);
+    while (pending.current) {
+      const p = pending.current;
+      // Notes of a slide deleted meanwhile (e.g. by the assistant) are dropped
+      // rather than retried forever, which would block saving and closing.
+      if (p.docId === state.doc?.docId && state.doc.deck.slides.some((s) => s.id === p.id)) {
+        const out = await apply({ op: 'updateSlides', ids: [p.id], patch: { notes: p.value } }, { docId: p.docId, coalesce: `notes:${p.id}`, navigate: false });
+        if (!out) return false;
+      }
+      if (pending.current === p) pending.current = null;
+    }
+    return true;
   }).current;
 
   useEffect(() => registerFlush(flush), []);
@@ -78,7 +85,7 @@ export function NotesPanel() {
       value=${text}
       onInput=${(e) => {
         setText(e.target.value);
-        pending.current = { id: slide.id, value: e.target.value };
+        pending.current = { docId: state.doc?.docId, id: slide.id, value: e.target.value };
         clearTimeout(timer.current);
         timer.current = setTimeout(flush, 600);
       }}

@@ -203,7 +203,7 @@
  {
   "key": "AI Edit",
   "files": [
-   "lib.rs"
+   "ai.rs"
   ]
  },
  {
@@ -831,6 +831,18 @@
   ]
  },
  {
+  "key": "Cannot save: media is missing on these slides: {slides}. Replace or delete it, then save again.",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
+  "key": "Cannot save: the files of these embedded fonts are missing: {fonts}. Remove them under Document > Typography, then save again.",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
   "key": "Capitalize",
   "files": [
    "panels.js"
@@ -1231,6 +1243,12 @@
   "files": [
    "ai.js",
    "welcome.js"
+  ]
+ },
+ {
+  "key": "Create the presentation in a new window.",
+  "files": [
+   "lib.rs"
   ]
  },
  {
@@ -3109,6 +3127,12 @@
   ]
  },
  {
+  "key": "No slide is selected",
+  "files": [
+   "clipboard.rs"
+  ]
+ },
+ {
   "key": "None",
   "files": [
    "inspector.js",
@@ -4456,6 +4480,12 @@
   ]
  },
  {
+  "key": "Some media in the selection is missing. Replace or delete it, then copy again.",
+  "files": [
+   "clipboard.rs"
+  ]
+ },
+ {
   "key": "Space after each paragraph",
   "files": [
    "panels.js"
@@ -4740,6 +4770,12 @@
   ]
  },
  {
+  "key": "The copied media is no longer available. Copy the content again.",
+  "files": [
+   "clipboard.rs"
+  ]
+ },
+ {
   "key": "The file is empty",
   "files": [
    "document.rs"
@@ -4767,6 +4803,12 @@
   "key": "The page is shown live during the presentation. Some sites refuse to be embedded.",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "The presentation changed while the operation was running.",
+  "files": [
+   "document.rs"
   ]
  },
  {

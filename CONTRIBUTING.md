@@ -85,6 +85,8 @@ A few principles keep Cadenza predictable. Please follow them:
   surrounding code.
 - Run `node tools/check_js.cjs` to check every module's syntax and that each imported name is
   actually exported. A typo there would otherwise only show up as a blank window.
+- Run `node --experimental-vm-modules tools/test_ui.cjs` for the document, clipboard and AI
+  regression tests. They use the real UI modules with stubbed DOM and Tauri boundaries.
 
 **CSS**
 - Use the color tokens defined at the top of `app.css` so both light and dark modes work.
@@ -141,6 +143,7 @@ into every language, but please say so in the description. To add a language, ad
   ```sh
   cd src-tauri && cargo fmt --check && cargo clippy --all-targets && cargo test --lib && cd ..
   node tools/check_js.cjs
+  node --experimental-vm-modules tools/test_ui.cjs
   python3 tools/i18n.py check
   ```
 

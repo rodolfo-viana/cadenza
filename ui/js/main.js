@@ -221,13 +221,17 @@ let closing = false;
 currentWindow()
   .onCloseRequested(async (event) => {
     if (closing) return;
-    await endAllEditing();
-    if (!state.doc?.dirty) return;
     event.preventDefault();
+    if (!(await endAllEditing())) return;
     if (await confirmDiscard()) {
-      closing = true;
-      await invoke('doc_close').catch(() => {});
-      await currentWindow().destroy();
+      try {
+        await invoke('doc_close');
+        closing = true;
+        await currentWindow().destroy();
+      } catch (e) {
+        closing = false;
+        toast(String(e), 'error');
+      }
     }
   })
   .catch(() => {});

@@ -5,12 +5,13 @@ const T = window.__TAURI__;
 export const invoke = (cmd, args) => T.core.invoke(cmd, args);
 
 /** Sends raw bytes (e.g. a pasted image) to Rust without JSON encoding. */
-export const importBytes = (bytes, ext) =>
-  T.core.invoke('asset_import_bytes', bytes, { headers: { 'x-ext': ext || '' } });
+export const importBytes = (bytes, ext, docId) =>
+  T.core.invoke('asset_import_bytes', bytes, { headers: { 'x-ext': ext || '', 'x-doc-id': docId } });
 
 export const dialog = T.dialog;
 export const events = T.event;
 export const opener = T.opener;
+export const clipboard = T.clipboardManager;
 export const currentWindow = () => T.window.getCurrentWindow();
 export const currentWebview = () => T.webview.getCurrentWebview();
 

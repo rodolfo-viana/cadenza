@@ -63,6 +63,7 @@ pub fn read(path: &Path, assets_dir: &Path) -> anyhow::Result<Deck> {
         fs::rename(&tmp, &dest)?;
     }
     deck.normalize();
+    crate::sanitize::deck(&mut deck);
     Ok(deck)
 }
 
@@ -75,9 +76,76 @@ fn migrate(value: serde_json::Value) -> anyhow::Result<Deck> {
     Ok(serde_json::from_value(value)?)
 }
 
+/// Media the deck uses that is missing from its assets folder. Saving
+/// refuses rather than write a file that silently lacks it.
+#[derive(Debug, PartialEq)]
+pub struct MissingMedia {
+    /// 1-based numbers of the slides that use missing media.
+    pub slides: Vec<usize>,
+    /// Embedded fonts whose files are missing.
+    pub fonts: Vec<String>,
+}
+
+impl MissingMedia {
+    fn find(deck: &Deck, assets_dir: &Path) -> Option<Self> {
+        let missing = |name: &str| !assets_dir.join(name).is_file();
+        let slides: Vec<usize> = deck
+            .slides
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.asset_refs().into_iter().any(missing))
+            .map(|(i, _)| i + 1)
+            .collect();
+        let fonts: Vec<String> = deck
+            .web_fonts
+            .iter()
+            .filter(|f| f.asset_refs().iter().any(|n| missing(n)))
+            .map(|f| f.family.clone())
+            .collect();
+        (!slides.is_empty() || !fonts.is_empty()).then_some(Self { slides, fonts })
+    }
+
+    /// The explanation shown to the user, translated with `text`.
+    pub fn message(&self, text: &dyn Fn(&str) -> String) -> String {
+        let mut parts = Vec::new();
+        if !self.slides.is_empty() {
+            let list = self.slides.iter().map(usize::to_string).collect::<Vec<_>>().join(", ");
+            parts.push(
+                crate::tr(
+                    &text,
+                    "Cannot save: media is missing on these slides: {slides}. Replace or delete it, then save again.",
+                )
+                .replace("{slides}", &list),
+            );
+        }
+        if !self.fonts.is_empty() {
+            let list = self.fonts.join(", ");
+            parts.push(
+                crate::tr(
+                    &text,
+                    "Cannot save: the files of these embedded fonts are missing: {fonts}. Remove them under Document > Typography, then save again.",
+                )
+                .replace("{fonts}", &list),
+            );
+        }
+        parts.join("\n\n")
+    }
+}
+
+impl std::fmt::Display for MissingMedia {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message(&|s: &str| s.to_string()))
+    }
+}
+
+impl std::error::Error for MissingMedia {}
+
 /// Writes a package atomically. Only assets referenced by the deck are
 /// included, so files never accumulate unused media.
 pub fn write(path: &Path, deck: &Deck, assets_dir: &Path) -> anyhow::Result<()> {
+    if let Some(missing) = MissingMedia::find(deck, assets_dir) {
+        return Err(missing.into());
+    }
     let dir = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
     let file_name = path
         .file_name()
@@ -102,12 +170,13 @@ pub fn write(path: &Path, deck: &Deck, assets_dir: &Path) -> anyhow::Result<()> 
         });
         zip.write_all(serde_json::to_string_pretty(&meta)?.as_bytes())?;
 
-        for name in deck.referenced_assets() {
-            if !is_valid_asset_name(&name) {
+        let required = deck.referenced_assets();
+        for name in deck.retained_assets() {
+            let src = assets_dir.join(&name);
+            if !required.contains(&name) && !src.is_file() {
                 continue;
             }
-            let src = assets_dir.join(&name);
-            let Ok(mut f) = File::open(&src) else { continue };
+            let mut f = File::open(src).with_context(|| format!("Cannot read {name}"))?;
             // Media is already compressed; text-like assets are deflated.
             let compressible = matches!(
                 name.rsplit('.').next().unwrap_or("").to_ascii_lowercase().as_str(),

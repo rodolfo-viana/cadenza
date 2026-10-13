@@ -168,30 +168,23 @@ impl Deck {
         }
     }
 
-    /// Names of every bundled asset referenced anywhere in the deck.
+    /// Names of every bundled asset currently used by the deck.
     pub fn referenced_assets(&self) -> BTreeSet<String> {
-        let mut out = BTreeSet::new();
-        let mut add = |s: &str| {
-            if !s.is_empty() && !crate::util::is_remote(s) {
-                out.insert(s.to_string());
-            }
-        };
-        for font in &self.web_fonts {
-            for name in crate::webfonts::asset_names(&font.css) {
-                add(&name);
-            }
-        }
+        let mut out: BTreeSet<String> = self.web_fonts.iter().flat_map(crate::webfonts::WebFont::asset_refs).collect();
         for slide in &self.slides {
-            add(&slide.background.image);
-            add(&slide.background.video);
-            for el in &slide.elements {
-                match &el.content {
-                    Content::Image(i) => add(&i.src),
-                    Content::Video(v) => {
-                        add(&v.src);
-                        add(&v.poster);
-                    }
-                    _ => {}
+            out.extend(slide.asset_refs().into_iter().map(str::to_string));
+        }
+        out
+    }
+
+    /// Also keep remembered background media when it is available, so
+    /// switching to a color does not discard it from saved files or copies.
+    pub fn retained_assets(&self) -> BTreeSet<String> {
+        let mut out = self.referenced_assets();
+        for slide in &self.slides {
+            for name in [&slide.background.image, &slide.background.video] {
+                if crate::util::is_asset_ref(name) {
+                    out.insert(name.clone());
                 }
             }
         }
@@ -328,6 +321,24 @@ impl Slide {
             el.id = new_id("e");
         }
         copy
+    }
+
+    /// Names of the bundled assets this slide uses.
+    pub fn asset_refs(&self) -> Vec<&str> {
+        let mut out = match self.background.kind.as_str() {
+            "image" => vec![self.background.image.as_str()],
+            "video" => vec![self.background.video.as_str()],
+            _ => Vec::new(),
+        };
+        for el in &self.elements {
+            match &el.content {
+                Content::Image(i) => out.push(&i.src),
+                Content::Video(v) => out.extend([v.src.as_str(), v.poster.as_str()]),
+                _ => {}
+            }
+        }
+        out.retain(|s| crate::util::is_asset_ref(s));
+        out
     }
 }
 

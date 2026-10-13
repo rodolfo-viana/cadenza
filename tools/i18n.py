@@ -34,7 +34,7 @@ RS_PATTERNS = [
     re.compile(r'outcome\(\s*"((?:[^"\\]|\\.)*)"'),
     re.compile(r'LayoutInfo \{\s*id: "[^"]*",\s*name: "((?:[^"\\]|\\.)*)"'),
     re.compile(r'label: Some\("((?:[^"\\]|\\.)*)"'),
-    re.compile(r'tr\(&\w+,\s*"((?:[^"\\]|\\.)*)"'),
+    re.compile(r'tr\(\s*&\w+,\s*"((?:[^"\\]|\\.)*)"'),
     # The media browser's Insert bar (browse.rs).
     re.compile(r'"((?:Insert this|Open an?) [^"]+)"'),
 ]

@@ -8,6 +8,7 @@ import { state, set, apply, registerFlush, seal, richOf } from './store.js';
 import { parseColor, toCss } from './controls.js';
 
 let session = null;
+let editStart = 0;
 
 export const isEditing = () => !!session;
 export const editingNode = () => session?.node || null;
@@ -30,9 +31,14 @@ function placeCaret(node, point, selectAll) {
 }
 
 /** Starts editing the text of a text box or shape. */
-export function beginTextEdit(view, el, point = null, { selectAll = false } = {}) {
+export async function beginTextEdit(view, el, point = null, { selectAll = false } = {}) {
+  const start = ++editStart;
+  const docId = state.doc?.docId;
+  const slide = state.slideId;
   if (session?.id === el.id) return;
-  endTextEdit();
+  if (session && !(await endTextEdit())) return;
+  if (tableSession && !(await endTableEdit())) return;
+  if (start !== editStart || state.doc?.docId !== docId || state.slideId !== slide) return;
   const wrapper = view.node(el.id);
   const node = wrapper?.querySelector('.cz-text');
   if (!node) return;
@@ -56,6 +62,7 @@ export function beginTextEdit(view, el, point = null, { selectAll = false } = {}
   node.focus({ preventScroll: true });
   placeCaret(node, point, selectAll && !wasEmpty);
   session = {
+    docId,
     id: el.id,
     kind: el.content.kind,
     slide: state.slideId,
@@ -67,7 +74,8 @@ export function beginTextEdit(view, el, point = null, { selectAll = false } = {}
   node.addEventListener('input', onInput);
   node.addEventListener('paste', onPaste);
   node.addEventListener('keydown', onKeyDown);
-  session.unregister = registerFlush(() => commit(session));
+  const s = session;
+  s.unregister = registerFlush(() => commit(s));
   set({ editing: el.id, selection: [el.id], focus: 'canvas' });
 }
 
@@ -98,14 +106,31 @@ function onKeyDown(e) {
   }
 }
 
-async function commit(s) {
-  if (!s) return;
+function commit(s) {
+  if (!s || s.docId !== state.doc?.docId) return Promise.resolve(true);
   clearTimeout(s.timer);
-  const html = cleanHtml(s.node.innerHTML);
-  if (html === s.lastHtml) return;
-  s.lastHtml = html;
-  const patch = s.kind === 'shape' ? { content: { text: { html } } } : { content: { html } };
-  await apply({ op: 'updateElements', slide: s.slide, updates: [{ id: s.id, patch }] }, { coalesce: 'text:' + s.id, navigate: false });
+  // A flush must also wait for edits already being sent, including any text
+  // typed while that request was pending.
+  if (!s.committing) s.committing = commitText(s).finally(() => { s.committing = null; });
+  return s.committing;
+}
+
+/**
+ * Whether an edited element still exists. Once it is deleted, undone or
+ * replaced (e.g. by the assistant), its pending edit has nowhere to go and
+ * must not block saving or closing forever.
+ */
+const elementExists = (s) => !!state.doc?.deck.slides.find((x) => x.id === s.slide)?.elements.some((e) => e.id === s.id);
+
+async function commitText(s) {
+  for (;;) {
+    const html = cleanHtml(s.node.innerHTML);
+    if (html === s.lastHtml || !elementExists(s)) return true;
+    const patch = s.kind === 'shape' ? { content: { text: { html } } } : { content: { html } };
+    const out = await apply({ op: 'updateElements', slide: s.slide, updates: [{ id: s.id, patch }] }, { docId: s.docId, coalesce: 'text:' + s.id, navigate: false });
+    if (!out) return false;
+    s.lastHtml = html;
+  }
 }
 
 /** Drops the empty markup editors leave behind. */
@@ -117,7 +142,9 @@ function cleanHtml(html) {
 /** Finishes editing, committing any pending change. */
 export async function endTextEdit() {
   const s = session;
-  if (!s) return;
+  if (!s) return true;
+  if (!(await commit(s))) return false;
+  if (session !== s) return true;
   session = null;
   s.node.removeEventListener('input', onInput);
   s.node.removeEventListener('paste', onPaste);
@@ -128,10 +155,10 @@ export async function endTextEdit() {
   s.view.editingId = null;
   const sel = window.getSelection();
   if (sel && s.node.contains(sel.anchorNode)) sel.removeAllRanges();
-  await commit(s);
   seal();
   if (state.editing === s.id) set({ editing: null });
   window.dispatchEvent(new CustomEvent('cz-edit-ended'));
+  return true;
 }
 
 /** Runs a formatting command on the current text selection. */
@@ -200,9 +227,14 @@ let tableSession = null;
 export const isEditingTable = () => !!tableSession;
 export const tableNode = () => tableSession?.node || null;
 
-export function beginTableEdit(view, el, point = null) {
-  endTableEdit();
-  endTextEdit();
+export async function beginTableEdit(view, el, point = null) {
+  const start = ++editStart;
+  const docId = state.doc?.docId;
+  const slide = state.slideId;
+  if (tableSession?.id === el.id) return;
+  if (tableSession && !(await endTableEdit())) return;
+  if (session && !(await endTextEdit())) return;
+  if (start !== editStart || state.doc?.docId !== docId || state.slideId !== slide) return;
   const wrapper = view.node(el.id);
   const table = wrapper?.querySelector('table');
   if (!table) return;
@@ -215,10 +247,11 @@ export function beginTableEdit(view, el, point = null) {
     }
     c.setAttribute('contenteditable', 'true');
   }
-  tableSession = { id: el.id, slide: state.slideId, view, node: table, rows: el.content.rows };
+  tableSession = { docId, id: el.id, slide, view, node: table, rows: el.content.rows };
   table.addEventListener('keydown', onTableKey);
   table.addEventListener('paste', onPaste);
-  tableSession.unregister = registerFlush(() => commitTable(tableSession));
+  const s = tableSession;
+  s.unregister = registerFlush(() => commitTable(s));
   let target = cells[0];
   if (point) {
     const hit = document.elementFromPoint(point.x, point.y)?.closest('td, th');
@@ -250,31 +283,41 @@ function readTable(table) {
   return [...table.querySelectorAll('tr')].map((tr) => [...tr.children].map((c) => cleanHtml(c.innerHTML)));
 }
 
-async function commitTable(s) {
-  if (!s) return;
-  const rows = readTable(s.node);
-  if (JSON.stringify(rows) === JSON.stringify(s.rows)) return;
-  s.rows = rows;
-  await apply({ op: 'updateElements', slide: s.slide, updates: [{ id: s.id, patch: { content: { rows } } }] }, { coalesce: 'table:' + s.id, navigate: false });
+function commitTable(s) {
+  if (!s || s.docId !== state.doc?.docId) return Promise.resolve(true);
+  if (!s.committing) s.committing = commitRows(s).finally(() => { s.committing = null; });
+  return s.committing;
+}
+
+async function commitRows(s) {
+  for (;;) {
+    const rows = readTable(s.node);
+    if (JSON.stringify(rows) === JSON.stringify(s.rows) || !elementExists(s)) return true;
+    const out = await apply({ op: 'updateElements', slide: s.slide, updates: [{ id: s.id, patch: { content: { rows } } }] }, { docId: s.docId, coalesce: 'table:' + s.id, navigate: false });
+    if (!out) return false;
+    s.rows = rows;
+  }
 }
 
 export async function endTableEdit() {
   const s = tableSession;
-  if (!s) return;
+  if (!s) return true;
+  if (!(await commitTable(s))) return false;
+  if (tableSession !== s) return true;
   tableSession = null;
   s.node.removeEventListener('keydown', onTableKey);
   s.node.removeEventListener('paste', onPaste);
   s.unregister?.();
   for (const c of s.node.querySelectorAll('[contenteditable]')) c.removeAttribute('contenteditable');
   s.view.editingId = null;
-  await commitTable(s);
   seal();
   if (state.editingTable === s.id) set({ editingTable: null });
   window.dispatchEvent(new CustomEvent('cz-edit-ended'));
+  return true;
 }
 
 /** Ends any inline editing. */
 export async function endAllEditing() {
-  await endTextEdit();
-  await endTableEdit();
+  if (!(await endTextEdit())) return false;
+  return endTableEdit();
 }

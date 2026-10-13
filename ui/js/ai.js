@@ -3,7 +3,7 @@
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
 import { invoke, events } from './api.js';
-import { state, set, useStore, settings, updateSettings, toast, closeModal, ingestView, openView, flushEdits, undo } from './store.js';
+import { state, set, useStore, settings, updateSettings, toast, closeModal, ingestView, openView, flushEdits, refreshDocument, undo } from './store.js';
 import { Button, Modal } from './ui.js';
 import { Row, Segmented, Select, TextField, Toggle } from './controls.js';
 import { KeyPrompt } from './media.js';
@@ -26,6 +26,7 @@ const LANGUAGES = UI_LANGUAGES.map((l) => ({ value: l.english, label: l.name }))
 // ---------------------------------------------------------------------------
 
 let current = null;
+let latest = null;
 
 events.listen('cz-ai-progress', (e) => {
   if (state.ai) set({ ai: { ...state.ai, ...e.payload } });
@@ -34,14 +35,25 @@ events.listen('cz-ai-progress', (e) => {
 /** Runs an assistant request; resolves null when it was stopped. */
 export async function runAi(req) {
   if (state.ai) return null;
+  const docId = state.doc?.docId || null;
   const token = {};
   current = token;
+  latest = token;
   set({ ai: { phase: 'connecting', slides: 0, title: '' } });
+  const sameDoc = () => (state.doc?.docId || null) === docId;
   try {
-    const res = await invoke('ai_run', { req });
-    return current === token ? res : null;
+    const res = await invoke('ai_run', { req: { ...req, docId } });
+    if (!sameDoc()) return null;
+    if (latest !== token) {
+      // The old request may have applied changes before it was stopped.
+      // Read the current backend state without displaying its stale response.
+      await refreshDocument();
+      return null;
+    }
+    // A result means the change was made, even if Stop was pressed too late.
+    return res;
   } catch (e) {
-    if (current !== token || String(e) === 'Cancelled') return null;
+    if (current !== token || !sameDoc() || String(e) === 'Cancelled') return null;
     throw e;
   } finally {
     if (current === token) {
@@ -291,7 +303,8 @@ async function sendRequest(prompt) {
   if (!p || !docId || state.ai) return;
   const history = (chats.get(docId) || []).filter((m) => !m.error && !m.muted).map((m) => ({ role: m.role, text: m.text }));
   pushMessage(docId, { role: 'user', text: p });
-  await flushEdits();
+  if (!(await flushEdits())) return;
+  if (state.doc?.docId !== docId) return;
   try {
     const res = await runAi({ mode: 'edit', prompt: p, history, currentSlide: state.slideId, selected: state.selectedSlides });
     if (!res) {

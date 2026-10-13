@@ -235,6 +235,13 @@ pub fn asset_names(css: &str) -> Vec<String> {
     names.into_inner()
 }
 
+impl WebFont {
+    /// Names of the bundled font files this font uses.
+    pub fn asset_refs(&self) -> Vec<String> {
+        asset_names(&self.css).into_iter().filter(|s| crate::util::is_asset_ref(s)).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

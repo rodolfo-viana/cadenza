@@ -1,8 +1,9 @@
 //! Sanitization of rich text produced by the editor's `contenteditable`
 //! surfaces, so that stored decks never carry scripts or arbitrary markup.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use ammonia::{Builder, UrlRelative};
 
@@ -75,6 +76,53 @@ pub fn rich_text(html: &str) -> String {
     cleaned
 }
 
+/// `rich_text` for rendering, which runs for every slide after each edit.
+/// Stored text is already clean (it is cleaned when loaded or edited), so
+/// strings that cleaning leaves unchanged are remembered and passed through.
+pub fn rich_text_cached(html: &str) -> Cow<'_, str> {
+    const MAX_BYTES: usize = 16 * 1024 * 1024;
+    static CLEAN: OnceLock<Mutex<(HashSet<String>, usize)>> = OnceLock::new();
+    let clean = CLEAN.get_or_init(Default::default);
+    if clean.lock().is_ok_and(|c| c.0.contains(html)) {
+        return Cow::Borrowed(html);
+    }
+    let out = rich_text(html);
+    if out != html {
+        return Cow::Owned(out);
+    }
+    if let Ok(mut c) = clean.lock() {
+        // Text no longer shown is forgotten wholesale.
+        if c.1 + out.len() > MAX_BYTES {
+            *c = Default::default();
+        }
+        c.1 += out.len();
+        c.0.insert(out);
+    }
+    Cow::Borrowed(html)
+}
+
+/// Cleans every rich-text surface at a document or clipboard boundary.
+pub fn element(el: &mut crate::model::Element) {
+    if let Some(text) = el.content.text_mut() {
+        text.html = rich_text(&text.html);
+    }
+    if let crate::model::Content::Table(table) = &mut el.content {
+        for cell in table.rows.iter_mut().flatten() {
+            *cell = rich_text(cell);
+        }
+        if table.rows.is_empty() {
+            table.rows.push(vec![String::new()]);
+        }
+    }
+}
+
+/// Loaded presentations and recovery snapshots are untrusted input too.
+pub fn deck(deck: &mut crate::model::Deck) {
+    for el in deck.slides.iter_mut().flat_map(|slide| &mut slide.elements) {
+        element(el);
+    }
+}
+
 /// Converts plain text into paragraphs of escaped HTML.
 pub fn plain_to_html(text: &str) -> String {
     text.split('\n')
@@ -96,6 +144,23 @@ pub fn style_block(css: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cached_cleaning_passes_clean_text_and_never_unsafe_markup() {
+        let unsafe_html = r#"<p onclick="x()">Hi<script>alert(1)</script></p>"#;
+        for _ in 0..2 {
+            assert_eq!(rich_text_cached(unsafe_html), "<p>Hi</p>");
+        }
+        for raw in [
+            r#"<p><b>Bold</b> <i>it</i> <span style="color: #f00; font-size: 20px">x</span> $a^2 &lt; b$</p>"#,
+            r#"<ul><li>One</li><li><a href="https://example.com">Two</a></li></ul><p>A&amp;B &nbsp;</p>"#,
+        ] {
+            let clean = rich_text(raw);
+            // Clean text is a fixed point, so the cache serves it.
+            assert_eq!(rich_text(&clean), clean);
+            assert!(matches!(rich_text_cached(&clean), Cow::Borrowed(_)));
+        }
+    }
 
     #[test]
     fn strips_scripts_and_handlers() {

@@ -199,14 +199,18 @@ pub fn section(deck: &Deck, slide: &Slide, ctx: &Ctx) -> String {
 /// takes its place.
 pub fn visible_groups(deck: &Deck) -> Vec<Vec<&Slide>> {
     let mut groups: Vec<Vec<&Slide>> = Vec::new();
+    let mut new_group = true;
     for slide in deck.slides.iter() {
+        // A skipped head still starts a new vertical stack.
+        new_group |= !slide.nested;
         if slide.hidden {
             continue;
         }
         match groups.last_mut() {
-            Some(group) if slide.nested => group.push(slide),
+            Some(group) if !new_group => group.push(slide),
             _ => groups.push(vec![slide]),
         }
+        new_group = false;
     }
     groups
 }
@@ -477,7 +481,7 @@ fn rich_text_body(text: &RichText, ctx: &Ctx, extra_class: &str) -> Option<Strin
     let body = if empty {
         format!(r#"<p class="cz-placeholder">{}</p>"#, esc(&text.placeholder))
     } else {
-        wrap_math(&text.html).into_owned()
+        wrap_math(&crate::sanitize::rich_text_cached(&text.html)).into_owned()
     };
     Some(format!(
         // dir="auto": right-to-left text (Arabic, Hebrew…) flows correctly.
@@ -535,7 +539,7 @@ fn shape_element(s: &ShapeContent, el: &Element) -> Option<String> {
                 r#"<div class="cz-text {}" dir="auto" style="{}">{}</div>"#,
                 role_class(&s.text.style.role),
                 esc(&text_css(&s.text.style)),
-                wrap_math(&s.text.html)
+                wrap_math(&crate::sanitize::rich_text_cached(&s.text.html))
             )
         };
         let _ = write!(
@@ -836,7 +840,8 @@ fn table_element(t: &TableContent, el: &Element) -> Option<String> {
     for (r, row) in t.rows.iter().enumerate() {
         html.push_str("<tr>");
         for c in 0..cols {
-            let cell = wrap_math(row.get(c).map(String::as_str).unwrap_or(""));
+            let clean = crate::sanitize::rich_text_cached(row.get(c).map(String::as_str).unwrap_or(""));
+            let cell = wrap_math(&clean);
             let tag = if (t.header_row && r == 0) || (t.header_col && c == 0) { "th" } else { "td" };
             let _ = write!(html, r#"<{tag} data-r="{r}" data-c="{c}">{cell}</{tag}>"#);
         }
@@ -1058,7 +1063,7 @@ pub fn document(deck: &Deck, ctx: &Ctx, libs: &dyn LibLinker) -> String {
         },
         title = esc(&title),
         head = head,
-        css = deck_css(deck, ctx),
+        css = crate::sanitize::style_block(&deck_css(deck, ctx)),
         sections = sections(deck, ctx),
         scripts = scripts,
         config = serde_json::to_string(&config).unwrap_or_else(|_| "{}".into()).replace("</", "<\\/"),
@@ -1293,5 +1298,63 @@ mod tests {
         assert!(html.contains("katex.min.js"));
         assert!(!html.contains("highlight.js"));
         assert!(html.contains("CadenzaRuntime.start("));
+    }
+
+    #[test]
+    fn skipped_heads_preserve_vertical_stack_boundaries() {
+        let deck: Deck = serde_json::from_value(json!({"slides": [
+            {"id": "a"}, {"id": "a-child", "nested": true},
+            {"id": "b", "hidden": true}, {"id": "b-hidden-child", "nested": true, "hidden": true},
+            {"id": "b-child", "nested": true}, {"id": "b-child-2", "nested": true},
+            {"id": "c", "hidden": true}, {"id": "d"}
+        ]}))
+        .unwrap();
+        let groups: Vec<Vec<&str>> = visible_groups(&deck).iter().map(|g| g.iter().map(|s| s.id.as_str()).collect()).collect();
+        assert_eq!(groups, vec![vec!["a", "a-child"], vec!["b-child", "b-child-2"], vec!["d"]]);
+        assert_eq!(slide_indices(&deck, "b"), Some((1, 0)));
+        assert_eq!(slide_indices(&deck, "b-child-2"), Some((1, 1)));
+        assert_eq!(slide_indices(&deck, "c"), Some((2, 0)));
+    }
+
+    #[test]
+    fn renderer_sanitizes_rich_text_even_without_document_loading() {
+        let unsafe_html = "<b>Keep</b><img src=x onerror=alert(1)><script>alert(1)</script>";
+        let deck: Deck = serde_json::from_value(json!({"slides": [{"elements": [
+            {"content": {"kind": "text", "html": unsafe_html}},
+            {"content": {"kind": "shape", "text": {"html": unsafe_html}}},
+            {"content": {"kind": "table", "rows": [[unsafe_html]]}}
+        ]}]}))
+        .unwrap();
+        for mode in [Mode::Editor, Mode::Show] {
+            let html = slide_for_editor(&deck, &deck.slides[0], &ctx(mode)).html;
+            assert_eq!(html.matches("<b>Keep</b>").count(), 3);
+            assert!(!html.contains("onerror") && !html.contains("<script"), "{html}");
+        }
+    }
+
+    #[test]
+    fn theme_font_css_cannot_close_the_exported_style_block() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("imported.cadenza-theme");
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&json!({
+                "id": "custom-test", "headingFont": "TestFont", "fonts": [{
+                    "family": "TestFont", "css": "@font-face{font-family:TestFont}</StYlE><script>alert(1)</script><style>"
+                }]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let theme = crate::custom_theme::read_file(&path).unwrap();
+        let fonts = crate::custom_theme::extract_fonts(&theme, &|_| unreachable!()).unwrap();
+        let deck = Deck {
+            web_fonts: fonts,
+            ..Default::default()
+        };
+        let html = document(&deck, &ctx(Mode::Show), &Linked);
+        assert!(html.contains("@font-face{font-family:TestFont}"));
+        assert_eq!(html.to_ascii_lowercase().matches("</style>").count(), 1);
+        assert!(html.contains("<\\/StYlE>"));
     }
 }
