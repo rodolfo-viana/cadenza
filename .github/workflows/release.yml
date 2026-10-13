@@ -37,6 +37,19 @@ jobs:
         with:
           node-version: 22
 
+      # The release page shows this version's section of CHANGELOG.md.
+      - name: Read release notes
+        id: notes
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          {
+            echo 'body<<CADENZA_RELEASE_NOTES'
+            awk -v v="$version" '/^## / { p = ($2 == v); next } p' CHANGELOG.md
+            echo 'Installers for Linux and Windows are attached below.'
+            echo 'CADENZA_RELEASE_NOTES'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build installers
         uses: tauri-apps/tauri-action@v0
         env:
@@ -45,7 +58,7 @@ jobs:
           tauriScript: npx --yes @tauri-apps/cli@2.12.1
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: Cadenza ${{ github.ref_name }}
-          releaseBody: Installers for Linux and Windows.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
 
       - name: Keep installers as workflow artifacts

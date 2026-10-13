@@ -1,6 +1,6 @@
 [package]
 name = "cadenza"
-version = "0.1.0"
+version = "0.1.1"
 description = "Cadenza — a presentation studio built on reveal.js"
 authors = ["Rodolfo Viana"]
 license = "MIT"
