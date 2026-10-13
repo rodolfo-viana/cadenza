@@ -2,7 +2,23 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
-## Unreleased
+## 0.2.0 — 2026-10-13
+
+Cadenza now runs on macOS, and the AI assistant has been removed. Presentations from 0.1.x open as before.
+
+### New
+
+- Cadenza for macOS 12 or newer, as one app for both Apple Silicon and Intel Macs. It has the usual menu bar, opens `.cadenza` files from Finder and the Dock, and keeps API keys in the macOS Keychain.
+- On a Mac, quitting with ⌘Q asks about unsaved changes in each open presentation. Quitting from the Dock or by logging out keeps them for recovery at the next start.
+
+### Changes
+
+- Cadenza has its real icon on Linux and Windows, instead of a plain purple square.
+
+### Fixes
+
+- Options in segmented controls, such as Fast / Normal / Slow or the background types, now fit their labels instead of spilling past the highlight. When a translation is too long to fit, only the longest labels are shortened.
+- With several presentations open, media picked on YouTube, Vimeo, GIPHY or Unsplash is inserted only into the presentation you picked it for, not into all of them.
 
 ### Removed
 
