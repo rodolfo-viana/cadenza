@@ -3,11 +3,69 @@
   "productName": "Cadenza",
   "version": "0.1.0",
   "identifier": "app.cadenza.studio",
-  "build": { "frontendDist": "../ui" },
+  "build": {
+    "frontendDist": "../ui"
+  },
   "app": {
     "withGlobalTauri": true,
     "windows": [],
-    "security": { "csp": null, "assetProtocol": { "enable": true, "scope": [] } }
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
   },
-  "bundle": { "active": true, "targets": "all", "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.png", "icons/icon.ico"] }
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "publisher": "Rodolfo Viana",
+    "copyright": "© 2026 Rodolfo Viana",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "homepage": "https://github.com/rodolfo-viana/cadenza",
+    "category": "Productivity",
+    "shortDescription": "Presentations, powered by reveal.js",
+    "longDescription": "Cadenza is a presentation app built on reveal.js: themes, builds, Magic Move, charts, tables, code, LaTeX math, Mermaid diagrams, Google Fonts, a media library, a theme builder, an optional AI assistant and a presenter display.",
+    "fileAssociations": [
+      {
+        "ext": [
+          "cadenza"
+        ],
+        "name": "Cadenza Presentation",
+        "description": "Cadenza Presentation",
+        "mimeType": "application/x-cadenza",
+        "role": "Editor"
+      }
+    ],
+    "linux": {
+      "deb": {
+        "section": "office",
+        "desktopTemplate": "linux/cadenza.desktop",
+        "files": {
+          "/usr/share/mime/packages/cadenza.xml": "linux/cadenza-mime.xml"
+        }
+      },
+      "rpm": {
+        "release": "1",
+        "desktopTemplate": "linux/cadenza.desktop",
+        "files": {
+          "/usr/share/mime/packages/cadenza.xml": "linux/cadenza-mime.xml"
+        }
+      }
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
 }

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Cadenza
+Comment=Presentations, powered by reveal.js
+Exec=cadenza %F
+Icon=cadenza
+Terminal=false
+Categories=Office;Presentation;
+MimeType=application/x-cadenza;
+StartupWMClass=cadenza
