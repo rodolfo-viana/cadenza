@@ -5,7 +5,6 @@
 //! exports and window management. The UI (in `ui/`) runs in the system
 //! webview and talks to it through the commands defined here.
 
-pub mod ai;
 pub mod browse;
 pub mod chart;
 pub mod clipboard;
@@ -31,8 +30,8 @@ pub mod webfonts;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -66,8 +65,6 @@ pub struct AppState {
     secrets: secrets::Secrets,
     /// Media browser helper processes, per editor window.
     browsers: Mutex<HashMap<String, (u64, std::process::Child)>>,
-    /// Cancel flags of running AI requests, per editor window.
-    ai_runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
     /// Media of the latest copy, shared by every window.
     clipboard: clipboard::Store,
 }
@@ -84,14 +81,6 @@ impl AppState {
             doc.ensure_id(doc_id)?;
             f(doc)
         })
-    }
-
-    fn cancel_ai(&self, label: &str) {
-        if let Ok(mut runs) = self.ai_runs.lock() {
-            if let Some(cancel) = runs.remove(label) {
-                cancel.store(true, Ordering::SeqCst);
-            }
-        }
     }
 
     fn remember_recent(&self, path: &Path) {
@@ -194,7 +183,6 @@ fn theme_css(theme: String) -> String {
 fn install_doc(state: &AppState, label: &str, mut doc: Document) -> CmdResult<DocView> {
     let view = doc.view(true, None);
     let mut docs = state.docs.lock().map_err(err)?;
-    state.cancel_ai(label);
     if let Some(old) = docs.insert(label.to_string(), doc) {
         old.dispose();
     }
@@ -482,7 +470,6 @@ fn doc_checkpoint(window: Window, state: State<AppState>) -> CmdResult<()> {
 #[tauri::command]
 fn doc_close(window: Window, state: State<AppState>) -> CmdResult<()> {
     let mut docs = state.docs.lock().map_err(err)?;
-    state.cancel_ai(window.label());
     if let Some(doc) = docs.remove(window.label()) {
         doc.dispose();
     }
@@ -846,398 +833,6 @@ async fn media_import(window: Window, state: State<'_, AppState>, url: String, p
 }
 
 // ---------------------------------------------------------------------------
-// AI assistant (opt-in)
-// ---------------------------------------------------------------------------
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AiRequest {
-    /// "new" (create a presentation) or "edit" (change the open one).
-    mode: String,
-    /// Session identity of the presentation the user asked to edit.
-    #[serde(default)]
-    doc_id: Option<String>,
-    prompt: String,
-    #[serde(default)]
-    history: Vec<ai::Message>,
-    #[serde(default)]
-    current_slide: Option<String>,
-    #[serde(default)]
-    selected: Vec<String>,
-    /// New presentations: wanted number of slides (0 = let the model decide).
-    #[serde(default)]
-    slides: u32,
-    #[serde(default)]
-    audience: String,
-    #[serde(default)]
-    language: String,
-    /// Notes or text to base a new presentation on.
-    #[serde(default)]
-    source: String,
-    #[serde(default)]
-    theme: Option<String>,
-    #[serde(default)]
-    aspect: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AiResponse {
-    reply: String,
-    summary: ai::Summary,
-    view: Option<DocView>,
-}
-
-/// The configured provider, or why the assistant can't run.
-fn ai_provider(state: &AppState) -> CmdResult<(ai::Provider, bool)> {
-    let s = state.settings.lock().map_err(err)?.clone();
-    if !s.ai_enabled {
-        return Err("The AI assistant is turned off. You can turn it on in Settings ▸ AI Assistant.".into());
-    }
-    let kind = s.ai_provider.clone();
-    let model = s
-        .ai_models
-        .get(&kind)
-        .map(|m| m.trim().to_string())
-        .filter(|m| !m.is_empty())
-        .or_else(|| (kind == "anthropic").then(|| ai::DEFAULT_ANTHROPIC_MODEL.to_string()))
-        .ok_or("Choose a model in Settings ▸ AI Assistant")?;
-    let key = state.secrets.get(&kind);
-    if kind != "compatible" && key.is_none() {
-        let name = if kind == "openai" { "OpenAI" } else { "Anthropic" };
-        return Err(format!("Add your {name} API key in Settings ▸ AI Assistant"));
-    }
-    Ok((
-        ai::Provider {
-            kind,
-            model,
-            base_url: s.ai_base_url.clone(),
-            key,
-        },
-        s.ai_images,
-    ))
-}
-
-#[tauri::command]
-async fn ai_models(state: State<'_, AppState>, provider: String, base_url: Option<String>) -> CmdResult<Vec<ai::ModelInfo>> {
-    let p = ai::Provider {
-        key: state.secrets.get(&provider),
-        kind: provider,
-        model: String::new(),
-        base_url: base_url.unwrap_or_default(),
-    };
-    tauri::async_runtime::spawn_blocking(move || ai::list_models(&p))
-        .await
-        .map_err(err)?
-        .map_err(err)
-}
-
-#[tauri::command]
-fn ai_cancel(window: Window, state: State<AppState>) {
-    if let Ok(runs) = state.ai_runs.lock() {
-        if let Some(flag) = runs.get(window.label()) {
-            flag.store(true, Ordering::SeqCst);
-        }
-    }
-}
-
-fn ai_new_deck_prompt(req: &AiRequest) -> String {
-    let mut p = format!("Create a complete presentation.\n\nTopic and instructions:\n{}", req.prompt.trim());
-    match req.slides {
-        0 => p.push_str("\n\nLength: choose a suitable number of slides (usually 8 to 12)."),
-        n => p.push_str(&format!("\n\nLength: about {n} slides.")),
-    }
-    if !req.audience.trim().is_empty() {
-        p.push_str(&format!("\nAudience and tone: {}", req.audience.trim()));
-    }
-    if !req.language.trim().is_empty() {
-        p.push_str(&format!("\nWrite the presentation in {}.", req.language.trim()));
-    }
-    if !req.source.trim().is_empty() {
-        let source: String = req.source.trim().chars().take(60_000).collect();
-        p.push_str(&format!("\n\nBase the content on this source material:\n<source>\n{source}\n</source>"));
-    }
-    p.push_str(
-        "\n\nAnswer with a \"set_title\" action and one \"insert\" action (slide_id null) containing every slide. \
-         Start with a \"title\" slide, separate the parts of longer talks with \"section\" slides, and end with a closing slide \
-         (key takeaways, a call to action or questions). Write speaker notes for every slide.",
-    );
-    p
-}
-
-fn ai_theme_list(custom: Option<&custom_theme::ThemeDef>) -> String {
-    let mut out = String::from("Themes you can switch to (id: name, look):");
-    if let Some(c) = custom {
-        out.push_str(&format!("\n- {}: {} (custom, {})", c.id, c.name, if c.dark { "dark" } else { "light" }));
-    }
-    for t in themes::THEMES {
-        out.push_str(&format!("\n- {}: {} ({}, {})", t.id, t.name, t.group, if t.dark { "dark" } else { "light" }));
-    }
-    out
-}
-
-/// Keeps the conversation valid: starts with the user, alternates roles.
-fn ai_history(history: &[ai::Message]) -> Vec<ai::Message> {
-    let mut out: Vec<ai::Message> = Vec::new();
-    for m in history.iter().rev().take(10).rev() {
-        if !(m.role == "user" || m.role == "assistant") || m.text.trim().is_empty() || (out.is_empty() && m.role != "user") {
-            continue;
-        }
-        match out.last_mut() {
-            Some(last) if last.role == m.role => {
-                last.text.push_str("\n\n");
-                last.text.push_str(&m.text);
-            }
-            _ => out.push(m.clone()),
-        }
-    }
-    if out.last().is_some_and(|m| m.role == "user") {
-        out.pop();
-    }
-    out
-}
-
-/// Credit line stored as the image description (as the Media Library does).
-fn ai_credit(it: &media::MediaItem) -> String {
-    match it.provider.as_str() {
-        "unsplash" => format!("Photo by {} on Unsplash", it.author),
-        _ => {
-            let title = if it.title.is_empty() {
-                "Image".to_string()
-            } else {
-                format!("“{}”", it.title)
-            };
-            let by = if it.author.is_empty() { String::new() } else { format!(" by {}", it.author) };
-            let lic = if it.license.is_empty() { String::new() } else { format!(", {}", it.license) };
-            format!("{title}{by}{lic}")
-        }
-    }
-}
-
-/// Finds and downloads one photo per query (in parallel) into `dir`.
-fn ai_find_images(queries: &[String], dir: &Path, unsplash: Option<String>, cancel: &AtomicBool) -> HashMap<String, ai::FoundImage> {
-    let provider = if unsplash.is_some() { "unsplash" } else { "openverse" };
-    std::thread::scope(|scope| {
-        let jobs: Vec<_> = queries
-            .iter()
-            .take(12)
-            .map(|q| {
-                let key = unsplash.clone();
-                scope.spawn(move || -> Option<(String, ai::FoundImage)> {
-                    if cancel.load(Ordering::SeqCst) {
-                        return None;
-                    }
-                    let page = media::search(provider, q, None, key.as_deref()).ok()?;
-                    let item = page.items.into_iter().find(|x| x.kind == "image")?;
-                    let (bytes, ext) = media::download(&item.url).ok()?;
-                    if let Some(k) = key.as_deref().filter(|_| !item.track_url.is_empty()) {
-                        media::track_unsplash(&item.track_url, k);
-                    }
-                    let src = document::store_asset(dir, &bytes, &ext).ok()?;
-                    let (width, height) = imagesize::blob_size(&bytes)
-                        .map(|s| (s.width as u32, s.height as u32))
-                        .unwrap_or((item.width, item.height));
-                    Some((
-                        q.clone(),
-                        ai::FoundImage {
-                            src,
-                            width,
-                            height,
-                            alt: ai_credit(&item),
-                        },
-                    ))
-                })
-            })
-            .collect();
-        jobs.into_iter().filter_map(|j| j.join().ok().flatten()).collect()
-    })
-}
-
-#[tauri::command]
-async fn ai_run(app: AppHandle, window: Window, state: State<'_, AppState>, req: AiRequest) -> CmdResult<AiResponse> {
-    let (provider, want_images) = ai_provider(&state)?;
-    let label = window.label().to_string();
-    let cancel = Arc::new(AtomicBool::new(false));
-    {
-        // Register under the document lock so closing/replacing it cannot
-        // miss cancelling a request that has just started.
-        let docs = state.docs.lock().map_err(err)?;
-        if req.mode == "new" {
-            if docs.contains_key(&label) {
-                return Err("Create the presentation in a new window.".into());
-            }
-        } else {
-            let doc = docs.get(&label).ok_or("No presentation is open in this window")?;
-            doc.ensure_id(req.doc_id.as_deref().ok_or(ai::CANCELLED)?).map_err(err)?;
-        }
-        if let Some(old) = state.ai_runs.lock().map_err(err)?.insert(label.clone(), cancel.clone()) {
-            old.store(true, Ordering::SeqCst);
-        }
-    }
-    let result = ai_run_inner(&app, &state, &label, req, provider, want_images, &cancel).await;
-    if let Ok(mut runs) = state.ai_runs.lock() {
-        if runs.get(&label).is_some_and(|c| Arc::ptr_eq(c, &cancel)) {
-            runs.remove(&label);
-        }
-    }
-    match result {
-        // A change that was already made is reported even if Stop came too
-        // late to prevent it, so the window shows what the document holds.
-        Err(_) if cancel.load(Ordering::SeqCst) => Err(ai::CANCELLED.into()),
-        result => result,
-    }
-}
-
-async fn ai_run_inner(
-    app: &AppHandle,
-    state: &AppState,
-    label: &str,
-    req: AiRequest,
-    provider: ai::Provider,
-    want_images: bool,
-    cancel: &Arc<AtomicBool>,
-) -> CmdResult<AiResponse> {
-    let emit = {
-        let app = app.clone();
-        let label = label.to_string();
-        move |v: Value| {
-            let _ = app.emit_to(label.as_str(), "cz-ai-progress", v);
-        }
-    };
-    let new = req.mode == "new";
-    let (request, custom) = if new {
-        (ai_new_deck_prompt(&req), None)
-    } else {
-        let docs = state.docs.lock().map_err(err)?;
-        let doc = docs.get(label).ok_or("No presentation is open in this window")?;
-        if cancel.load(Ordering::SeqCst) || req.doc_id.as_deref() != Some(doc.id.as_str()) {
-            return Err(ai::CANCELLED.into());
-        }
-        let ctx = ai::deck_context(&doc.deck, req.current_slide.as_deref(), &req.selected);
-        (
-            format!("The presentation (JSON):\n{ctx}\n\nRequest: {}", req.prompt.trim()),
-            doc.deck.active_custom_theme().cloned(),
-        )
-    };
-    let mut messages = ai_history(&req.history);
-    messages.push(ai::Message {
-        role: "user".into(),
-        text: format!("{}\n\n{request}", ai_theme_list(custom.as_ref())),
-    });
-
-    emit(json!({ "phase": "thinking" }));
-    let text = {
-        let cancel = cancel.clone();
-        let emit = emit.clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            let mut last: Option<std::time::Instant> = None;
-            ai::complete(&provider, ai::SYSTEM_PROMPT, &messages, &ai::plan_schema(), &cancel, &mut |t: &str| {
-                if last.is_none_or(|l| l.elapsed() >= std::time::Duration::from_millis(200)) {
-                    last = Some(std::time::Instant::now());
-                    let (slides, title) = ai::progress(t);
-                    emit(json!({ "phase": "writing", "slides": slides, "title": title, "chars": t.len() }));
-                }
-            })
-        })
-        .await
-        .map_err(err)?
-        .map_err(err)?
-    };
-    if cancel.load(Ordering::SeqCst) {
-        return Err(ai::CANCELLED.into());
-    }
-    let plan = ai::parse_plan(&text).map_err(err)?;
-
-    // New presentations get their document (and assets folder) now.
-    let mut new_doc = None;
-    let assets_dir = if new {
-        let s = state.settings.lock().map_err(err)?.clone();
-        let theme = req.theme.clone().unwrap_or(s.default_theme.clone());
-        let (w, h) = settings::aspect_size(req.aspect.as_deref().unwrap_or(&s.default_aspect));
-        let mut doc = Document::new(&state.sessions_root, layouts::starter_deck(&theme, w, h)).map_err(err)?;
-        if let Some(def) = custom_theme::find(&state.config_dir, &theme) {
-            apply_theme_to(&mut doc, def).map_err(err)?;
-            doc.reset_baseline();
-        }
-        let dir = doc.assets_dir();
-        new_doc = Some(doc);
-        dir
-    } else {
-        state.with_doc_id(label, req.doc_id.as_deref().ok_or(ai::CANCELLED)?, |doc| Ok(doc.assets_dir()))?
-    };
-
-    // Photos are fetched before touching the presentation.
-    let queries = if want_images { ai::image_queries(&plan) } else { Vec::new() };
-    let images = if queries.is_empty() {
-        HashMap::new()
-    } else {
-        emit(json!({ "phase": "images", "count": queries.len() }));
-        let unsplash = state.secrets.get("unsplash");
-        let cancel = cancel.clone();
-        tauri::async_runtime::spawn_blocking(move || ai_find_images(&queries, &assets_dir, unsplash, &cancel))
-            .await
-            .map_err(err)?
-    };
-    if cancel.load(Ordering::SeqCst) {
-        if let Some(doc) = new_doc {
-            doc.dispose();
-        }
-        return Err(ai::CANCELLED.into());
-    }
-
-    if let Some(mut doc) = new_doc {
-        let active = doc.deck.active_custom_theme().map(|t| t.id.clone());
-        let theme_ok = |t: &str| themes::THEMES.iter().any(|x| x.id == t) || active.as_deref() == Some(t);
-        let mut deck = doc.deck.clone();
-        deck.slides.clear();
-        let summary = ai::apply_plan(&mut deck, &plan, &images, &theme_ok);
-        if deck.slides.is_empty() {
-            doc.dispose();
-            let why = if plan.reply.trim().is_empty() {
-                "The AI didn't create any slides. Try describing the presentation in more detail.".to_string()
-            } else {
-                plan.reply.clone()
-            };
-            return Err(why);
-        }
-        doc.apply(
-            Op::ReplaceDeck {
-                deck: Box::new(deck),
-                label: Some("AI Presentation".into()),
-            },
-            None,
-        )
-        .map_err(err)?;
-        let view = {
-            let mut docs = state.docs.lock().map_err(err)?;
-            if cancel.load(Ordering::SeqCst) || docs.contains_key(label) {
-                doc.dispose();
-                return Err(ai::CANCELLED.into());
-            }
-            let view = doc.view(true, None);
-            docs.insert(label.to_string(), doc);
-            view
-        };
-        return Ok(AiResponse {
-            reply: plan.reply,
-            summary,
-            view: Some(view),
-        });
-    }
-
-    let active = custom.as_ref().map(|t| t.id.clone());
-    let theme_ok = |t: &str| themes::THEMES.iter().any(|x| x.id == t) || active.as_deref() == Some(t);
-    let (summary, view) = state.with_doc(label, |doc| {
-        ai::apply_edit(doc, req.doc_id.as_deref().unwrap_or(""), cancel, &plan, &images, &theme_ok)
-    })?;
-    Ok(AiResponse {
-        reply: plan.reply,
-        summary,
-        view,
-    })
-}
-
-// ---------------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------------
 
@@ -1569,6 +1164,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             app.asset_protocol_scope().allow_directory(&sessions_root, true)?;
             let recoverable = document::list_recoverable(&sessions_root);
             let settings_path = config.join("settings.json");
+            let forget_ai_settings = settings::has_ai_settings(&settings_path);
             app.manage(AppState {
                 docs: Mutex::new(HashMap::new()),
                 settings: Mutex::new(Settings::load(&settings_path)),
@@ -1580,10 +1176,24 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                 window_counter: AtomicU32::new(1),
                 secrets: secrets::Secrets::new(&config, data_dir_override().is_none()),
                 browsers: Mutex::new(HashMap::new()),
-                ai_runs: Mutex::new(HashMap::new()),
                 clipboard: clipboard::Store::new(cache.join("clipboard")),
             });
             fonts::warm_up();
+            // Credential cleanup has its own completion marker and retries on
+            // later launches even after the old AI settings have been removed.
+            // Keep keychain access in the background because it can be slow.
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let state = app_handle.state::<AppState>();
+                if let Err(e) = state.secrets.forget_retired() {
+                    eprintln!("Could not remove retired API keys; will retry on next launch: {e}");
+                }
+                if forget_ai_settings {
+                    if let Ok(s) = state.settings.lock() {
+                        let _ = s.save(&state.settings_path);
+                    }
+                }
+            });
 
             let cwd = std::env::current_dir().unwrap_or_default();
             let files = files_from_args(std::env::args(), &cwd);
@@ -1606,10 +1216,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                     }
                     stop_browser(app, &label);
                     let state = app.state::<AppState>();
-                    let doc = state.docs.lock().ok().and_then(|mut d| {
-                        state.cancel_ai(&label);
-                        d.remove(&label)
-                    });
+                    let doc = state.docs.lock().ok().and_then(|mut d| d.remove(&label));
                     if let Some(doc) = doc {
                         doc.dispose();
                     }
@@ -1653,9 +1260,6 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             theme_export,
             theme_import,
             theme_preview,
-            ai_models,
-            ai_run,
-            ai_cancel,
             secret_status,
             secret_set,
             secret_delete,

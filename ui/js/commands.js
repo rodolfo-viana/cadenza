@@ -120,17 +120,6 @@ export const COMMANDS = [
   { id: 'theme.import', group: N_('Theme'), label: N_('Import Theme…'), icon: 'upload', when: hasDoc,
     run: () => import('./themebuilder.js').then(async (m) => { const d = await m.importTheme(); if (d) m.applyCustomTheme(d); }) },
 
-  // AI assistant (only when turned on in Settings)
-  { id: 'ai.assistant', group: N_('AI'), label: N_('Ask the Assistant…'), icon: 'wand-sparkles', keys: ['Mod+J'], global: true,
-    when: () => hasDoc() && !!S.settings().aiEnabled, hidden: () => !S.settings().aiEnabled,
-    run: () => import('./ai.js').then((m) => m.askAssistant()) },
-  { id: 'ai.generate', group: N_('AI'), label: N_('Create a Presentation with AI…'), icon: 'wand-sparkles',
-    when: () => !!S.settings().aiEnabled, hidden: () => !S.settings().aiEnabled,
-    run: () => (S.state.doc ? invoke('window_new', { path: null }) : S.openModal('aiGenerate', {})) },
-  { id: 'ai.notes', group: N_('AI'), label: N_('Write Speaker Notes for All Slides (AI)'), icon: 'message-square-text',
-    when: () => hasDoc() && !!S.settings().aiEnabled, hidden: () => !S.settings().aiEnabled,
-    run: () => import('./ai.js').then((m) => m.askAssistant(t('Write speaker notes for every slide'))) },
-
   // App
   { id: 'app.palette', group: N_('Help'), label: N_('Command Palette…'), icon: 'search', keys: ['Mod+K', 'Mod+Shift+P'], global: true, run: () => S.openModal('palette') },
   { id: 'app.settings', group: N_('Help'), label: N_('Settings…'), icon: 'settings', keys: ['Mod+,'], global: true, run: () => S.openModal('settings') },

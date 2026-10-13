@@ -1,6 +1,5 @@
 //! Application preferences and the recent-files list.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -33,16 +32,6 @@ pub struct Settings {
     pub show_rulers: bool,
     /// Show (and snap to) the document's guides.
     pub show_guides: bool,
-    /// The AI assistant is opt-in: nothing is sent anywhere while off.
-    pub ai_enabled: bool,
-    /// "anthropic", "openai" or "compatible".
-    pub ai_provider: String,
-    /// Chosen model per provider.
-    pub ai_models: BTreeMap<String, String>,
-    /// Address of an OpenAI-compatible server (e.g. Ollama).
-    pub ai_base_url: String,
-    /// Find stock photos for image slides the assistant creates.
-    pub ai_images: bool,
 }
 
 impl Default for Settings {
@@ -61,11 +50,6 @@ impl Default for Settings {
             show_notes: true,
             show_rulers: true,
             show_guides: true,
-            ai_enabled: false,
-            ai_provider: "anthropic".into(),
-            ai_models: BTreeMap::from([("anthropic".to_string(), crate::ai::DEFAULT_ANTHROPIC_MODEL.to_string())]),
-            ai_base_url: crate::ai::DEFAULT_COMPATIBLE_URL.into(),
-            ai_images: true,
         }
     }
 }
@@ -126,6 +110,15 @@ pub struct RecentFile {
     pub modified: u64,
 }
 
+/// Whether the file still holds settings of the AI assistant that Cadenza
+/// 0.1 had (unknown settings are dropped the next time the file is saved).
+pub fn has_ai_settings(path: &Path) -> bool {
+    fs::read(path)
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .is_some_and(|v| v.get("aiEnabled").is_some())
+}
+
 /// Slide size for an aspect ratio name.
 pub fn aspect_size(aspect: &str) -> (u32, u32) {
     match aspect {
@@ -163,5 +156,18 @@ mod tests {
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
         assert_eq!(Settings::load(&dir.path().join("missing.json")), Settings::default());
+    }
+
+    #[test]
+    fn ai_settings_of_older_versions_are_dropped() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        fs::write(&p, r#"{"uiTheme": "dark", "aiEnabled": true, "aiProvider": "openai"}"#).unwrap();
+        assert!(has_ai_settings(&p));
+        let s = Settings::load(&p);
+        assert_eq!(s.ui_theme, "dark");
+        s.save(&p).unwrap();
+        assert!(!has_ai_settings(&p));
+        assert!(!has_ai_settings(&dir.path().join("missing.json")));
     }
 }

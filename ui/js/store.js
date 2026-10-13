@@ -27,8 +27,6 @@ export const state = {
   toasts: [],
   fonts: null,
   presenting: false,
-  ai: null, // running assistant request: { phase, slides, title, count }
-  aiChat: 0, // bumps when an assistant conversation changes
 };
 
 const listeners = new Set();
@@ -214,7 +212,7 @@ function ingest(view, { navigate = true } = {}) {
 /** Ingests a view returned by a command other than `doc_apply`. */
 export const ingestView = (view, opts) => ingest(view, opts);
 
-/** Shows a freshly created document (e.g. one made by the assistant). */
+/** Shows a document view as a freshly opened document. */
 export const openView = (view) => loadView(view);
 
 function loadView(view) {
@@ -225,7 +223,6 @@ function loadView(view) {
     selectedSlides: [],
     editing: null,
     editingTable: null,
-    ai: null,
     zoom: 'fit',
     tab: 'format',
   });
@@ -438,7 +435,7 @@ export async function closeDocument() {
     toast(String(e), 'error');
     return;
   }
-  set({ doc: null, slideId: null, selection: [], selectedSlides: [], editing: null, editingTable: null, ai: null });
+  set({ doc: null, slideId: null, selection: [], selectedSlides: [], editing: null, editingTable: null });
   updateWindowTitle();
   refreshRecent();
 }

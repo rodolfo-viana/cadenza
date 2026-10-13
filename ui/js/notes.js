@@ -25,8 +25,8 @@ export function NotesPanel() {
     clearTimeout(timer.current);
     while (pending.current) {
       const p = pending.current;
-      // Notes of a slide deleted meanwhile (e.g. by the assistant) are dropped
-      // rather than retried forever, which would block saving and closing.
+      // Notes of a slide deleted meanwhile (e.g. by undo) are dropped rather
+      // than retried forever, which would block saving and closing.
       if (p.docId === state.doc?.docId && state.doc.deck.slides.some((s) => s.id === p.id)) {
         const out = await apply({ op: 'updateSlides', ids: [p.id], patch: { notes: p.value } }, { docId: p.docId, coalesce: `notes:${p.id}`, navigate: false });
         if (!out) return false;

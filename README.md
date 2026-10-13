@@ -41,13 +41,6 @@ with [Tauri](https://tauri.app). It runs on Linux first and on Windows.
 - Import reveal.js-style Markdown.
 - Crash recovery for unsaved work.
 
-**AI assistant (optional, off by default)**
-- Create a whole presentation from a description, or ask for changes such as "add three slides about
-  pricing" or "write speaker notes for every slide". Every AI change can be undone in one step.
-- Works with Anthropic Claude, OpenAI, or any OpenAI-compatible server, including local models with
-  [Ollama](https://ollama.com).
-- You need an API key (or a local model): ChatGPT and Claude subscriptions can't be used by other apps.
-
 **Languages**
 
 The interface is available in Arabic, Bengali, Chinese (Simplified), Dutch, English, French, German,
@@ -71,10 +64,9 @@ installers aren't code-signed yet, so Windows SmartScreen may ask you to confirm
 
 ## Privacy
 
-Cadenza works fully offline. Online features — Google Fonts downloads, the Media Library, video
-previews and the AI assistant — contact a service only when you use them, and the AI assistant must be
-switched on first. API keys are stored in your system's credential store (Secret Service on Linux,
-Credential Manager on Windows) and are never saved inside presentations.
+Cadenza works fully offline. Online features — Google Fonts downloads, the Media Library and video
+previews — contact a service only when you use them. API keys are stored in your system's credential
+store (Secret Service on Linux, Credential Manager on Windows) and are never saved inside presentations.
 
 ## Files
 

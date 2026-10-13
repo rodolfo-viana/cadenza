@@ -34,7 +34,7 @@
     "homepage": "https://github.com/rodolfo-viana/cadenza",
     "category": "Productivity",
     "shortDescription": "Presentations, powered by reveal.js",
-    "longDescription": "Cadenza is a presentation app built on reveal.js: themes, builds, Magic Move, charts, tables, code, LaTeX math, Mermaid diagrams, Google Fonts, a media library, a theme builder, an optional AI assistant and a presenter display.",
+    "longDescription": "Cadenza is a presentation app built on reveal.js: themes, builds, Magic Move, charts, tables, code, LaTeX math, Mermaid diagrams, Google Fonts, a media library, a theme builder and a presenter display.",
     "fileAssociations": [
       {
         "ext": [

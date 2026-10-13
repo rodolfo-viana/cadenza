@@ -117,8 +117,8 @@ function commit(s) {
 
 /**
  * Whether an edited element still exists. Once it is deleted, undone or
- * replaced (e.g. by the assistant), its pending edit has nowhere to go and
- * must not block saving or closing forever.
+ * replaced, its pending edit has nowhere to go and must not block saving or
+ * closing forever.
  */
 const elementExists = (s) => !!state.doc?.deck.slides.find((x) => x.id === s.slide)?.elements.some((e) => e.id === s.id);
 

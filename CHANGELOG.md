@@ -2,6 +2,13 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## Unreleased
+
+### Removed
+
+- The AI assistant is gone, along with its settings and the Create with AI button. Cadenza no longer connects to AI services.
+- API keys saved for the assistant (Anthropic, OpenAI or another server) are removed from your system keychain and fallback file on startup. If cleanup fails, Cadenza retries on later launches.
+
 ## 0.1.1 — 2026-10-13
 
 A maintenance release with security and reliability fixes. Presentations from 0.1.0 open as before.

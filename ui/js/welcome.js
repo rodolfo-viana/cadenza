@@ -59,10 +59,6 @@ export function Welcome() {
       <div class="welcome-actions">
         <button type="button" class="btn btn-primary btn-lg" onClick=${() => create()}><${Icon} name="file-plus" size=${18} />${t('New Presentation')}</button>
         <button type="button" class="btn btn-lg" onClick=${openDialog}><${Icon} name="folder-open" size=${18} />${t('Open…')}</button>
-        ${settings().aiEnabled &&
-        html`<button type="button" class="btn btn-lg btn-ai" onClick=${() => openModal('aiGenerate', { theme, aspect })}>
-          <${Icon} name="wand-sparkles" size=${18} />${t('Create with AI…')}
-        </button>`}
       </div>
       ${info.recoverable?.length > 0 &&
       html`<div class="recover">

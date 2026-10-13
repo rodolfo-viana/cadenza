@@ -12,14 +12,13 @@ import { keyLabel, cls } from './util.js';
 import { opener, invoke } from './api.js';
 import { MediaLibrary, KeyPrompt } from './media.js';
 import { ThemeBuilder } from './themebuilder.js';
-import { AiSettings, GenerateDialog } from './ai.js';
 import { t, N_, LANGUAGES } from './i18n.js';
 
 export function ModalHost() {
   const st = useStore();
   const m = st.modal;
   if (!m) return null;
-  const C = { unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder, aiGenerate: GenerateDialog }[m.type];
+  const C = { unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder }[m.type];
   return C ? html`<${C} ...${m.props} />` : null;
 }
 
@@ -110,7 +109,6 @@ function Settings() {
       <h4>${t('Integrations')}</h4>
       <p class="ihint">${t('Optional online services for the Media Library. Keys are stored in your system keychain and never saved in presentations.')}</p>
       <${Integrations} />
-      <${AiSettings} />
       <h4>${t('Presenting')}</h4>
       <${Row}><${Toggle} value=${s.presenterView} label=${t('Open the presenter display (notes, timer, next slide)')} onChange=${(v) => updateSettings({ presenterView: v })} /><//>
       <p class="ihint">${t('With two screens, the audience sees the presentation on the other screen while the presenter display stays on yours.')}</p>

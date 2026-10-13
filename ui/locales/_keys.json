@@ -1,22 +1,9 @@
 [
  {
-  "key": "+ Add notes or source text",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "+ Add row",
   "files": [
    "panels.js"
   ]
- },
- {
-  "key": "+{n} slides",
-  "files": [
-   "ai.js"
-  ],
-  "one": "+{n} slide"
  },
  {
   "key": "0 = off",
@@ -79,12 +66,6 @@
   ]
  },
  {
-  "key": "Add a summary slide at the end",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Add column",
   "files": [
    "panels.js"
@@ -128,12 +109,6 @@
   ]
  },
  {
-  "key": "Add stock photos to image slides (Openverse, or Unsplash when connected)",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Add the imported slides after the existing ones, or replace the whole presentation?",
   "files": [
    "actions.js"
@@ -144,24 +119,6 @@
   "files": [
    "canvas.js",
    "commands.js"
-  ]
- },
- {
-  "key": "Add your Anthropic API key first",
-  "files": [
-   "ai.rs"
-  ]
- },
- {
-  "key": "Add your Anthropic API key in Settings ▸ AI Assistant",
-  "files": [
-   "ai.rs"
-  ]
- },
- {
-  "key": "Add your OpenAI API key first",
-  "files": [
-   "ai.rs"
   ]
  },
  {
@@ -186,30 +143,6 @@
   "key": "Address",
   "files": [
    "panels.js"
-  ]
- },
- {
-  "key": "AI",
-  "files": [
-   "commands.js"
-  ]
- },
- {
-  "key": "AI Assistant",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "AI Edit",
-  "files": [
-   "ai.rs"
-  ]
- },
- {
-  "key": "AI Presentation",
-  "files": [
-   "lib.rs"
   ]
  },
  {
@@ -385,26 +318,7 @@
   ]
  },
  {
-  "key": "Any OpenAI-compatible server: Ollama, LM Studio, llama.cpp, vLLM, OpenRouter…",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "API key",
-  "files": [
-   "ai.js",
-   "media.js"
-  ]
- },
- {
   "key": "API Key",
-  "files": [
-   "media.js"
-  ]
- },
- {
-  "key": "API key (only if it needs one)",
   "files": [
    "media.js"
   ]
@@ -498,31 +412,6 @@
   ]
  },
  {
-  "key": "Ask for a change… (e.g. “Add three slides about pricing after this one”)",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "Ask the Assistant…",
-  "files": [
-   "commands.js"
-  ]
- },
- {
-  "key": "Assistant",
-  "files": [
-   "inspector.js",
-   "toolbar.js"
-  ]
- },
- {
-  "key": "Audience",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Author",
   "files": [
    "inspector.js",
@@ -532,7 +421,6 @@
  {
   "key": "Auto",
   "files": [
-   "ai.js",
    "panels.js"
   ]
  },
@@ -819,7 +707,6 @@
  {
   "key": "Cancel",
   "files": [
-   "ai.js",
    "dialogs.js",
    "themebuilder.js"
   ]
@@ -915,12 +802,6 @@
   ]
  },
  {
-  "key": "ChatGPT Plus and Claude Pro/Max subscriptions can’t be used by other apps; the providers offer API keys for that (billed by use, usually a few cents per presentation). For free, offline use, run a local model with Ollama and choose “Other”.",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Chevron",
   "files": [
    "shapes.rs"
@@ -930,12 +811,6 @@
   "key": "Choose a layout",
   "files": [
    "navigator.js"
-  ]
- },
- {
-  "key": "Choose a model in Settings ▸ AI Assistant",
-  "files": [
-   "lib.rs"
   ]
  },
  {
@@ -1124,12 +999,6 @@
   ]
  },
  {
-  "key": "Connecting…",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Connect…",
   "files": [
    "dialogs.js"
@@ -1191,21 +1060,9 @@
   ]
  },
  {
-  "key": "Could not reach Anthropic. Check your internet connection.",
-  "files": [
-   "ai.rs"
-  ]
- },
- {
   "key": "Could not reach Google Fonts — check your internet connection",
   "files": [
    "webfonts.rs"
-  ]
- },
- {
-  "key": "Could not reach the AI service. Check your internet connection (or that the server is running).",
-  "files": [
-   "ai.rs"
   ]
  },
  {
@@ -1233,32 +1090,7 @@
   ]
  },
  {
-  "key": "Create a Presentation with AI…",
-  "files": [
-   "commands.js"
-  ]
- },
- {
   "key": "Create Presentation",
-  "files": [
-   "ai.js",
-   "welcome.js"
-  ]
- },
- {
-  "key": "Create the presentation in a new window.",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
-  "key": "Create with AI",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "Create with AI…",
   "files": [
    "welcome.js"
   ]
@@ -1488,12 +1320,6 @@
   ]
  },
  {
-  "key": "Done.",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Donut",
   "files": [
    "chart.rs"
@@ -1616,24 +1442,6 @@
   ]
  },
  {
-  "key": "e.g. A 10-minute talk introducing photosynthesis to high-school students, with a diagram of the light reactions",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "e.g. investors, students, a conference",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "e.g. llama3.3",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Each “|” is a click during the presentation that highlights those lines.",
   "files": [
    "panels.js"
@@ -1734,12 +1542,6 @@
   "key": "Emphasis",
   "files": [
    "inspector.js"
-  ]
- },
- {
-  "key": "Enable the AI assistant",
-  "files": [
-   "ai.js"
   ]
  },
  {
@@ -1951,13 +1753,6 @@
   ]
  },
  {
-  "key": "Finding {n} photos…",
-  "files": [
-   "ai.js"
-  ],
-  "one": "Finding a photo…"
- },
- {
   "key": "Fit",
   "files": [
    "panels.js"
@@ -1973,12 +1768,6 @@
   "key": "Fit to Window",
   "files": [
    "toolbar.js"
-  ]
- },
- {
-  "key": "Fix spelling and grammar everywhere",
-  "files": [
-   "ai.js"
   ]
  },
  {
@@ -2372,18 +2161,6 @@
   ]
  },
  {
-  "key": "I can add or rewrite slides, write speaker notes, translate, proofread, build charts, tables and diagrams, or change the theme.",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "I didn’t change anything.",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Image",
   "files": [
    "actions.js",
@@ -2613,7 +2390,6 @@
  {
   "key": "Language",
   "files": [
-   "ai.js",
    "dialogs.js",
    "panels.js"
   ]
@@ -2773,12 +2549,6 @@
   ]
  },
  {
-  "key": "Local / other",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Lock",
   "files": [
    "canvas.js",
@@ -2849,12 +2619,6 @@
   ]
  },
  {
-  "key": "Make this slide more concise",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Make Top-level Slide",
   "files": [
    "commands.js",
@@ -2921,18 +2685,6 @@
   "key": "Mixed",
   "files": [
    "panels.js"
-  ]
- },
- {
-  "key": "Model",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "Model id",
-  "files": [
-   "ai.js"
   ]
  },
  {
@@ -3055,12 +2807,6 @@
   ]
  },
  {
-  "key": "new theme",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "New Window",
   "files": [
    "commands.js"
@@ -3161,19 +2907,6 @@
   "key": "Notes",
   "files": [
    "presenter.html"
-  ]
- },
- {
-  "key": "notes on {n} slides",
-  "files": [
-   "ai.js"
-  ],
-  "one": "notes on {n} slide"
- },
- {
-  "key": "Notes or source text (optional)",
-  "files": [
-   "ai.js"
   ]
  },
  {
@@ -3336,12 +3069,6 @@
   ]
  },
  {
-  "key": "Optional and off by default. When it’s on, your request and the text of the presentation are sent to the provider you choose, only when you ask the assistant something.",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Optional file name or caption",
   "files": [
    "panels.js"
@@ -3387,12 +3114,6 @@
   "key": "Original Ratio",
   "files": [
    "panels.js"
-  ]
- },
- {
-  "key": "Other",
-  "files": [
-   "ai.js"
   ]
  },
  {
@@ -3471,12 +3192,6 @@
   ]
  },
  {
-  "key": "Paste an outline, an article, meeting notes…",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Paste Slides",
   "files": [
    "ops.rs"
@@ -3484,12 +3199,6 @@
  },
  {
   "key": "Paste your free {service} {keyName}.",
-  "files": [
-   "media.js"
-  ]
- },
- {
-  "key": "Paste your {service} {keyName}.",
   "files": [
    "media.js"
   ]
@@ -3705,12 +3414,6 @@
   ]
  },
  {
-  "key": "Provider",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Push (slide)",
   "files": [
    "inspector.js"
@@ -3788,15 +3491,8 @@
   ]
  },
  {
-  "key": "Refresh the model list",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Remove",
   "files": [
-   "ai.js",
    "dialogs.js"
   ]
  },
@@ -3852,12 +3548,6 @@
   "key": "Remove series",
   "files": [
    "panels.js"
-  ]
- },
- {
-  "key": "renamed",
-  "files": [
-   "ai.js"
   ]
  },
  {
@@ -3989,12 +3679,6 @@
   ]
  },
  {
-  "key": "Same as my description",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Sans",
   "files": [
    "controls.js"
@@ -4048,12 +3732,6 @@
   "key": "Saved",
   "files": [
    "store.js"
-  ]
- },
- {
-  "key": "Saved on this computer",
-  "files": [
-   "ai.js"
   ]
  },
  {
@@ -4147,12 +3825,6 @@
   ]
  },
  {
-  "key": "Send",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Send Backward",
   "files": [
    "commands.js"
@@ -4192,18 +3864,6 @@
   "key": "Serif",
   "files": [
    "controls.js"
-  ]
- },
- {
-  "key": "Server",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "server",
-  "files": [
-   "media.js"
   ]
  },
  {
@@ -4426,7 +4086,6 @@
  {
   "key": "Slides",
   "files": [
-   "ai.js",
    "dialogs.js",
    "inspector.js"
   ]
@@ -4594,18 +4253,6 @@
   ]
  },
  {
-  "key": "Stop",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "Stopped.",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Stretch",
   "files": [
    "panels.js"
@@ -4746,30 +4393,6 @@
   ]
  },
  {
-  "key": "The AI assistant is turned off. You can turn it on in Settings ▸ AI Assistant.",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
-  "key": "The AI's answer could not be understood. Please try again (or pick a more capable model).",
-  "files": [
-   "ai.rs"
-  ]
- },
- {
-  "key": "The answer was too long and got cut off. Try asking for fewer slides.",
-  "files": [
-   "ai.rs"
-  ]
- },
- {
-  "key": "The connection to Anthropic was interrupted",
-  "files": [
-   "ai.rs"
-  ]
- },
- {
   "key": "The copied media is no longer available. Copy the content again.",
   "files": [
    "clipboard.rs"
@@ -4791,12 +4414,6 @@
   "key": "The Markdown file has no content",
   "files": [
    "lib.rs"
-  ]
- },
- {
-  "key": "The model declined this request. Try rephrasing it.",
-  "files": [
-   "ai.rs"
   ]
  },
  {
@@ -4967,12 +4584,6 @@
   ]
  },
  {
-  "key": "Thinking…",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "This file is not a Cadenza presentation",
   "files": [
    "package.rs"
@@ -5105,12 +4716,6 @@
   ]
  },
  {
-  "key": "Turn this slide into a diagram",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "Two Columns",
   "files": [
    "layouts.rs"
@@ -5150,7 +4755,6 @@
  {
   "key": "Undo",
   "files": [
-   "ai.js",
    "commands.js",
    "toolbar.js"
   ]
@@ -5159,12 +4763,6 @@
   "key": "Undo {action}",
   "files": [
    "toolbar.js"
-  ]
- },
- {
-  "key": "Unexpected answer from the AI service",
-  "files": [
-   "ai.rs"
   ]
  },
  {
@@ -5364,18 +4962,6 @@
   ]
  },
  {
-  "key": "What is your presentation about?",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "What should I do?",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "What this number means",
   "files": [
    "slideview.js"
@@ -5406,37 +4992,6 @@
   ]
  },
  {
-  "key": "Write Speaker Notes for All Slides (AI)",
-  "files": [
-   "commands.js"
-  ]
- },
- {
-  "key": "Write speaker notes for every slide",
-  "files": [
-   "ai.js",
-   "commands.js"
-  ]
- },
- {
-  "key": "Writing slide {n}: “{title}”",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "Writing slide {n}…",
-  "files": [
-   "ai.js"
-  ]
- },
- {
-  "key": "Writing…",
-  "files": [
-   "ai.js"
-  ]
- },
- {
   "key": "You can change the theme at any time from the Document inspector.",
   "files": [
    "welcome.js"
@@ -5453,12 +5008,6 @@
   "files": [
    "inspector.js",
    "themebuilder.js"
-  ]
- },
- {
-  "key": "Your presentation is ready",
-  "files": [
-   "ai.js"
   ]
  },
  {
@@ -5553,25 +5102,11 @@
   ]
  },
  {
-  "key": "{n} deleted",
-  "files": [
-   "ai.js"
-  ],
-  "one": "{n} deleted"
- },
- {
   "key": "{n} objects selected",
   "files": [
    "inspector.js"
   ],
   "one": "{n} object selected"
- },
- {
-  "key": "{n} rebuilt",
-  "files": [
-   "ai.js"
-  ],
-  "one": "{n} rebuilt"
  },
  {
   "key": "{n} slides",
@@ -5580,13 +5115,6 @@
    "welcome.js"
   ],
   "one": "{n} slide"
- },
- {
-  "key": "{n} texts edited",
-  "files": [
-   "ai.js"
-  ],
-  "one": "{n} text edited"
  },
  {
   "key": "{service} key saved",

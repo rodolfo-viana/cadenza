@@ -8,7 +8,6 @@ import { TextPanel, BoxPanel, ShapePanel, ImagePanel, VideoPanel, EmbedPanel, Co
 import * as A from './actions.js';
 import { Button } from './ui.js';
 import { cardFromDef, openThemeBuilder, applyCustomTheme, importTheme, themeMenu } from './themebuilder.js';
-import { AssistantPanel, aiEnabled } from './ai.js';
 import { cls } from './util.js';
 import { t, tn, N_ } from './i18n.js';
 
@@ -20,23 +19,20 @@ export function Inspector() {
     { id: 'animate', label: t('Animate'), icon: 'sparkles' },
     { id: 'document', label: t('Document'), icon: 'file-text' },
   ];
-  if (aiEnabled()) tabs.push({ id: 'assistant', label: t('Assistant'), icon: 'wand-sparkles', iconOnly: true });
-  const tab = st.tab === 'assistant' && !aiEnabled() ? 'format' : st.tab;
+  const tab = st.tab;
   return html`<aside class="inspector">
     <div class="tabs">
       ${tabs.map(
-        (tabDef) => html`<button type="button" class=${cls('tab', tab === tabDef.id && 'active', tabDef.iconOnly && 'icon-only')} title=${tabDef.label} onClick=${() => set({ tab: tabDef.id })}>
-          <${Icon} name=${tabDef.icon} size=${15} />${!tabDef.iconOnly && html`<span class="tab-label">${tabDef.label}</span>`}
+        (tabDef) => html`<button type="button" class=${cls('tab', tab === tabDef.id && 'active')} title=${tabDef.label} onClick=${() => set({ tab: tabDef.id })}>
+          <${Icon} name=${tabDef.icon} size=${15} /><span class="tab-label">${tabDef.label}</span>
         </button>`,
       )}
     </div>
-    ${tab === 'assistant'
-      ? html`<div class="inspector-body assistant" key="assistant"><${AssistantPanel} /></div>`
-      : html`<div class="inspector-body" key=${tab + ':' + st.slideId}>
-          ${tab === 'format' && (els.length ? html`<${ElementFormat} els=${els} />` : html`<${SlideFormat} />`)}
-          ${tab === 'animate' && html`<${AnimatePanel} els=${els} />`}
-          ${tab === 'document' && html`<${DocumentPanel} />`}
-        </div>`}
+    <div class="inspector-body" key=${tab + ':' + st.slideId}>
+      ${tab === 'format' && (els.length ? html`<${ElementFormat} els=${els} />` : html`<${SlideFormat} />`)}
+      ${tab === 'animate' && html`<${AnimatePanel} els=${els} />`}
+      ${tab === 'document' && html`<${DocumentPanel} />`}
+    </div>
   </aside>`;
 }
 

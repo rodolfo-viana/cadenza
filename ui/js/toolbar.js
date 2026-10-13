@@ -198,8 +198,6 @@ export function Toolbar() {
       <${ToolButton} icon="paintbrush" label=${t('Format')} active=${settings().showInspector && st.tab === 'format'} onClick=${() => tab('format')} />
       <${ToolButton} icon="sparkles" label=${t('Animate')} active=${settings().showInspector && st.tab === 'animate'} onClick=${() => tab('animate')} />
       <${ToolButton} icon="file-text" label=${t('Document')} active=${settings().showInspector && st.tab === 'document'} onClick=${() => tab('document')} />
-      ${settings().aiEnabled &&
-      html`<${ToolButton} icon="wand-sparkles" label=${t('Assistant')} active=${settings().showInspector && st.tab === 'assistant'} onClick=${() => tab('assistant')} />`}
     </div>
   </header>`;
 }

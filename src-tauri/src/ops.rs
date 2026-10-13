@@ -94,7 +94,7 @@ pub enum Op {
         width: u32,
         height: u32,
     },
-    /// Replaces the whole deck (imports, AI edits).
+    /// Replaces the whole deck (imports, pastes).
     ReplaceDeck {
         deck: Box<Deck>,
         /// Undo label (default "Replace Presentation").
@@ -373,8 +373,8 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                     sanitize_element(el);
                 }
             }
-            // Imports start at the first slide; labelled replacements (AI
-            // edits) leave the view where it is, also when undone.
+            // Imports start at the first slide; labelled replacements
+            // (pastes) leave the view where it is, also when undone.
             let slide = if label.is_some() { None } else { deck.slides.first().map(|s| s.id.clone()) };
             Ok(outcome(label.as_deref().unwrap_or("Replace Presentation"), slide, vec![]))
         }

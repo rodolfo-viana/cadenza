@@ -31,10 +31,6 @@ Useful while developing:
 - `CADENZA_DATA_DIR=/tmp/cadenza-dev cargo run` starts Cadenza with a separate profile: its own
   settings, recent files and recovery data, and API keys kept in a file in that folder instead of your
   system keychain. It also runs alongside your normal Cadenza instead of handing files over to it.
-- `python3 tools/mock_ai.py 8765` starts a fake AI server that answers like Claude and OpenAI, so you
-  can work on the AI assistant without an API key or costs. In **Settings ▸ AI Assistant**, choose
-  **Other** with the server `http://127.0.0.1:8765/v1`. To exercise the Claude code path instead, start a
-  debug build with `CADENZA_ANTHROPIC_URL=http://127.0.0.1:8765/v1`.
 
 ## How the project is organized
 
@@ -46,7 +42,7 @@ src-tauri/        Rust app (Tauri 2)
   src/render.rs     slide HTML for the editor, the show and exports
   src/lib.rs        Tauri commands, windows, presenting
   src/…             charts, shapes, themes, Markdown import, export, fonts,
-                    media library, AI assistant, secrets, settings
+                    media library, secrets, settings
 ui/               the interface: HTML, CSS and JavaScript modules (no build step)
   js/               Preact + htm components, one module per area
   css/              app.css (interface), content.css (slide content)
@@ -67,8 +63,7 @@ A few principles keep Cadenza predictable. Please follow them:
 3. **No build step for the interface.** Modules are loaded as they are. Third-party code goes in
    `ui/vendor` together with its license.
 4. **Private by default.** Features that use the network contact a service only when the person uses
-   them, and anything AI-related is opt-in. API keys go through `secrets.rs` and are never written into
-   presentations.
+   them. API keys go through `secrets.rs` and are never written into presentations.
 5. **Slides don't depend on the interface language.** A presentation looks the same in every language,
    and the canvas stays left-to-right when the interface is right-to-left.
 
@@ -85,7 +80,7 @@ A few principles keep Cadenza predictable. Please follow them:
   surrounding code.
 - Run `node tools/check_js.cjs` to check every module's syntax and that each imported name is
   actually exported. A typo there would otherwise only show up as a blank window.
-- Run `node --experimental-vm-modules tools/test_ui.cjs` for the document, clipboard and AI
+- Run `node --experimental-vm-modules tools/test_ui.cjs` for the document, editing and clipboard
   regression tests. They use the real UI modules with stubbed DOM and Tauri boundaries.
 
 **CSS**

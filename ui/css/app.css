@@ -1075,53 +1075,11 @@ input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 .link-btn { border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: 12px; padding: 2px 4px; }
 .link-btn:hover { text-decoration: underline; }
 
-/* AI assistant ------------------------------------------------------------ */
+/* Inspector tabs ---------------------------------------------------------- */
 .tabs { gap: 2px; padding: 8px 6px; }
 .tab { min-width: 0; padding: 0 4px; flex: 1 1 auto; gap: 5px; }
 .tab svg { flex: none; }
 .tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tab.icon-only { flex: 0 0 auto; padding-left: 9px; padding-right: 9px; }
-.inspector-body.assistant { padding-bottom: 0; overflow: hidden; display: flex; flex-direction: column; }
-.ai-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.ai-chat { flex: 1; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; }
-.ai-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 18px 6px; }
-.ai-empty-icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); margin-bottom: 4px; }
-.ai-empty p { margin: 0 0 8px; line-height: 1.45; }
-.ai-suggestions { display: flex; flex-direction: column; gap: 6px; align-self: stretch; }
-.ai-suggestion {
-  display: flex; align-items: center; gap: 8px; text-align: start; padding: 8px 10px; border-radius: var(--radius);
-  border: 1px solid var(--border); background: var(--panel-2); color: var(--text-2); font: inherit; font-size: 12.5px; cursor: pointer;
-}
-.ai-suggestion:hover:not(:disabled) { background: var(--hover); color: var(--text); border-color: var(--border-strong); }
-.ai-suggestion svg { flex: none; color: var(--accent); }
-.ai-msg { display: flex; flex-direction: column; gap: 5px; max-width: 100%; }
-.ai-msg.user { align-items: flex-end; }
-.ai-bubble { padding: 8px 11px; border-radius: 12px; line-height: 1.45; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 92%; }
-.ai-msg.user .ai-bubble { background: var(--accent); color: var(--on-accent); border-end-end-radius: 4px; }
-.ai-msg.assistant .ai-bubble { background: var(--panel-2); color: var(--text); border-end-start-radius: 4px; }
-.ai-msg.error .ai-bubble { background: rgba(248, 113, 113, 0.12); color: var(--danger); }
-.ai-msg.muted .ai-bubble { color: var(--muted); font-style: italic; }
-.ai-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-.ai-chip { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
-.ai-undo { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
-.ai-composer { border-top: 1px solid var(--border); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
-.ai-composer textarea { resize: none; width: 100%; min-height: 64px; font: inherit; font-size: 13px; line-height: 1.4; padding: 8px 10px; }
-.ai-composer-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ai-composer-foot .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-progress { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-.ai-progress.compact { padding: 6px 10px; border-radius: 12px; background: var(--panel-2); font-size: 12.5px; }
-.ai-progress-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
-.ai-spinner { display: inline-flex; color: var(--accent); animation: spin 1s linear infinite; }
-.ai-generate { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
-.ai-generate.running { opacity: 0.6; pointer-events: none; }
-.ai-generate textarea { width: 100%; resize: vertical; font: inherit; font-size: 13.5px; line-height: 1.45; padding: 9px 11px; }
-.ai-label { font-size: 12px; font-weight: 600; color: var(--text-2); margin-top: 4px; }
-.ai-add-source { align-self: flex-start; font-size: 12.5px; }
-.ai-grid { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
-.ai-model-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
-.ai-model-row .select, .ai-model-row .textfield { flex: 1; min-width: 0; }
-.ihint.error { color: var(--danger); }
-.btn-ai svg { color: var(--accent); }
 
 /* Right-to-left interface (Arabic) --------------------------------------- */
 /* Slides look the same in every interface language: the canvas, rulers and

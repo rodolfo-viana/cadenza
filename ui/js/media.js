@@ -11,14 +11,11 @@ import * as A from './actions.js';
 import { cls, escapeHtml } from './util.js';
 import { t, N_ } from './i18n.js';
 
-// [where to get a key, service name, what the key is called, free?]
+// [where to get a key, service name, what the key is called]
 const KEY_LINKS = {
-  unsplash: ['https://unsplash.com/oauth/applications', 'Unsplash', N_('Access Key'), true],
-  giphy: ['https://developers.giphy.com/dashboard/', 'GIPHY', N_('API Key'), true],
-  youtube: ['https://console.cloud.google.com/apis/library/youtube.googleapis.com', 'YouTube', N_('Data API key'), true],
-  anthropic: ['https://console.anthropic.com/settings/keys', 'Anthropic', N_('API key'), false],
-  openai: ['https://platform.openai.com/api-keys', 'OpenAI', N_('API key'), false],
-  compatible: ['', N_('server'), N_('API key (only if it needs one)'), false],
+  unsplash: ['https://unsplash.com/oauth/applications', 'Unsplash', N_('Access Key')],
+  giphy: ['https://developers.giphy.com/dashboard/', 'GIPHY', N_('API Key')],
+  youtube: ['https://console.cloud.google.com/apis/library/youtube.googleapis.com', 'YouTube', N_('Data API key')],
 };
 
 const TABS = [
@@ -112,8 +109,7 @@ const isLink = (q) => /^https?:\/\/\S+$/i.test(q.trim());
 export function KeyPrompt({ name, onSaved, compact }) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
-  const [url, label, what, free] = KEY_LINKS[name];
-  const service = t(label);
+  const [url, service, what] = KEY_LINKS[name];
   const keyName = t(what);
   const save = async () => {
     setBusy(true);
@@ -132,8 +128,8 @@ export function KeyPrompt({ name, onSaved, compact }) {
     <div class="key-body">
       ${!compact && html`<b>${t('Connect {service}', { service })}</b>`}
       <p class="muted small">
-        ${free ? t('Paste your free {service} {keyName}.', { service, keyName }) : t('Paste your {service} {keyName}.', { service, keyName })}${' '}
-        ${url && html`<a href="#" onClick=${(e) => { e.preventDefault(); opener.openUrl(url); }}>${t('Get one here')}</a>. `}
+        ${t('Paste your free {service} {keyName}.', { service, keyName })}${' '}
+        <a href="#" onClick=${(e) => { e.preventDefault(); opener.openUrl(url); }}>${t('Get one here')}</a>.${' '}
         ${t('It is stored securely on this computer.')}
       </p>
       <div class="row-inline">

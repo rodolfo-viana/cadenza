@@ -1,4 +1,4 @@
-// Behavioral tests for document closing, portable clipboard operations and AI.
+// Behavioral tests for document closing, editing and portable clipboard operations.
 // Uses real UI modules with DOM/Tauri boundaries stubbed; no npm dependencies.
 // Run: node --experimental-vm-modules tools/test_ui.cjs
 const assert = require('node:assert/strict');
@@ -45,11 +45,9 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
       invoke, clipboard, importBytes, dialog: {}, opener: {}, events: { listen() {} },
       FILE_FILTER: [], IMAGE_EXTS: [], VIDEO_EXTS: [], currentWindow: () => ({ setTitle: async () => {} }),
     },
-    'i18n.js': { t: (s) => s, tn: (s) => s, N_: (s) => s, setLanguage: async () => {}, language: () => 'en', LANGUAGES: [] },
-    'controls.js': { parseColor: () => null, toCss: (v) => v, Row() {}, Segmented() {}, Select() {}, TextField() {}, Toggle() {} },
+    'i18n.js': { t: (s) => s, N_: (s) => s, setLanguage: async () => {}, language: () => 'en' },
+    'controls.js': { parseColor: () => null, toCss: (v) => v },
     'icons.js': { Icon() {} },
-    'ui.js': { Button() {}, Modal() {} },
-    'media.js': { KeyPrompt() {} },
   };
   const cache = new Map();
   function module(name) {
@@ -63,14 +61,14 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
     cache.set(name, mod);
     return mod;
   }
-  for (const name of ['actions.js', 'textedit.js', 'ai.js', 'notes.js']) {
+  for (const name of ['actions.js', 'textedit.js', 'notes.js']) {
     const mod = module(name);
     await mod.link((specifier) => module(path.basename(specifier)));
     await mod.evaluate();
   }
   return {
     S: module('store.js').namespace, A: module('actions.js').namespace,
-    T: module('textedit.js').namespace, AI: module('ai.js').namespace, Notes: module('notes.js').namespace,
+    T: module('textedit.js').namespace, Notes: module('notes.js').namespace,
   };
 }
 
@@ -227,57 +225,6 @@ test('a delayed clipboard read cannot paste into a replacement document', async 
   assert.equal(calls.length, 0);
 });
 
-for (const mode of ['edit', 'new']) {
-  test(`a late AI ${mode} response is ignored after switching documents`, async () => {
-    const response = deferred();
-    const { S, AI } = await ui(async (name, args) => {
-      assert.equal(name, 'ai_run');
-      assert.equal(args.req.docId, mode === 'edit' ? 'document-a' : null);
-      return response.promise;
-    });
-    if (mode === 'edit') S.openView(view());
-    const running = AI.runAi({ mode, prompt: 'Change the title' });
-    S.openView(view('document-b'));
-    response.resolve({ view: view(), summary: {} });
-    assert.equal(await running, null);
-    assert.equal(S.state.doc.docId, 'document-b');
-    assert.equal(S.state.ai, null);
-  });
-}
-
-test('an AI change that Stop came too late to prevent is still shown', async () => {
-  for (const outcome of ['applied', 'cancelled']) {
-    const response = deferred();
-    const { S, AI } = await ui(async (name) => (name === 'ai_run' ? response.promise : undefined));
-    S.openView(view());
-    const running = AI.runAi({ mode: 'edit', prompt: 'Change the title' });
-    AI.cancelAi();
-    assert.equal(S.state.ai, null);
-    if (outcome === 'applied') response.resolve({ view: view(), summary: {} });
-    else response.reject('Cancelled');
-    const res = await running;
-    assert.equal(!!res, outcome === 'applied');
-  }
-});
-
-test('an AI request waiting for edits is abandoned if its document closes', async () => {
-  const flushing = deferred();
-  const started = deferred();
-  const calls = [];
-  const { S, AI } = await ui(async (name) => { calls.push(name); });
-  S.openView(view());
-  S.set({ info: { settings: { showInspector: true } } });
-  const unregister = S.registerFlush(() => { started.resolve(); return flushing.promise; });
-  AI.askAssistant('Change the title');
-  await started.promise;
-  S.openView(view('document-b'));
-  flushing.resolve();
-  await tick();
-  unregister();
-  assert(!calls.includes('ai_run'));
-  assert.equal(S.state.doc.docId, 'document-b');
-});
-
 for (const action of ['close', 'save', 'endEditing']) {
   test(`a failed table edit prevents ${action} and is retried without losing the cell`, async () => {
     const backend = view();
@@ -419,7 +366,7 @@ for (const kind of ['table', 'text']) {
     const calls = [];
     const { S, T } = await ui(async (name) => {
       calls.push(name);
-      // The assistant replaced the slide: the backend no longer has the element.
+      // The slide was replaced: the backend no longer has the element.
       if (name === 'doc_apply') throw new Error('element not found');
       if (name === 'recent_list') return [];
     }, {}, { quiet: true });
@@ -466,29 +413,6 @@ test('notes of a slide removed elsewhere do not block closing', async () => {
   assert(!calls.includes('doc_apply'));
 });
 
-test('an older stopped AI result cannot replace a newer completed edit', async () => {
-  const first = deferred(), second = deferred();
-  let runs = 0;
-  const latest = view('document-a', 4);
-  latest.deck.title = 'Second';
-  const { S, AI } = await ui(async (name) => {
-    if (name === 'ai_run') return ++runs === 1 ? first.promise : second.promise;
-    if (name === 'doc_refresh') return clone(latest);
-  });
-  S.openView(view());
-  const older = AI.runAi({ mode: 'edit', prompt: 'Use the title First' });
-  AI.cancelAi();
-  const newer = AI.runAi({ mode: 'edit', prompt: 'Use the title Second' });
-  second.resolve({ view: { ...clone(latest), revision: 3 }, summary: {} });
-  S.ingestView((await newer).view);
-  const outdated = view('document-a', 2);
-  outdated.deck.title = 'First';
-  first.resolve({ view: outdated, summary: {} });
-  assert.equal(await older, null);
-  assert.equal(S.state.doc.deck.title, 'Second');
-  assert.equal(S.state.doc.revision, 4);
-});
-
 test('out-of-order incremental views refresh missing renderings and ignore stale data', async () => {
   const response = deferred();
   const calls = [];
@@ -503,7 +427,7 @@ test('out-of-order incremental views refresh missing renderings and ignore stale
   const second = view('document-a', 2);
   second.deck.title = 'Old';
   assert.equal(S.ingestView(second), false);
-  // A more recent AI view arrives while the refresh response is in transit.
+  // A more recent view arrives while the refresh response is in transit.
   const fifth = view('document-a', 5);
   fifth.deck.title = 'Even newer';
   fifth.slides = { 'slide-1': { html: 'Current rendering' } };
