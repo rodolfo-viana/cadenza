@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cadenza — Presentation</title>
+<link rel="stylesheet" href="vendor/reveal/reset.css">
+<link rel="stylesheet" href="vendor/reveal/reveal.css">
+<link rel="stylesheet" id="cz-theme">
+<link rel="stylesheet" href="css/content.css">
+<style id="cz-deck-css"></style>
+<style>
+  html, body { height: 100%; margin: 0; background: #000; }
+  .cz-preview .reveal .controls, .cz-preview .reveal .progress, .cz-preview .reveal .slide-number { display: none !important; }
+  .cz-print-bar {
+    position: fixed; z-index: 1000; top: 12px; right: 12px; display: flex; gap: 8px; align-items: center;
+    padding: 8px 10px; border-radius: 10px; background: rgba(20, 20, 24, 0.92); color: #eee;
+    font: 13px/1.3 system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  }
+  .cz-print-bar button {
+    font: inherit; padding: 6px 12px; border-radius: 7px; border: 0; cursor: pointer;
+    background: #6366f1; color: #fff;
+  }
+  .cz-print-bar button.secondary { background: #3f3f46; }
+  .cz-print-bar span { opacity: 0.75; max-width: 320px; }
+  @media print { .cz-print-bar { display: none !important; } }
+  .cz-loading { position: fixed; inset: 0; display: grid; place-items: center; color: #888; font: 15px system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div class="cz-loading" id="cz-loading">Loading…</div>
+<div class="reveal"><div class="slides"></div></div>
+<script src="vendor/reveal/reveal.js"></script>
+<script src="js/runtime.js"></script>
+<script src="js/present.js"></script>
+</body>
+</html>

@@ -1,0 +1,407 @@
+/*
+ * Cadenza slide content.
+ *
+ * Shared by the editor canvas, the live presentation and exported decks so
+ * that what you edit is exactly what you present. Every rule is scoped under
+ * `.reveal` and beats the theme's generic element rules where needed.
+ */
+
+/* ---- Slide frame --------------------------------------------------------- */
+
+.reveal .slides > section,
+.reveal .slides > section > section {
+  padding: 0;
+}
+
+.reveal .cz-slide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  text-align: left;
+  overflow: visible;
+}
+
+.reveal .cz-el {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.reveal .cz-rot,
+.reveal .cz-frag,
+.reveal .cz-link {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.reveal .cz-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.reveal .cz-box {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+}
+
+/* ---- Text ---------------------------------------------------------------- */
+
+.reveal .cz-text-box,
+.reveal .cz-shape-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.reveal .cz-v-top { justify-content: flex-start; }
+.reveal .cz-v-middle { justify-content: center; }
+.reveal .cz-v-bottom { justify-content: flex-end; }
+
+.reveal .cz-text {
+  width: 100%;
+  font-family: var(--r-main-font);
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  white-space: normal;
+  outline: none;
+}
+
+.reveal .cz-text p,
+.reveal .cz-text div {
+  margin: 0 0 var(--cz-ps, 0.4em);
+  line-height: inherit;
+}
+
+.reveal .cz-text ul,
+.reveal .cz-text ol {
+  display: block;
+  margin: 0 0 var(--cz-ps, 0.4em);
+  padding: 0 0 0 1.25em;
+  text-align: inherit;
+}
+
+.reveal .cz-text li {
+  margin: 0 0 calc(var(--cz-ps, 0.4em) * 0.5);
+}
+
+.reveal .cz-text li > ul,
+.reveal .cz-text li > ol {
+  margin: calc(var(--cz-ps, 0.4em) * 0.5) 0 0;
+}
+
+.reveal .cz-text > :last-child,
+.reveal .cz-text li:last-child {
+  margin-bottom: 0;
+}
+
+.reveal .cz-text a {
+  color: var(--r-link-color);
+  text-decoration: underline;
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.12em;
+}
+
+.reveal .cz-text code {
+  font-family: var(--r-code-font);
+  font-size: 0.9em;
+  padding: 0.05em 0.3em;
+  border-radius: 0.2em;
+  background: var(--cz-surface, rgba(127, 127, 127, 0.15));
+  text-transform: none;
+}
+
+.reveal .cz-text blockquote {
+  width: auto;
+  margin: 0 0 var(--cz-ps, 0.4em);
+  padding: 0 0 0 0.8em;
+  border-left: 0.12em solid var(--cz-accent, currentColor);
+  background: none;
+  box-shadow: none;
+  font-style: italic;
+}
+
+.reveal .cz-text mark {
+  color: inherit;
+  background: color-mix(in srgb, var(--cz-accent, #fde047) 35%, transparent);
+  padding: 0 0.1em;
+}
+
+.reveal .cz-text small {
+  display: inline;
+  vertical-align: baseline;
+  line-height: inherit;
+}
+
+.reveal .cz-role-title,
+.reveal .cz-role-heading {
+  font-family: var(--r-heading-font);
+  color: var(--r-heading-color);
+  font-weight: var(--r-heading-font-weight);
+  text-transform: var(--r-heading-text-transform);
+  letter-spacing: var(--r-heading-letter-spacing);
+  text-shadow: var(--r-heading-text-shadow);
+  line-height: var(--r-heading-line-height);
+}
+
+.reveal .cz-role-title { text-shadow: var(--r-heading1-text-shadow); }
+.reveal .cz-role-subtitle { opacity: 0.85; }
+.reveal .cz-role-caption { opacity: 0.72; letter-spacing: 0.02em; }
+
+.reveal .cz-role-quote {
+  font-family: var(--r-heading-font);
+  font-style: italic;
+  line-height: 1.3;
+}
+
+/* Editor-only states (never produced for presentations). */
+.reveal .cz-placeholder { opacity: 0.38; }
+.reveal .cz-empty:empty::before { content: "\200b"; }
+
+/* ---- Shapes -------------------------------------------------------------- */
+
+.reveal .cz-shape-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.reveal .cz-shape-text {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+}
+
+.reveal .cz-shape-box .cz-text {
+  color: var(--cz-on-accent, #fff);
+}
+
+/* ---- Media --------------------------------------------------------------- */
+
+.reveal .cz-image-box,
+.reveal .cz-video-box,
+.reveal .cz-embed-box,
+.reveal .cz-table-box,
+.reveal .cz-code-box {
+  overflow: hidden;
+}
+
+.reveal .cz-image-box img,
+.reveal .cz-video-box img,
+.reveal .cz-video-box video,
+.reveal .cz-video-box iframe,
+.reveal .cz-embed-box iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: inherit;
+}
+
+.reveal .cz-video-box img { object-fit: cover; }
+
+.reveal .cz-image-empty,
+.reveal .cz-embed-preview {
+  background:
+    repeating-linear-gradient(45deg, rgba(127, 127, 127, 0.08) 0 14px, rgba(127, 127, 127, 0.14) 14px 28px);
+  outline: 2px dashed rgba(127, 127, 127, 0.45);
+  outline-offset: -2px;
+}
+
+.reveal .cz-placeholder-media {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  box-sizing: border-box;
+  font: 600 18px/1.3 system-ui, sans-serif;
+  color: rgba(127, 127, 127, 0.95);
+  text-align: center;
+  text-transform: none;
+  letter-spacing: 0;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+.reveal .cz-embed-preview .cz-placeholder-media {
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+}
+
+.reveal .cz-ph-icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--cz-icon) center / contain no-repeat;
+  mask: var(--cz-icon) center / contain no-repeat;
+}
+
+.reveal .cz-ph-image { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21'/%3E%3C/svg%3E"); }
+.reveal .cz-ph-video { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11'/%3E%3Crect x='2' y='6' width='14' height='12' rx='2'/%3E%3C/svg%3E"); }
+.reveal .cz-ph-play { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M8 5.1v13.8a1 1 0 0 0 1.5.9l11-6.9a1 1 0 0 0 0-1.7l-11-6.9A1 1 0 0 0 8 5.1z'/%3E%3C/svg%3E"); }
+.reveal .cz-ph-web { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20'/%3E%3C/svg%3E"); }
+
+/* ---- Diagrams ------------------------------------------------------------ */
+
+.reveal .cz-diagram-box img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  object-fit: contain;
+}
+
+.reveal .cz-ph-diagram { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='8' x='3' y='3' rx='2'/%3E%3Cpath d='M7 11v4a2 2 0 0 0 2 2h4'/%3E%3Crect width='8' height='8' x='13' y='13' rx='2'/%3E%3C/svg%3E"); }
+
+/* ---- Code ---------------------------------------------------------------- */
+
+.reveal .cz-code-box {
+  display: flex;
+  flex-direction: column;
+  background: #272822;
+  color: #f8f8f2;
+}
+
+.reveal .cz-code-box pre.cz-code {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  font-size: 1em;
+  line-height: 1.45;
+  box-shadow: none;
+  text-align: left;
+}
+
+.reveal .cz-code-box pre.cz-code code {
+  box-sizing: border-box;
+  height: 100%;
+  max-height: none;
+  padding: 0.75em 1em;
+  font-family: var(--r-code-font);
+  font-size: inherit;
+  line-height: inherit;
+  overflow: hidden;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.reveal .cz-code-title {
+  flex: none;
+  padding: 0.45em 1em;
+  font: 600 0.62em/1.3 var(--r-main-font);
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(0, 0, 0, 0.25);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.reveal .cz-no-ln .hljs-ln-numbers { display: none; }
+
+.reveal .cz-code-box .hljs table { margin: 0; }
+.reveal .cz-code-box .hljs-ln-numbers,
+.reveal .cz-code-box .hljs-ln-code { padding: 0; border: 0; }
+.reveal .cz-code-box .hljs-ln-numbers {
+  padding-right: 0.9em;
+  text-align: right;
+  vertical-align: top;
+  opacity: 0.45;
+  user-select: none;
+}
+
+/* ---- Math ---------------------------------------------------------------- */
+
+.reveal .cz-math-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.reveal .cz-math { max-width: 100%; }
+.reveal .cz-math .katex-display { margin: 0; }
+.reveal .cz-math .katex { font-size: 1em; }
+
+/* ---- Tables -------------------------------------------------------------- */
+
+.reveal table.cz-table {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--r-main-font);
+}
+
+.reveal table.cz-table td,
+.reveal table.cz-table th {
+  padding: 0.35em 0.6em;
+  border: 0;
+  border-bottom: 1px solid var(--cz-grid, rgba(127, 127, 127, 0.35));
+  text-align: inherit;
+  vertical-align: middle;
+  font-weight: inherit;
+  overflow-wrap: break-word;
+  outline: none;
+}
+
+.reveal table.cz-table tbody tr:last-child > * { border-bottom: 0; }
+
+.reveal table.cz-table.cz-head-row tr:first-child > * {
+  background: var(--cz-head-bg);
+  color: var(--cz-head-fg);
+  font-weight: 700;
+}
+
+.reveal table.cz-table.cz-head-col tr > :first-child { font-weight: 700; }
+
+.reveal table.cz-table.cz-striped:not(.cz-head-row) tr:nth-child(even) > *,
+.reveal table.cz-table.cz-striped.cz-head-row tr:nth-child(odd):not(:first-child) > * {
+  background: var(--cz-stripe);
+}
+
+/* ---- Charts -------------------------------------------------------------- */
+
+.reveal .cz-chart-box {
+  display: flex;
+  font-family: var(--r-main-font);
+}
+
+.reveal .cz-chart-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* ---- Auto-height text boxes ---------------------------------------------- */
+
+/* The wrapper's min-height is the stored height; the content can grow it. */
+.reveal .cz-el.cz-auto > .cz-rot,
+.reveal .cz-el.cz-auto .cz-frag,
+.reveal .cz-el.cz-auto .cz-link,
+.reveal .cz-el.cz-auto .cz-box {
+  position: relative;
+  inset: auto;
+  min-height: inherit;
+}
+
+/* ---- Inline math in text ($…$, $$…$$) ------------------------------------------ */
+
+.reveal .cz-math-inline .katex { font-size: 1.08em; }
+.reveal .cz-math-display { display: block; margin: 0.25em 0; text-align: center; }
+.reveal .cz-math-display .katex-display { margin: 0; }
+.reveal .cz-math-display .katex { font-size: 1.08em; }

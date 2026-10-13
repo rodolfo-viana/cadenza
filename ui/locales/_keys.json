@@ -1,0 +1,5585 @@
+[
+ {
+  "key": "+ Add notes or source text",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "+ Add row",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "+{n} slides",
+  "files": [
+   "ai.js"
+  ],
+  "one": "+{n} slide"
+ },
+ {
+  "key": "0 = off",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "0 = use the presentation setting",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "A bold statement.",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "A presentation studio built with Rust and the {engine} engine.",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "A subtitle goes here",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "About",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "About Cadenza",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Accent",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Access Key",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Actual Size",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Add a summary slide at the end",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Add column",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Add Horizontal Guide at Center",
+  "files": [
+   "canvas.js",
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Add notes for this slide — only you see them, in the presenter display.",
+  "files": [
+   "notes.js"
+  ]
+ },
+ {
+  "key": "Add photo credit",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Add row",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Add series",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Add Slides",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Add stock photos to image slides (Openverse, or Unsplash when connected)",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Add the imported slides after the existing ones, or replace the whole presentation?",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Add Vertical Guide at Center",
+  "files": [
+   "canvas.js",
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Add your Anthropic API key first",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "Add your Anthropic API key in Settings ▸ AI Assistant",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "Add your OpenAI API key first",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "Added “{name}” to My Themes",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Adding GIF…",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Adding photo…",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Address",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "AI",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "AI Assistant",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "AI Edit",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "AI Presentation",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "Align",
+  "files": [
+   "canvas.js",
+   "panels.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Align Bottom",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Align bottoms",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align bottoms (to slide)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align centers",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align centers (to slide)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align Centers Horizontally",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Align Left",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Align left",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align left (to slide)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align Middles",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Align middles",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align middles (to slide)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align Right",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Align right",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align right (to slide)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align Top",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Align tops",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Align tops (to slide)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "All",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "All slides are skipped — there is nothing to present.",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "Alternative text for accessibility",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Angle",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Animate",
+  "files": [
+   "inspector.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Animate Inspector",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Animate objects shared with the previous slide",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Animated GIFs",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Animate…",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Any OpenAI-compatible server: Ollama, LM Studio, llama.cpp, vLLM, OpenRouter…",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "API key",
+  "files": [
+   "ai.js",
+   "media.js"
+  ]
+ },
+ {
+  "key": "API Key",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "API key (only if it needs one)",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "App theme",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Appear (fade)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Appear, then dim",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Appear, then disappear",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Appearance",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Applied after the theme.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Apply to All Slides",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Apply to Presentation",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Area",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Arrange",
+  "files": [
+   "canvas.js",
+   "commands.js",
+   "panels.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Arrow",
+  "files": [
+   "panels.js",
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Arrow keys",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Arrow Line",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "As typed",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Ask for a change… (e.g. “Add three slides about pricing after this one”)",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Ask the Assistant…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Assistant",
+  "files": [
+   "inspector.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Audience",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Author",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Auto",
+  "files": [
+   "ai.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Auto-advance",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "B or .",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Background",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Background Image",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Background Video",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Backgrounds",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Bar",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Base",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Base size",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Big Image",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Big Number",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Black screen",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "black screen",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Blank",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Blur",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Body",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Body text",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Body Text",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Bold (Ctrl+B)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Border",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Border color",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Bottom",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Bottom left",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Bottom right",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Brightness",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Bring Forward",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Bring forward",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Bring to Front",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Bring to front",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Browse GIPHY…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Browse the web",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Browse Unsplash…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Browse YouTube…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Browse {site}",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Build",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Build in",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Build In",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Build Order ({n})",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Build out",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Builds play one click at a time during the presentation. Objects with the same step appear together.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Bulleted list",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Burst",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Cadenza failed to start:",
+  "files": [
+   "main.js"
+  ]
+ },
+ {
+  "key": "Cadenza Presentation",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Cadenza Theme",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Cadenza themes",
+  "files": [
+   "inspector.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Cancel",
+  "files": [
+   "ai.js",
+   "dialogs.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Cannot create the session folder",
+  "files": [
+   "document.rs"
+  ]
+ },
+ {
+  "key": "Capitalize",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Caption",
+  "files": [
+   "panels.js",
+   "slideview.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Case",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Center",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Center on Slide",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Centered equation:",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Change Slide",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Change Slide Size",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Changing the size scales your content to fit. reveal.js scales slides to any screen.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Chart",
+  "files": [
+   "commands.js",
+   "inspector.js",
+   "panels.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Chart & Shape Palette",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "ChatGPT Plus and Claude Pro/Max subscriptions can’t be used by other apps; the providers offer API keys for that (billed by use, usually a few cents per presentation). For free, offline use, run a local model with Ollama and choose “Other”.",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Chevron",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Choose a layout",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Choose a model in Settings ▸ AI Assistant",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "Choose a theme",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Choose File…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Choose Image",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Choose Image…",
+  "files": [
+   "canvas.js",
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Choose Video",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Choose Video File…",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Choose Video…",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Choose “Print to File” (PDF) or “Save as PDF” in the dialog.",
+  "files": [
+   "present.js"
+  ]
+ },
+ {
+  "key": "Choose…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Class",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Classic",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Classic reveal.js themes",
+  "files": [
+   "inspector.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Clear All Guides",
+  "files": [
+   "canvas.js",
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Clear formatting",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Click to add text",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Close",
+  "files": [
+   "dialogs.js",
+   "present.js",
+   "ui.js"
+  ]
+ },
+ {
+  "key": "Close Presentation",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Cloud",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Code",
+  "files": [
+   "inspector.js",
+   "panels.js",
+   "toolbar.js",
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Code Block",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Code Blocks",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Color",
+  "files": [
+   "inspector.js",
+   "panels.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Color {number}",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Colors",
+  "files": [
+   "panels.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Column",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Columns",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Command Palette…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Connect {service}",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Connected",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Connecting…",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Connect…",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Constrain movement / keep proportions",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Contrast",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Copy",
+  "files": [
+   "canvas.js",
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Copy the link of the video you want, then come back to Cadenza.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Corners",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Corrupted font in theme",
+  "files": [
+   "custom_theme.rs"
+  ]
+ },
+ {
+  "key": "Could not load the diagram engine",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Could not open the presentation",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Could not open {name}",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Could not reach Anthropic. Check your internet connection.",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "Could not reach Google Fonts — check your internet connection",
+  "files": [
+   "webfonts.rs"
+  ]
+ },
+ {
+  "key": "Could not reach the AI service. Check your internet connection (or that the server is running).",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "Could not reach the service — check your internet connection",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
+  "key": "Could not save",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Could not start the presentation: {error}",
+  "files": [
+   "present.js"
+  ]
+ },
+ {
+  "key": "Create a guide (drag it back to remove)",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Create a Presentation with AI…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Create Presentation",
+  "files": [
+   "ai.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Create with AI",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Create with AI…",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Ctrl + drag",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Ctrl + scroll",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Cube (convex)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Current",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Current slide",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Custom CSS",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Customize…",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Cut",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Dark",
+  "files": [
+   "dialogs.js",
+   "panels.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Dashed",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Data API key",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "deck.json is corrupted",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
+  "key": "deck.json is unreasonably large",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
+  "key": "Default",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Default (from theme)",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Default (←→ and ↑↓)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Delete",
+  "files": [
+   "commands.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Delete from My Themes",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Delete Slide",
+  "files": [
+   "commands.js",
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Delete {n} Slides",
+  "files": [
+   "navigator.js"
+  ],
+  "one": "Delete {n} Slide"
+ },
+ {
+  "key": "Describe the image",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Description",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Deselect",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Diagram",
+  "files": [
+   "inspector.js",
+   "panels.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Diagram (Mermaid)",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Diamond",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Dim",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Discard",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Display",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Dissolve (fade)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Distribute Horizontally",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Distribute horizontally",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Distribute Vertically",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Document",
+  "files": [
+   "inspector.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Document Inspector",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Dollar sign:",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Done.",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Donut",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Don’t Save",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Don’t Skip Slide",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Dot",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Dotted",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Double Arrow",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Double-click",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Double-click to choose a video",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Double-click to choose an image",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Download failed — check your internet connection",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
+  "key": "Downloading…",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Drag down to add a horizontal guide",
+  "files": [
+   "rulers.js"
+  ]
+ },
+ {
+  "key": "Drag from a ruler",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Drag right to add a vertical guide",
+  "files": [
+   "rulers.js"
+  ]
+ },
+ {
+  "key": "Drop a presentation to open it",
+  "files": [
+   "main.js"
+  ]
+ },
+ {
+  "key": "Drop images, videos, Markdown or presentations",
+  "files": [
+   "main.js"
+  ]
+ },
+ {
+  "key": "Duplicate",
+  "files": [
+   "commands.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Duplicate for Magic Move",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Duplicate Slide",
+  "files": [
+   "commands.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "e.g. 1|2-3|5,7",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "e.g. A 10-minute talk introducing photosynthesis to high-school students, with a diagram of the light reactions",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "e.g. investors, students, a conference",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "e.g. llama3.3",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Each “|” is a click during the presentation that highlights those lines.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Earlier",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Easing",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Edit",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Edit Cells",
+  "files": [
+   "canvas.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Edit Text",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Edit text / replace image",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Edit Theme…",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Edited",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Editing",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Effect",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "element not found",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Embed",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Embed Web Page",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "embedded",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Embedded fonts",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Emphasis",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Enable the AI assistant",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "end",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "End of presentation",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "End Show",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "End show (Esc)",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "End the show",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Ends",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Entity Relationship",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Equation",
+  "files": [
+   "inspector.js",
+   "panels.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Equation (LaTeX)",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Expected binary data",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "Export",
+  "files": [
+   "commands.js",
+   "themebuilder.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Export as PDF / Print…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Export as reveal.js CSS…",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Export as Single HTML File",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Export as Single HTML File…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Export as Website (folder)…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Export as Website Folder (name the new folder)",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Export reveal.js Theme CSS",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Export Theme",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Export Theme File…",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Exported HTML file",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Exported website folder",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Exported {name}",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Exporting…",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Fade down",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Fade from left",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Fade from right",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Fade out",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Fade up",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Fast",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "File",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Fill",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Fill & Border",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Find Photo Online…",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Finding {n} photos…",
+  "files": [
+   "ai.js"
+  ],
+  "one": "Finding a photo…"
+ },
+ {
+  "key": "Fit",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Fit Box to Diagram",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Fit to Window",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Fix spelling and grammar everywhere",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Flip",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "flip::Horizontal",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "flip::Vertical",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Flowchart",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Focus",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Font",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "font weight::Black",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "font weight::Bold",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "font weight::Extra Bold",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "font weight::Light",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "font weight::Medium",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "font weight::Regular",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "font weight::Semibold",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Forest",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Format",
+  "files": [
+   "inspector.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Format Inspector",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Formatting applies to the selected text.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Frame",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Free high-quality photos",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "From",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "From Computer…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "From this computer",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Gantt",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Get one here",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "GIF via GIPHY",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "GIFs",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "GIFs (GIPHY)…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Git graph",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Glow",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Glow (accent)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Go to slide",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Go to slide {n}: {title}",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Google fonts are downloaded once and embedded in the presentation, so they work offline and in exports.",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Gradient",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Grayscale",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Grid",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Grid lines",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Grid size",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Grow",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Grow box to fit text",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Guides",
+  "files": [
+   "canvas.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "H",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Handwriting",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Hard",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Hard (offset)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Has builds",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Has speaker notes",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Header column",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Header fill",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Header row",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Header text",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Heading",
+  "files": [
+   "panels.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Headings",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Heart",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Help",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Hexagon",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Hide Guides",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Hide notes",
+  "files": [
+   "notes.js"
+  ]
+ },
+ {
+  "key": "Hide rulers (Ctrl+R)",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Highlight",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Highlight blue",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Highlight green",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Highlight red",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Highlighting",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "I can add or rewrite slides, write speaker notes, translate, proofread, build charts, tables and diagrams, or change the theme.",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "I didn’t change anything.",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Image",
+  "files": [
+   "actions.js",
+   "inspector.js",
+   "media.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Image & Text",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Image by {author}",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "image fit::Fill",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "image fit::Fit",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Images",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Image…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Import Markdown",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Import Markdown…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Import Theme",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Import Theme…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Imported Markdown slides",
+  "files": [
+   "main.js"
+  ]
+ },
+ {
+  "key": "Imported {name}",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Import…",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "In this presentation",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Inline equation ($…$)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Inline equation:",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Insert",
+  "files": [
+   "actions.js",
+   "canvas.js",
+   "commands.js",
+   "inspector.js",
+   "media.js"
+  ]
+ },
+ {
+  "key": "Insert Image",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Insert Online Video",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Insert the video link you copied?",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Insert this GIF",
+  "files": [
+   "browse.rs"
+  ]
+ },
+ {
+  "key": "Insert this photo",
+  "files": [
+   "browse.rs"
+  ]
+ },
+ {
+  "key": "Insert this video",
+  "files": [
+   "browse.rs"
+  ]
+ },
+ {
+  "key": "Insert Video",
+  "files": [
+   "actions.js",
+   "media.js"
+  ]
+ },
+ {
+  "key": "Integrations",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Interactive while presenting",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Invalid address",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
+  "key": "Invalid diagram",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "invalid session",
+  "files": [
+   "document.rs"
+  ]
+ },
+ {
+  "key": "It is stored securely on this computer.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Italic (Ctrl+I)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Item {n}",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "just now",
+  "files": [
+   "util.js"
+  ]
+ },
+ {
+  "key": "Justify",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Keyboard Shortcuts",
+  "files": [
+   "commands.js",
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Language",
+  "files": [
+   "ai.js",
+   "dialogs.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Larger",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Larger notes (+)",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Later",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "LaTeX, e.g. {example}",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Learn more",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Left",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Left column",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Legend",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Letter",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Letter spacing (em)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Light",
+  "files": [
+   "dialogs.js",
+   "panels.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Line",
+  "files": [
+   "chart.rs",
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Line color",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Line height (0 = automatic)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "line height::Line",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Line numbers",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Linear",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Linear (all slides in a row)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Lines",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Link",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Link address…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Links",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Live preview",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Loading catalog…",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Loading system fonts…",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Local / other",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Lock",
+  "files": [
+   "canvas.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Lock / Unlock",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "lock poisoned",
+  "files": [
+   "secrets.rs"
+  ]
+ },
+ {
+  "key": "Locked",
+  "files": [
+   "canvas.js",
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Look",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Loop",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Loop presentation",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "lowercase",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Made with {tauri}, {reveal} (MIT), {katex} (MIT), {highlight} (BSD), {preact} (MIT) and {lucide} icons (ISC).",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Magic Move",
+  "files": [
+   "inspector.js",
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Magic Move (reveal.js auto-animate) smoothly moves and resizes objects that also appear on the previous slide. Tip: duplicate a slide, rearrange it, then turn this on for the copy.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Make this slide more concise",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Make Top-level Slide",
+  "files": [
+   "commands.js",
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Make Vertical Sub-slide",
+  "files": [
+   "commands.js",
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Markdown",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Math uses LaTeX, typeset with KaTeX.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Media",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Media Library",
+  "files": [
+   "media.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Medium",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Menu",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Middle",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Mindmap",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Mixed",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Model",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Model id",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Mono",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Mouse & presenting",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Move Slides",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Move without snapping",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Muted",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "My themes",
+  "files": [
+   "inspector.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Name",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "navigate",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Navigation",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Navigation arrows",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Neo",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Nest / un-nest slide (vertical stack)",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Neutral",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "New Presentation",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "New presentations",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "New Presentation…",
+  "files": [
+   "commands.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "New Slide",
+  "files": [
+   "commands.js",
+   "navigator.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "New slide ({shortcut})",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "New Slide with Layout",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "new theme",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "New Window",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Next",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Next Slide",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Next slide",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "No account or key needed.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "No builds on this slide. Select an object and choose a “Build in” effect.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "No fill",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "No matches",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "No notes for this slide.",
+  "files": [
+   "presenter.js"
+  ]
+ },
+ {
+  "key": "No presentation is open",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "No presentation is open in this window",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "None",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Normal",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Not saved",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Not saved yet — click to rename",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Notes",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "notes on {n} slides",
+  "files": [
+   "ai.js"
+  ],
+  "one": "notes on {n} slide"
+ },
+ {
+  "key": "Notes or source text (optional)",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Nothing",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "nothing to duplicate",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "nothing to move",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Nudge 1 px (Shift: 10 px)",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Numbered list",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Octagon",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "OK",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "On accent",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "On click",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "On this computer",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Online Video (YouTube, Vimeo)…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Online videos need an internet connection while presenting.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Opacity",
+  "files": [
+   "controls.js",
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Open a GIF to insert it",
+  "files": [
+   "browse.rs"
+  ]
+ },
+ {
+  "key": "Open a photo to insert it",
+  "files": [
+   "browse.rs"
+  ]
+ },
+ {
+  "key": "Open a presentation to pick Google Fonts here.",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Open a video to insert it",
+  "files": [
+   "browse.rs"
+  ]
+ },
+ {
+  "key": "Open in my web browser instead",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Open Presentation",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Open Recent",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Open the presenter display (notes, timer, next slide)",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Open web page",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Open {site}",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Opening…",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Openly licensed media via {service} — check each license",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Open…",
+  "files": [
+   "commands.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Optional and off by default. When it’s on, your request and the text of the presentation are sent to the provider you choose, only when you ask the assistant something.",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Optional file name or caption",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Optional online services for the Media Library. Keys are stored in your system keychain and never saved in presentations.",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Or search GIFs right here with an API key…",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Or search photos right here with an API key…",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Or search videos right here with an API key…",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Original",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Original Proportions",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Original Ratio",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Other",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Out step",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "out: {effect}",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Outline",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Outline color",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Oval",
+  "files": [
+   "commands.js",
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Padding",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Page address",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Palette",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Paragraph",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Parallelogram",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Paste",
+  "files": [
+   "canvas.js",
+   "navigator.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Paste a YouTube or Vimeo link",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
+  "key": "Paste an outline, an article, meeting notes…",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Paste Slides",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Paste your free {service} {keyName}.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Paste your {service} {keyName}.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Pause",
+  "files": [
+   "presenter.js"
+  ]
+ },
+ {
+  "key": "Pause/resume timer (P)",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Pentagon",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Photo",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Photo by {author} on Unsplash",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Photos",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Photos (Unsplash, Openverse)…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Photos from {service} — free to use, credit appreciated",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Pick any color",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Pick any of 1,800 Google Fonts: they are embedded in the file, so they work offline and in exports.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Pie",
+  "files": [
+   "diagrams.js",
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Play",
+  "files": [
+   "commands.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Play (F5)",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Play automatically",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Play from Beginning",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Play from Current Slide",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Play from This Slide",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Play options",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Playback",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Plus",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Position",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Powered by {service}",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Presentation",
+  "files": [
+   "actions.js",
+   "inspector.js",
+   "present.js",
+   "presenter.js",
+   "store.js"
+  ]
+ },
+ {
+  "key": "Presentation default",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Presentation title",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Presentation Title",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Presentations you open or save appear here.",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Presentations, powered by reveal.js",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Presenter — {title}",
+  "files": [
+   "presenter.js"
+  ]
+ },
+ {
+  "key": "Presenting",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Previous",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Previous Slide",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Print / Save PDF…",
+  "files": [
+   "present.js"
+  ]
+ },
+ {
+  "key": "Progress bar",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Provider",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Push (slide)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Quadrant",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Quote",
+  "files": [
+   "panels.js",
+   "toolbar.js",
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Radial",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Recent",
+  "files": [
+   "controls.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Recover",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Recovered unsaved presentation — remember to save it.",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Rectangle",
+  "files": [
+   "commands.js",
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Redo",
+  "files": [
+   "commands.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Redo {action}",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Redux",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Redux (color)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Refresh the model list",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Remove",
+  "files": [
+   "ai.js",
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Remove from list",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Remove from presentation",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Remove guide",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Remove Guide",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Remove last column",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Remove last row",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Remove link",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Remove row",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Remove series",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "renamed",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Rendering diagram…",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Rendering…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Reorder Builds",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Replace All",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Replace Image…",
+  "files": [
+   "canvas.js",
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Replace Video…",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Replace…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Reset",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Reset timer (R)",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Resume",
+  "files": [
+   "presenter.js"
+  ]
+ },
+ {
+  "key": "Reveal (concave)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "reveal.js CSS…",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Right",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Right column",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Right Triangle",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Rotate (Shift: 15° steps)",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Rotation",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Rounded Rectangle",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Rows",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Rulers",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Same as accent",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Same as my description",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Sans",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Saturation",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Save",
+  "files": [
+   "commands.js",
+   "dialogs.js",
+   "media.js"
+  ]
+ },
+ {
+  "key": "Save As…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Save changes to “{name}”?",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Save Presentation",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Save Presentation As",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Save to My Themes",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Saved",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Saved on this computer",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Saved “{name}” to My Themes",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Saving…",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Screen blacked out — press B to resume",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Scroll view (web page style)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Search fonts…",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Search GIFs…",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Search Online…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Search photos…",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Search YouTube or paste a YouTube/Vimeo link…",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Search YouTube, or paste a YouTube or Vimeo link.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Search {site} just like you normally do — then click {button} in the Cadenza bar at the bottom of the page.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "SECTION 01",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Section Header",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Section title",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Select All",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Send",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Send Backward",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Send backward",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Send to Back",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Send to back",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Sequence",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Series {n}",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Serif",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Server",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "server",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Settings",
+  "files": [
+   "dialogs.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Settings…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Shadow",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Shadow color",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Shape",
+  "files": [
+   "inspector.js",
+   "panels.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "shape stroke::Line",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Shift + drag",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Show / Hide Guides",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Show / Hide Inspector",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Show / Hide Rulers",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Show / Hide Speaker Notes",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Show controls",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Show Grid",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Show grid and snap to it",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Show Guides",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Show in Folder",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "Show Rulers",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Shrink",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Size",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Sketch",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Skip / Unskip Slide",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Skip during presentation",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Skip Slide",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Skipped",
+  "files": [
+   "navigator.js"
+  ]
+ },
+ {
+  "key": "Skipped during the presentation",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Slide",
+  "files": [
+   "commands.js",
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Slide Background…",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "slide not found",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Slide numbers",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Slide overview",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Slide size",
+  "files": [
+   "dialogs.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Slide Size",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Slide title",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Slide {n}",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Slide {n} of {total}",
+  "files": [
+   "presenter.js"
+  ]
+ },
+ {
+  "key": "Slides",
+  "files": [
+   "ai.js",
+   "dialogs.js",
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Slow",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Smaller",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Smaller notes (-)",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Snap to Guides",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Snap to smart guides (hold Ctrl to disable)",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Soft",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Solid",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Some files were not recognized (images, videos, .md and .cadenza are supported)",
+  "files": [
+   "main.js"
+  ]
+ },
+ {
+  "key": "Space after each paragraph",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Spacing",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Speaker notes",
+  "files": [
+   "notes.js"
+  ]
+ },
+ {
+  "key": "Speaker Notes",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Speech Bubble",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Speed",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "spring",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Square (1080×1080)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Stacked",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Stacks this slide below the previous one (reveal.js vertical slides).",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Standard 4:3 (1024×768)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Star",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Start from a template…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Starting…",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "State",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Statement",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Step",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Step highlights",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Stop",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Stopped.",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Stretch",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Strike through",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Strikethrough",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Striped rows",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Stripes",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Style",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Sub-slides form a vertical stack: navigate down with ↓ during the show. Press Tab in the slide list to nest.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Subtitle",
+  "files": [
+   "panels.js",
+   "slideview.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Subtitle text",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Superscript",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "System",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "System fonts",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "System fonts only display correctly on computers that have them installed.",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "System sans-serif",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Table",
+  "files": [
+   "commands.js",
+   "inspector.js",
+   "panels.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Target {selector} to style slides only.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Template",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Text",
+  "files": [
+   "inspector.js",
+   "panels.js",
+   "themebuilder.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Text Box",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Text color",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Text in shape",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Text size",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "The AI assistant is turned off. You can turn it on in Settings ▸ AI Assistant.",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "The AI's answer could not be understood. Please try again (or pick a more capable model).",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "The answer was too long and got cut off. Try asking for fewer slides.",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "The connection to Anthropic was interrupted",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "The file is empty",
+  "files": [
+   "document.rs"
+  ]
+ },
+ {
+  "key": "The file is too large (40 MB max)",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
+  "key": "The Markdown file has no content",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "The model declined this request. Try rephrasing it.",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "The page is shown live during the presentation. Some sites refuse to be embedded.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "The presentation is missing deck.json",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
+  "key": "The presentation is no longer open",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "The website closed unexpectedly (a problem in the system web engine). Your presentation is safe.",
+  "files": [
+   "main.js"
+  ]
+ },
+ {
+  "key": "Theme",
+  "files": [
+   "commands.js",
+   "controls.js",
+   "dialogs.js",
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Theme accent",
+  "files": [
+   "controls.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Theme body font",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Theme Builder",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Theme Builder…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Theme color",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Theme color 1",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Theme color 2",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Theme color 3",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Theme color 4",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Theme color 5",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Theme color {n}",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Theme default",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Theme File (.cadenza-theme)…",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Theme file is too large",
+  "files": [
+   "custom_theme.rs"
+  ]
+ },
+ {
+  "key": "Theme font",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Theme heading",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Theme heading font",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Theme preview",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Theme text",
+  "files": [
+   "controls.js"
+  ]
+ },
+ {
+  "key": "Theme text color",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Theme: {name}",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Thinking…",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "This file is not a Cadenza presentation",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
+  "key": "This is not a Cadenza theme file",
+  "files": [
+   "custom_theme.rs"
+  ]
+ },
+ {
+  "key": "This theme was made with a newer version of Cadenza",
+  "files": [
+   "custom_theme.rs"
+  ]
+ },
+ {
+  "key": "This video is private, removed or cannot be embedded",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
+  "key": "Tile",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Timeline",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Tip: you can also paste any YouTube or Vimeo link in the box above.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Title",
+  "files": [
+   "commands.js",
+   "inspector.js",
+   "panels.js",
+   "toolbar.js",
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Title & Content",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Title Only",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "To",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Too many requests — please wait a moment and try again.",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
+  "key": "Top",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Top left",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Top right",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Tracking",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Transition",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Transitions",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Transition…",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Trapezoid",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Triangle",
+  "files": [
+   "shapes.rs"
+  ]
+ },
+ {
+  "key": "Turn this slide into a diagram",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Two Columns",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "Type",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Type a command, slide or theme…",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Type to search.",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "Typography",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Underline (Ctrl+U)",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Undo",
+  "files": [
+   "ai.js",
+   "commands.js",
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Undo {action}",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Unexpected answer from the AI service",
+  "files": [
+   "ai.rs"
+  ]
+ },
+ {
+  "key": "unexpected font URL",
+  "files": [
+   "webfonts.rs"
+  ]
+ },
+ {
+  "key": "Unknown media provider",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
+  "key": "Unknown provider",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "Unlock",
+  "files": [
+   "canvas.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Unsaved work found",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Unsupported font data in theme",
+  "files": [
+   "custom_theme.rs"
+  ]
+ },
+ {
+  "key": "Untitled",
+  "files": [
+   "store.js",
+   "toolbar.js",
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Untitled Presentation",
+  "files": [
+   "store.js"
+  ]
+ },
+ {
+  "key": "Untitled slide",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "UPPERCASE",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Uppercase headings",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Use My Browser",
+  "files": [
+   "main.js"
+  ]
+ },
+ {
+  "key": "Use Presenter Display",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "User journey",
+  "files": [
+   "diagrams.js"
+  ]
+ },
+ {
+  "key": "Uses the background of the “{theme}” theme.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Value labels",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Version {version} · {platform}",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "vertical alignment::Vertical",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Vertical sub-slide",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Vertically",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Video",
+  "files": [
+   "actions.js",
+   "inspector.js",
+   "media.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Video File…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Video search (pasting links works without a key)",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Videos",
+  "files": [
+   "actions.js",
+   "media.js"
+  ]
+ },
+ {
+  "key": "View",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Vimeo video",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "W",
+  "files": [
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Web Page",
+  "files": [
+   "actions.js",
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Web page — set its address in the inspector",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Web Page…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Weight",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "What is your presentation about?",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "What should I do?",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "What this number means",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "Widescreen 16:9 (1280×720)",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "With two screens, the audience sees the presentation on the other screen while the presenter display stays on yours.",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Write LaTeX — rendered with KaTeX. Example:",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Write Mermaid syntax: flowcharts, sequence, class, state, ER, Gantt, pie, mindmaps, timelines and more.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Write Speaker Notes for All Slides (AI)",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Write speaker notes for every slide",
+  "files": [
+   "ai.js",
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Writing slide {n}: “{title}”",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Writing slide {n}…",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "Writing…",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "You can change the theme at any time from the Document inspector.",
+  "files": [
+   "welcome.js"
+  ]
+ },
+ {
+  "key": "Your changes will be lost if you don’t save them.",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Your name",
+  "files": [
+   "inspector.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Your presentation is ready",
+  "files": [
+   "ai.js"
+  ]
+ },
+ {
+  "key": "YouTube & Vimeo…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "YouTube or Vimeo address",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "YouTube video",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "YouTube/Vimeo link or video URL",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Zoom",
+  "files": [
+   "dialogs.js",
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Zoom In",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Zoom in",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Zoom Out",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Zoom to Fit",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "zoom::Fit",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "{file}: {error}",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "{name} closed unexpectedly (a problem in the system web engine). Your presentation is safe.",
+  "files": [
+   "main.js"
+  ]
+ },
+ {
+  "key": "{name} copy",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "{name} — pick something to insert into Cadenza",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
+  "key": "{name}: unsupported file type",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
+  "key": "{n} deleted",
+  "files": [
+   "ai.js"
+  ],
+  "one": "{n} deleted"
+ },
+ {
+  "key": "{n} objects selected",
+  "files": [
+   "inspector.js"
+  ],
+  "one": "{n} object selected"
+ },
+ {
+  "key": "{n} rebuilt",
+  "files": [
+   "ai.js"
+  ],
+  "one": "{n} rebuilt"
+ },
+ {
+  "key": "{n} slides",
+  "files": [
+   "inspector.js",
+   "welcome.js"
+  ],
+  "one": "{n} slide"
+ },
+ {
+  "key": "{n} texts edited",
+  "files": [
+   "ai.js"
+  ],
+  "one": "{n} text edited"
+ },
+ {
+  "key": "{service} key saved",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "{service} key saved in your system keychain",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "— Attribution",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "“A memorable quote goes here.”",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
+  "key": "“{title}”",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
+  "key": "“{title}” by {author}",
+  "files": [
+   "media.js"
+  ]
+ }
+]

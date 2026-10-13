@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cadenza — Presenter</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0e0f13; --panel: #17181e; --line: #262833; --text: #e8e9ee; --muted: #8b8fa3; --accent: #7c6cff;
+    --danger: #ef4444; --font: Inter, 'Segoe UI', Cantarell, Ubuntu, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 var(--font); overflow: hidden; user-select: none; }
+  .app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
+  header, footer { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  footer { border-top: 1px solid var(--line); border-bottom: 0; justify-content: space-between; }
+  .timer { font: 600 28px/1 var(--font); font-variant-numeric: tabular-nums; letter-spacing: 0.02em; min-width: 140px; }
+  .timer.paused { color: var(--muted); }
+  .clock { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 18px; }
+  .count { font-size: 16px; color: var(--muted); margin: 0 auto; }
+  .count b { color: var(--text); font-weight: 600; }
+  button {
+    font: inherit; color: var(--text); background: #252733; border: 1px solid #30323f; border-radius: 8px;
+    padding: 7px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  button:hover { background: #2d303d; }
+  button.primary { background: var(--accent); border-color: transparent; }
+  button.danger { background: transparent; color: #fca5a5; border-color: #5b2a2a; }
+  button.big { font-size: 16px; padding: 12px 22px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(320px, 1fr); gap: 16px; padding: 16px; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .frame { position: relative; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+  .frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+  .current { flex: 1; min-height: 0; }
+  .next { aspect-ratio: var(--ratio, 16 / 9); flex: none; }
+  .end { position: absolute; inset: 0; display: none; place-items: center; background: #000; color: var(--muted); font-size: 18px; }
+  .next.at-end .end { display: grid; }
+  .notes-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .notes { flex: 1; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; font-size: var(--notes-size, 22px); line-height: 1.45; white-space: pre-wrap; user-select: text; }
+  .notes.empty { color: var(--muted); font-style: italic; }
+  .spacer { flex: 1; }
+  .paused-banner { display: none; color: #fbbf24; font-weight: 600; }
+  .paused-banner.on { display: inline; }
+  kbd { font: 11px/1 var(--font); padding: 3px 5px; border-radius: 4px; background: #252733; border: 1px solid #343747; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="timer" id="timer">00:00</span>
+    <button id="timer-toggle" title="Pause/resume timer (P)" data-i18n-title="Pause/resume timer (P)">Pause</button>
+    <button id="timer-reset" title="Reset timer (R)" data-i18n-title="Reset timer (R)" data-i18n="Reset">Reset</button>
+    <span class="count" id="count" data-i18n="Starting…">Starting…</span>
+    <span class="paused-banner" id="paused" data-i18n="Screen blacked out — press B to resume">Screen blacked out — press B to resume</span>
+    <span class="clock" id="clock"></span>
+    <button class="danger" id="end" title="End show (Esc)" data-i18n-title="End show (Esc)" data-i18n="End Show">End Show</button>
+  </header>
+  <main>
+    <div class="col">
+      <div class="label" data-i18n="Current">Current</div>
+      <div class="frame current"><iframe id="current" src="present.html?preview=1" title="Current slide" data-i18n-title="Current slide"></iframe></div>
+    </div>
+    <div class="col">
+      <div>
+        <div class="label" data-i18n="Next">Next</div>
+        <div class="frame next" id="next-wrap"><iframe id="next" src="present.html?preview=1" title="Next slide" data-i18n-title="Next slide"></iframe><div class="end" data-i18n="End of presentation">End of presentation</div></div>
+      </div>
+      <div class="notes-wrap">
+        <div class="label"><span data-i18n="Notes">Notes</span> <span class="spacer"></span>
+          <button id="smaller" title="Smaller notes (-)" data-i18n-title="Smaller notes (-)">A−</button><button id="larger" title="Larger notes (+)" data-i18n-title="Larger notes (+)">A+</button>
+        </div>
+        <div class="notes empty" id="notes">No notes for this slide.</div>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <button class="big" id="prev">◀ <span data-i18n="Previous">Previous</span></button>
+    <span style="color:var(--muted)"><kbd>←</kbd> <kbd>→</kbd> <span data-i18n="navigate">navigate</span> · <kbd>B</kbd> <span data-i18n="black screen">black screen</span> · <kbd>Esc</kbd> <span data-i18n="end">end</span></span>
+    <button class="big primary" id="nextbtn"><span data-i18n="Next">Next</span> ▶</button>
+  </footer>
+</div>
+<script src="js/presenter.js"></script>
+</body>
+</html>
