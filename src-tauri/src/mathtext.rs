@@ -168,10 +168,10 @@ mod tests {
 
     #[test]
     fn finds_inline_and_display_math() {
-        assert_eq!(latex_of("<p>Energy $E=mc^2$ and $$\\int_0^1 x\\,dx$$</p>"), vec![
-            ("E=mc^2".to_string(), false),
-            ("\\int_0^1 x\\,dx".to_string(), true),
-        ]);
+        assert_eq!(
+            latex_of("<p>Energy $E=mc^2$ and $$\\int_0^1 x\\,dx$$</p>"),
+            vec![("E=mc^2".to_string(), false), ("\\int_0^1 x\\,dx".to_string(), true),]
+        );
         assert_eq!(latex_of("<p>\\(a+b\\) then \\[c\\]</p>"), vec![("a+b".into(), false), ("c".into(), true)]);
     }
 

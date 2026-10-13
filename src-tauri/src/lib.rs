@@ -14,8 +14,8 @@ pub mod export;
 pub mod fonts;
 pub mod layouts;
 pub mod markdown;
-pub mod media;
 pub mod mathtext;
+pub mod media;
 pub mod model;
 pub mod ops;
 pub mod package;
@@ -266,7 +266,12 @@ fn apply_theme_to(doc: &mut Document, def: custom_theme::ThemeDef) -> anyhow::Re
     let id = def.id.clone();
     // The patch carries the complete definition, so it replaces any previous
     // custom theme (arrays and fields alike) in a single undo step.
-    doc.apply(Op::UpdateDeck { patch: json!({ "customTheme": def, "theme": id, "webFonts": web_fonts }) }, None)
+    doc.apply(
+        Op::UpdateDeck {
+            patch: json!({ "customTheme": def, "theme": id, "webFonts": web_fonts }),
+        },
+        None,
+    )
 }
 
 #[tauri::command]
@@ -315,7 +320,11 @@ fn theme_preview(window: Window, state: State<AppState>, def: custom_theme::Them
     let theme_fonts = std::mem::take(&mut def.fonts);
     let docs = state.docs.lock().map_err(err)?;
     let doc = docs.get(window.label());
-    let mut deck = model::Deck { theme: def.id.clone(), custom_theme: Some(def), ..Default::default() };
+    let mut deck = model::Deck {
+        theme: def.id.clone(),
+        custom_theme: Some(def),
+        ..Default::default()
+    };
     if let Some(d) = doc {
         deck.web_fonts = d.deck.web_fonts.clone();
         deck.width = d.deck.width;
@@ -329,7 +338,10 @@ fn theme_preview(window: Window, state: State<AppState>, def: custom_theme::Them
     deck.slides = layouts::sample_slides(deck.width, deck.height);
     let assets = doc.map(|d| d.assets_dir()).unwrap_or_default();
     let url = move |name: &str| document::file_url(&assets.join(name));
-    let ctx = Ctx { mode: Mode::Editor, asset_url: &url };
+    let ctx = Ctx {
+        mode: Mode::Editor,
+        asset_url: &url,
+    };
     let slides: Vec<render::SlideRender> = deck.slides.iter().map(|s| render::slide_for_editor(&deck, s, &ctx)).collect();
     Ok(json!({ "css": render::deck_css(&deck, &ctx), "slides": slides, "width": deck.width, "height": deck.height }))
 }
@@ -338,7 +350,10 @@ fn theme_preview(window: Window, state: State<AppState>, def: custom_theme::Them
 async fn doc_open(window: Window, state: State<'_, AppState>, path: String) -> CmdResult<DocView> {
     let p = PathBuf::from(&path);
     let root = state.sessions_root.clone();
-    let doc = tauri::async_runtime::spawn_blocking(move || Document::open(&root, &p)).await.map_err(err)?.map_err(err)?;
+    let doc = tauri::async_runtime::spawn_blocking(move || Document::open(&root, &p))
+        .await
+        .map_err(err)?
+        .map_err(err)?;
     state.remember_recent(Path::new(&path));
     install_doc(&state, window.label(), doc)
 }
@@ -361,7 +376,11 @@ fn doc_state(window: Window, state: State<AppState>) -> CmdResult<Value> {
 #[tauri::command]
 fn doc_apply(window: Window, state: State<AppState>, op: Op, coalesce: Option<String>, track: Option<bool>) -> CmdResult<DocView> {
     state.with_doc(window.label(), |doc| {
-        let out = if track == Some(false) { doc.apply_untracked(op)? } else { doc.apply(op, coalesce.as_deref())? };
+        let out = if track == Some(false) {
+            doc.apply_untracked(op)?
+        } else {
+            doc.apply(op, coalesce.as_deref())?
+        };
         Ok(doc.view(false, Some(out)))
     })
 }
@@ -402,7 +421,11 @@ async fn doc_save(window: Window, state: State<'_, AppState>, path: Option<Strin
             None => return Err("NEEDS_PATH".into()),
         }
     };
-    let target = if target.extension().is_none() { target.with_extension(package::EXTENSION) } else { target };
+    let target = if target.extension().is_none() {
+        target.with_extension(package::EXTENSION)
+    } else {
+        target
+    };
     let view = state.with_doc(&label, |doc| {
         doc.save(&target)?;
         Ok(doc.view(false, None))
@@ -487,9 +510,15 @@ async fn import_markdown(window: Window, state: State<'_, AppState>, path: Strin
             if let Some(title) = parsed.iter().find_map(|s| s.title.clone()) {
                 deck.title = title;
             }
-            Op::ReplaceDeck { deck: Box::new(deck), label: None }
+            Op::ReplaceDeck {
+                deck: Box::new(deck),
+                label: None,
+            }
         } else {
-            Op::InsertSlides { after: doc.deck.slides.last().map(|s| s.id.clone()), slides }
+            Op::InsertSlides {
+                after: doc.deck.slides.last().map(|s| s.id.clone()),
+                slides,
+            }
         };
         let out = doc.apply(op, None)?;
         Ok(doc.view(false, Some(out)))
@@ -512,12 +541,11 @@ async fn font_install(window: Window, state: State<'_, AppState>, family: String
     let font = match assets {
         Some(dir) => {
             let fam = family.clone();
-            let font = tauri::async_runtime::spawn_blocking(move || {
-                webfonts::install(&fam, &variants, &|bytes: &[u8]| document::store_asset(&dir, bytes, "woff2"))
-            })
-            .await
-            .map_err(err)?
-            .map_err(err)?;
+            let font =
+                tauri::async_runtime::spawn_blocking(move || webfonts::install(&fam, &variants, &|bytes: &[u8]| document::store_asset(&dir, bytes, "woff2")))
+                    .await
+                    .map_err(err)?
+                    .map_err(err)?;
             Some(font)
         }
         None => None,
@@ -527,7 +555,12 @@ async fn font_install(window: Window, state: State<'_, AppState>, family: String
         let mut fonts = doc.deck.web_fonts.clone();
         fonts.retain(|f| f.family != font.family);
         fonts.push(font);
-        let out = doc.apply(Op::UpdateDeck { patch: json!({ "webFonts": fonts }) }, None)?;
+        let out = doc.apply(
+            Op::UpdateDeck {
+                patch: json!({ "webFonts": fonts }),
+            },
+            None,
+        )?;
         Ok(doc.view(false, Some(out)))
     })
 }
@@ -570,7 +603,10 @@ async fn media_search(state: State<'_, AppState>, provider: String, query: Strin
 
 #[tauri::command]
 async fn media_oembed(url: String) -> CmdResult<media::MediaItem> {
-    tauri::async_runtime::spawn_blocking(move || media::oembed(&url)).await.map_err(err)?.map_err(err)
+    tauri::async_runtime::spawn_blocking(move || media::oembed(&url))
+        .await
+        .map_err(err)?
+        .map_err(err)
 }
 
 /// Opens a provider's website (YouTube, Vimeo, GIPHY, Unsplash) with an
@@ -648,7 +684,10 @@ fn translator(app: &AppHandle, lang: &str) -> impl Fn(&str) -> String + use<> {
     let catalog: HashMap<String, Value> = if lang.is_empty() || lang == "en" || !lang.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
         HashMap::new()
     } else {
-        app.asset_resolver().get(format!("locales/{lang}.json")).and_then(|a| serde_json::from_slice(&a.bytes).ok()).unwrap_or_default()
+        app.asset_resolver()
+            .get(format!("locales/{lang}.json"))
+            .and_then(|a| serde_json::from_slice(&a.bytes).ok())
+            .unwrap_or_default()
     };
     move |key: &str| catalog.get(key).and_then(Value::as_str).filter(|s| !s.is_empty()).unwrap_or(key).to_string()
 }
@@ -797,13 +836,29 @@ fn ai_provider(state: &AppState) -> CmdResult<(ai::Provider, bool)> {
         let name = if kind == "openai" { "OpenAI" } else { "Anthropic" };
         return Err(format!("Add your {name} API key in Settings ▸ AI Assistant"));
     }
-    Ok((ai::Provider { kind, model, base_url: s.ai_base_url.clone(), key }, s.ai_images))
+    Ok((
+        ai::Provider {
+            kind,
+            model,
+            base_url: s.ai_base_url.clone(),
+            key,
+        },
+        s.ai_images,
+    ))
 }
 
 #[tauri::command]
 async fn ai_models(state: State<'_, AppState>, provider: String, base_url: Option<String>) -> CmdResult<Vec<ai::ModelInfo>> {
-    let p = ai::Provider { key: state.secrets.get(&provider), kind: provider, model: String::new(), base_url: base_url.unwrap_or_default() };
-    tauri::async_runtime::spawn_blocking(move || ai::list_models(&p)).await.map_err(err)?.map_err(err)
+    let p = ai::Provider {
+        key: state.secrets.get(&provider),
+        kind: provider,
+        model: String::new(),
+        base_url: base_url.unwrap_or_default(),
+    };
+    tauri::async_runtime::spawn_blocking(move || ai::list_models(&p))
+        .await
+        .map_err(err)?
+        .map_err(err)
 }
 
 #[tauri::command]
@@ -876,7 +931,11 @@ fn ai_credit(it: &media::MediaItem) -> String {
     match it.provider.as_str() {
         "unsplash" => format!("Photo by {} on Unsplash", it.author),
         _ => {
-            let title = if it.title.is_empty() { "Image".to_string() } else { format!("“{}”", it.title) };
+            let title = if it.title.is_empty() {
+                "Image".to_string()
+            } else {
+                format!("“{}”", it.title)
+            };
             let by = if it.author.is_empty() { String::new() } else { format!(" by {}", it.author) };
             let lic = if it.license.is_empty() { String::new() } else { format!(", {}", it.license) };
             format!("{title}{by}{lic}")
@@ -904,8 +963,18 @@ fn ai_find_images(queries: &[String], dir: &Path, unsplash: Option<String>, canc
                         media::track_unsplash(&item.track_url, k);
                     }
                     let src = document::store_asset(dir, &bytes, &ext).ok()?;
-                    let (width, height) = imagesize::blob_size(&bytes).map(|s| (s.width as u32, s.height as u32)).unwrap_or((item.width, item.height));
-                    Some((q.clone(), ai::FoundImage { src, width, height, alt: ai_credit(&item) }))
+                    let (width, height) = imagesize::blob_size(&bytes)
+                        .map(|s| (s.width as u32, s.height as u32))
+                        .unwrap_or((item.width, item.height));
+                    Some((
+                        q.clone(),
+                        ai::FoundImage {
+                            src,
+                            width,
+                            height,
+                            alt: ai_credit(&item),
+                        },
+                    ))
                 })
             })
             .collect();
@@ -956,10 +1025,16 @@ async fn ai_run_inner(
         let docs = state.docs.lock().map_err(err)?;
         let doc = docs.get(label).ok_or("No presentation is open in this window")?;
         let ctx = ai::deck_context(&doc.deck, req.current_slide.as_deref(), &req.selected);
-        (format!("The presentation (JSON):\n{ctx}\n\nRequest: {}", req.prompt.trim()), doc.deck.active_custom_theme().cloned())
+        (
+            format!("The presentation (JSON):\n{ctx}\n\nRequest: {}", req.prompt.trim()),
+            doc.deck.active_custom_theme().cloned(),
+        )
     };
     let mut messages = ai_history(&req.history);
-    messages.push(ai::Message { role: "user".into(), text: format!("{}\n\n{request}", ai_theme_list(custom.as_ref())) });
+    messages.push(ai::Message {
+        role: "user".into(),
+        text: format!("{}\n\n{request}", ai_theme_list(custom.as_ref())),
+    });
 
     emit(json!({ "phase": "thinking" }));
     let text = {
@@ -999,7 +1074,13 @@ async fn ai_run_inner(
         new_doc = Some(doc);
         dir
     } else {
-        state.docs.lock().map_err(err)?.get(label).ok_or("No presentation is open in this window")?.assets_dir()
+        state
+            .docs
+            .lock()
+            .map_err(err)?
+            .get(label)
+            .ok_or("No presentation is open in this window")?
+            .assets_dir()
     };
 
     // Photos are fetched before touching the presentation.
@@ -1010,7 +1091,9 @@ async fn ai_run_inner(
         emit(json!({ "phase": "images", "count": queries.len() }));
         let unsplash = state.secrets.get("unsplash");
         let cancel = cancel.clone();
-        tauri::async_runtime::spawn_blocking(move || ai_find_images(&queries, &assets_dir, unsplash, &cancel)).await.map_err(err)?
+        tauri::async_runtime::spawn_blocking(move || ai_find_images(&queries, &assets_dir, unsplash, &cancel))
+            .await
+            .map_err(err)?
     };
     if cancel.load(Ordering::SeqCst) {
         if let Some(doc) = new_doc {
@@ -1027,12 +1110,27 @@ async fn ai_run_inner(
         let summary = ai::apply_plan(&mut deck, &plan, &images, &theme_ok);
         if deck.slides.is_empty() {
             doc.dispose();
-            let why = if plan.reply.trim().is_empty() { "The AI didn't create any slides. Try describing the presentation in more detail.".to_string() } else { plan.reply.clone() };
+            let why = if plan.reply.trim().is_empty() {
+                "The AI didn't create any slides. Try describing the presentation in more detail.".to_string()
+            } else {
+                plan.reply.clone()
+            };
             return Err(why);
         }
-        doc.apply(Op::ReplaceDeck { deck: Box::new(deck), label: Some("AI Presentation".into()) }, None).map_err(err)?;
+        doc.apply(
+            Op::ReplaceDeck {
+                deck: Box::new(deck),
+                label: Some("AI Presentation".into()),
+            },
+            None,
+        )
+        .map_err(err)?;
         let view = install_doc(state, label, doc)?;
-        return Ok(AiResponse { reply: plan.reply, summary, view: Some(view) });
+        return Ok(AiResponse {
+            reply: plan.reply,
+            summary,
+            view: Some(view),
+        });
     }
 
     let active = custom.as_ref().map(|t| t.id.clone());
@@ -1045,12 +1143,22 @@ async fn ai_run_inner(
         if summary.is_empty() {
             return Ok((summary, None));
         }
-        let mut out = doc.apply(Op::ReplaceDeck { deck: Box::new(deck), label: Some("AI Edit".into()) }, None)?;
+        let mut out = doc.apply(
+            Op::ReplaceDeck {
+                deck: Box::new(deck),
+                label: Some("AI Edit".into()),
+            },
+            None,
+        )?;
         out.slide = summary.slide.clone().or(out.slide);
         out.created = summary.created.clone();
         Ok((summary, Some(doc.view(false, Some(out)))))
     })?;
-    Ok(AiResponse { reply: plan.reply, summary, view })
+    Ok(AiResponse {
+        reply: plan.reply,
+        summary,
+        view,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -1071,7 +1179,11 @@ async fn export_html(app: AppHandle, window: Window, state: State<'_, AppState>,
     let target = PathBuf::from(&path);
     let reader = ui_reader(&app);
     if single {
-        let file = if target.extension().is_none() { target.with_extension("html") } else { target };
+        let file = if target.extension().is_none() {
+            target.with_extension("html")
+        } else {
+            target
+        };
         export::export_single(&deck, &assets, &file, &reader).map_err(err)?;
         Ok(file.to_string_lossy().to_string())
     } else {
@@ -1137,11 +1249,20 @@ fn present_data(window: Window, state: State<AppState>) -> CmdResult<PresentData
     let deck = &doc.deck;
     let assets = doc.assets_dir();
     let url = move |name: &str| document::file_url(&assets.join(name));
-    let ctx = Ctx { mode: Mode::Show, asset_url: &url };
+    let ctx = Ctx {
+        mode: Mode::Show,
+        asset_url: &url,
+    };
     let mut slides = Vec::new();
     for (h, group) in render::visible_groups(deck).iter().enumerate() {
         for (v, s) in group.iter().enumerate() {
-            slides.push(PresentSlide { id: s.id.clone(), h, v, notes: s.notes.clone(), index: slides.len() });
+            slides.push(PresentSlide {
+                id: s.id.clone(),
+                h,
+                v,
+                notes: s.notes.clone(),
+                index: slides.len(),
+            });
         }
     }
     Ok(PresentData {
@@ -1150,7 +1271,11 @@ fn present_data(window: Window, state: State<AppState>) -> CmdResult<PresentData
         config: render::reveal_config(deck, json!({ "hash": false, "respondToHashChanges": false })),
         theme_css: deck.theme_href().unwrap_or(""),
         deck_css: render::deck_css(deck, &ctx),
-        code_theme: if deck.settings.code_theme == "zenburn" { "zenburn".into() } else { "monokai".into() },
+        code_theme: if deck.settings.code_theme == "zenburn" {
+            "zenburn".into()
+        } else {
+            "monokai".into()
+        },
         needs: render::needs(deck),
         slides,
         width: deck.width,
@@ -1322,7 +1447,12 @@ pub fn run() {
     let context = tauri::generate_context!();
     let args: Vec<String> = std::env::args().collect();
     if let Some(i) = args.iter().position(|a| a == "--media-browser") {
-        let lang = args.iter().position(|a| a == "--lang").and_then(|j| args.get(j + 1)).cloned().unwrap_or_default();
+        let lang = args
+            .iter()
+            .position(|a| a == "--lang")
+            .and_then(|j| args.get(j + 1))
+            .cloned()
+            .unwrap_or_default();
         run_media_browser(context, args.get(i + 1).cloned().unwrap_or_default(), lang, args.iter().any(|a| a == "--safe"));
         return;
     }
@@ -1482,7 +1612,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let f = dir.path().join("a.cadenza");
         std::fs::write(&f, b"x").unwrap();
-        let args = vec!["cadenza".to_string(), "--flag".into(), "a.cadenza".into(), "missing.cadenza".into(), "b.txt".into()];
+        let args = vec![
+            "cadenza".to_string(),
+            "--flag".into(),
+            "a.cadenza".into(),
+            "missing.cadenza".into(),
+            "b.txt".into(),
+        ];
         assert_eq!(files_from_args(args, dir.path()), vec![f]);
     }
 }

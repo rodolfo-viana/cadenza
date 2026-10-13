@@ -38,18 +38,7 @@ pub fn encode_uri_component(s: &str) -> String {
     let mut out = String::with_capacity(s.len() * 3);
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z'
-            | b'a'..=b'z'
-            | b'0'..=b'9'
-            | b'-'
-            | b'_'
-            | b'.'
-            | b'!'
-            | b'~'
-            | b'*'
-            | b'\''
-            | b'('
-            | b')' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')' => out.push(b as char),
             _ => {
                 let _ = write!(out, "%{:02X}", b);
             }
@@ -109,14 +98,8 @@ pub fn parse_color(s: &str) -> Option<Rgba> {
         };
     }
     let lower = s.to_ascii_lowercase();
-    let inner = lower
-        .strip_prefix("rgba(")
-        .or_else(|| lower.strip_prefix("rgb("))?
-        .strip_suffix(')')?;
-    let parts: Vec<&str> = inner
-        .split([',', ' ', '/'])
-        .filter(|p| !p.is_empty())
-        .collect();
+    let inner = lower.strip_prefix("rgba(").or_else(|| lower.strip_prefix("rgb("))?.strip_suffix(')')?;
+    let parts: Vec<&str> = inner.split([',', ' ', '/']).filter(|p| !p.is_empty()).collect();
     if parts.len() < 3 {
         return None;
     }
@@ -126,7 +109,12 @@ pub fn parse_color(s: &str) -> Option<Rgba> {
         Some(p) => p.parse::<f64>().ok()?,
         None => 1.0,
     };
-    Some(Rgba { r: channel(parts[0])?, g: channel(parts[1])?, b: channel(parts[2])?, a: alpha.clamp(0.0, 1.0) })
+    Some(Rgba {
+        r: channel(parts[0])?,
+        g: channel(parts[1])?,
+        b: channel(parts[2])?,
+        a: alpha.clamp(0.0, 1.0),
+    })
 }
 
 /// Perceived brightness (0-255) using the same formula reveal.js uses to
@@ -152,10 +140,7 @@ pub fn css_value(s: &str) -> &str {
 /// Validates the names Cadenza gives to stored assets (`<hash>.<ext>`), which
 /// also guarantees they cannot be used for path traversal.
 pub fn is_valid_asset_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 128
-        && !name.starts_with('.')
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+    !name.is_empty() && name.len() <= 128 && !name.starts_with('.') && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
 }
 
 /// True when the reference points at the web rather than a bundled asset.

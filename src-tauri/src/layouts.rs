@@ -16,16 +16,40 @@ pub struct LayoutInfo {
 
 pub const LAYOUTS: &[LayoutInfo] = &[
     LayoutInfo { id: "title", name: "Title" },
-    LayoutInfo { id: "title-content", name: "Title & Content" },
-    LayoutInfo { id: "section", name: "Section Header" },
-    LayoutInfo { id: "two-column", name: "Two Columns" },
-    LayoutInfo { id: "image-text", name: "Image & Text" },
-    LayoutInfo { id: "big-image", name: "Big Image" },
-    LayoutInfo { id: "statement", name: "Statement" },
+    LayoutInfo {
+        id: "title-content",
+        name: "Title & Content",
+    },
+    LayoutInfo {
+        id: "section",
+        name: "Section Header",
+    },
+    LayoutInfo {
+        id: "two-column",
+        name: "Two Columns",
+    },
+    LayoutInfo {
+        id: "image-text",
+        name: "Image & Text",
+    },
+    LayoutInfo {
+        id: "big-image",
+        name: "Big Image",
+    },
+    LayoutInfo {
+        id: "statement",
+        name: "Statement",
+    },
     LayoutInfo { id: "quote", name: "Quote" },
-    LayoutInfo { id: "big-number", name: "Big Number" },
+    LayoutInfo {
+        id: "big-number",
+        name: "Big Number",
+    },
     LayoutInfo { id: "code", name: "Code" },
-    LayoutInfo { id: "title-only", name: "Title Only" },
+    LayoutInfo {
+        id: "title-only",
+        name: "Title Only",
+    },
     LayoutInfo { id: "blank", name: "Blank" },
 ];
 
@@ -63,7 +87,11 @@ pub fn text(role: &str, placeholder: &str, size: f64, align: &str) -> Element {
     if role == "title" || role == "heading" {
         t.text.style.line_height = 1.1;
     }
-    Element { name: role_name(role).into(), content: Content::Text(t), ..Default::default() }
+    Element {
+        name: role_name(role).into(),
+        content: Content::Text(t),
+        ..Default::default()
+    }
 }
 
 fn role_name(role: &str) -> &'static str {
@@ -79,7 +107,10 @@ fn role_name(role: &str) -> &'static str {
 
 /// Builds the elements of a layout.
 pub fn layout_elements(layout: &str, width: u32, height: u32) -> Vec<Element> {
-    let f = Frame { w: width as f64, h: height as f64 };
+    let f = Frame {
+        w: width as f64,
+        h: height as f64,
+    };
     match layout {
         "title" => vec![
             placed(text("title", "Presentation title", f.font(84.0), "center"), f.rect(0.08, 0.30, 0.84, 0.2)),
@@ -107,12 +138,12 @@ pub fn layout_elements(layout: &str, width: u32, height: u32) -> Vec<Element> {
             placed(image_placeholder(), f.rect(0.0, 0.0, 1.0, 1.0)),
             placed(text("caption", "Caption", f.font(24.0), "left"), f.rect(0.05, 0.86, 0.6, 0.08)),
         ],
-        "statement" => vec![placed(
-            text("title", "A bold statement.", f.font(72.0), "center"),
-            f.rect(0.1, 0.35, 0.8, 0.3),
-        )],
+        "statement" => vec![placed(text("title", "A bold statement.", f.font(72.0), "center"), f.rect(0.1, 0.35, 0.8, 0.3))],
         "quote" => vec![
-            placed(text("quote", "“A memorable quote goes here.”", f.font(52.0), "center"), f.rect(0.12, 0.3, 0.76, 0.3)),
+            placed(
+                text("quote", "“A memorable quote goes here.”", f.font(52.0), "center"),
+                f.rect(0.12, 0.3, 0.76, 0.3),
+            ),
             placed(text("caption", "— Attribution", f.font(26.0), "center"), f.rect(0.25, 0.66, 0.5, 0.08)),
         ],
         "big-number" => vec![
@@ -141,18 +172,31 @@ pub fn layout_elements(layout: &str, width: u32, height: u32) -> Vec<Element> {
 }
 
 fn image_placeholder() -> Element {
-    Element { name: "Image".into(), content: Content::Image(ImageContent::default()), ..Default::default() }
+    Element {
+        name: "Image".into(),
+        content: Content::Image(ImageContent::default()),
+        ..Default::default()
+    }
 }
 
 /// A new slide built from a layout.
 pub fn new_slide(layout: &str, width: u32, height: u32) -> Slide {
     let layout = if LAYOUTS.iter().any(|l| l.id == layout) { layout } else { "blank" };
-    Slide { layout: layout.into(), elements: layout_elements(layout, width, height), ..Default::default() }
+    Slide {
+        layout: layout.into(),
+        elements: layout_elements(layout, width, height),
+        ..Default::default()
+    }
 }
 
 /// The deck every new document starts with: a single title slide.
 pub fn starter_deck(theme: &str, width: u32, height: u32) -> Deck {
-    let mut deck = Deck { theme: theme.into(), width, height, ..Default::default() };
+    let mut deck = Deck {
+        theme: theme.into(),
+        width,
+        height,
+        ..Default::default()
+    };
     deck.slides.push(new_slide("title", width, height));
     deck
 }
@@ -160,7 +204,10 @@ pub fn starter_deck(theme: &str, width: u32, height: u32) -> Deck {
 /// Default element of a given kind, centered on the slide. `variant` picks a
 /// shape id, chart type or text role.
 pub fn new_element(kind: &str, variant: &str, width: u32, height: u32) -> Element {
-    let f = Frame { w: width as f64, h: height as f64 };
+    let f = Frame {
+        w: width as f64,
+        h: height as f64,
+    };
     let (w, h) = match kind {
         "text" => (f.w * 0.5, f.font(32.0) * 1.6),
         "shape" if variant == "line" => (f.w * 0.3, 24.0),
@@ -175,7 +222,10 @@ pub fn new_element(kind: &str, variant: &str, width: u32, height: u32) -> Elemen
     };
     let content = match kind {
         "shape" => {
-            let mut s = ShapeContent { shape: if variant.is_empty() { "rect".into() } else { variant.into() }, ..Default::default() };
+            let mut s = ShapeContent {
+                shape: if variant.is_empty() { "rect".into() } else { variant.into() },
+                ..Default::default()
+            };
             s.text.style.font_size = f.font(28.0);
             if variant == "line" {
                 s.end_cap = "arrow".into();
@@ -189,10 +239,16 @@ pub fn new_element(kind: &str, variant: &str, width: u32, height: u32) -> Elemen
             font_size: f.font(24.0),
             ..Default::default()
         }),
-        "math" => Content::Math(MathContent { font_size: f.font(48.0), ..Default::default() }),
+        "math" => Content::Math(MathContent {
+            font_size: f.font(48.0),
+            ..Default::default()
+        }),
         "embed" => Content::Embed(EmbedContent::default()),
         "diagram" => Content::Diagram(DiagramContent::default()),
-        "table" => Content::Table(TableContent { font_size: f.font(26.0), ..Default::default() }),
+        "table" => Content::Table(TableContent {
+            font_size: f.font(26.0),
+            ..Default::default()
+        }),
         "chart" => Content::Chart(ChartContent {
             chart: if variant.is_empty() { "column".into() } else { variant.into() },
             font_size: f.font(20.0),
@@ -200,13 +256,18 @@ pub fn new_element(kind: &str, variant: &str, width: u32, height: u32) -> Elemen
         }),
         _ => {
             let role = if variant.is_empty() { "body" } else { variant };
-            let mut el = text(role, "", f.font(match role {
-                "title" => 56.0,
-                "subtitle" => 36.0,
-                "heading" => 44.0,
-                "caption" => 22.0,
-                _ => 32.0,
-            }), "left");
+            let mut el = text(
+                role,
+                "",
+                f.font(match role {
+                    "title" => 56.0,
+                    "subtitle" => 36.0,
+                    "heading" => 44.0,
+                    "caption" => 22.0,
+                    _ => 32.0,
+                }),
+                "left",
+            );
             el.w = w;
             el.h = h;
             el.x = ((f.w - w) / 2.0).round();
@@ -246,10 +307,16 @@ pub fn sample_slides(width: u32, height: u32) -> Vec<Slide> {
     html(&mut title.elements[0], "<p>Theme Preview</p>");
     html(&mut title.elements[1], "<p>Headings, text, accents and charts</p>");
 
-    let f = Frame { w: width as f64, h: height as f64 };
+    let f = Frame {
+        w: width as f64,
+        h: height as f64,
+    };
     let mut content = new_slide("two-column", width, height);
     html(&mut content.elements[0], "<p>What’s inside</p>");
-    html(&mut content.elements[1], "<ul><li>Clear, readable text</li><li>A <a href=\"#\">link</a> and <b>bold</b> words</li><li>Theme accent colors</li></ul>");
+    html(
+        &mut content.elements[1],
+        "<ul><li>Clear, readable text</li><li>A <a href=\"#\">link</a> and <b>bold</b> words</li><li>Theme accent colors</li></ul>",
+    );
     content.elements.truncate(2);
     content.elements[1].w = (f.w * 0.42).round();
     let mut chart = new_element("chart", "column", width, height);

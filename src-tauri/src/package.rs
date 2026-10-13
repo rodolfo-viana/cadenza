@@ -79,7 +79,10 @@ fn migrate(value: serde_json::Value) -> anyhow::Result<Deck> {
 /// included, so files never accumulate unused media.
 pub fn write(path: &Path, deck: &Deck, assets_dir: &Path) -> anyhow::Result<()> {
     let dir = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
-    let file_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "presentation".into());
+    let file_name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "presentation".into());
     let tmp: PathBuf = dir.join(format!(".{file_name}.{}.tmp", now_ms()));
     let result = (|| -> anyhow::Result<()> {
         let file = File::create(&tmp).with_context(|| format!("Cannot write to {}", dir.display()))?;
@@ -159,7 +162,10 @@ mod tests {
 
         let mut deck = crate::layouts::starter_deck("black", 1280, 720);
         deck.slides[0].elements.push(Element {
-            content: Content::Image(ImageContent { src: "abc.png".into(), ..Default::default() }),
+            content: Content::Image(ImageContent {
+                src: "abc.png".into(),
+                ..Default::default()
+            }),
             ..Default::default()
         });
         let file = dir.path().join("talk.cadenza");
@@ -173,7 +179,11 @@ mod tests {
 
         // Overwriting an existing file works and leaves no temp files.
         write(&file, &back, &out_assets).unwrap();
-        let leftovers: Vec<_> = fs::read_dir(dir.path()).unwrap().filter_map(|e| e.ok()).filter(|e| e.file_name().to_string_lossy().ends_with(".tmp")).collect();
+        let leftovers: Vec<_> = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
+            .collect();
         assert!(leftovers.is_empty());
     }
 

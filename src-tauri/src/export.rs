@@ -101,8 +101,13 @@ fn inline_css_urls(css: &str, css_path: &str, read: UiReader) -> String {
 pub fn export_folder(deck: &Deck, assets_dir: &Path, dir: &Path, read: UiReader) -> anyhow::Result<PathBuf> {
     fs::create_dir_all(dir).with_context(|| format!("Cannot create {}", dir.display()))?;
     let url = |name: &str| format!("assets/{name}");
-    let ctx = Ctx { mode: Mode::Show, asset_url: &url };
-    let linker = FolderLinker { used: RefCell::new(BTreeSet::new()) };
+    let ctx = Ctx {
+        mode: Mode::Show,
+        asset_url: &url,
+    };
+    let linker = FolderLinker {
+        used: RefCell::new(BTreeSet::new()),
+    };
     let html = render::document(deck, &ctx, &linker);
 
     for path in linker.used.borrow().iter() {
@@ -159,7 +164,10 @@ pub fn export_single(deck: &Deck, assets_dir: &Path, file: &Path, read: UiReader
             Err(_) => String::new(),
         }
     };
-    let ctx = Ctx { mode: Mode::Show, asset_url: &url };
+    let ctx = Ctx {
+        mode: Mode::Show,
+        asset_url: &url,
+    };
     let html = render::document(deck, &ctx, &InlineLinker { read });
     if let Some(parent) = file.parent() {
         fs::create_dir_all(parent)?;
@@ -185,10 +193,16 @@ mod tests {
     fn deck() -> Deck {
         let mut deck = crate::layouts::starter_deck("cadenza-midnight", 1280, 720);
         deck.slides[0].elements.push(Element {
-            content: Content::Image(ImageContent { src: "abc.png".into(), ..Default::default() }),
+            content: Content::Image(ImageContent {
+                src: "abc.png".into(),
+                ..Default::default()
+            }),
             ..Default::default()
         });
-        deck.slides[0].elements.push(Element { content: Content::Math(MathContent::default()), ..Default::default() });
+        deck.slides[0].elements.push(Element {
+            content: Content::Math(MathContent::default()),
+            ..Default::default()
+        });
         deck
     }
 

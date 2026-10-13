@@ -16,32 +16,84 @@ use crate::util::new_id;
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Op {
     /// Adds a slide built from a layout after `after` (or at the end).
-    AddSlide { after: Option<String>, layout: String },
-    DuplicateSlides { ids: Vec<String> },
-    DeleteSlides { ids: Vec<String> },
+    AddSlide {
+        after: Option<String>,
+        layout: String,
+    },
+    DuplicateSlides {
+        ids: Vec<String>,
+    },
+    DeleteSlides {
+        ids: Vec<String>,
+    },
     /// Moves slides so they end up before the slide currently at index `to`
     /// (`to == len` moves them to the end).
-    MoveSlides { ids: Vec<String>, to: usize },
+    MoveSlides {
+        ids: Vec<String>,
+        to: usize,
+    },
     /// Inserts copies of slides (e.g. from the clipboard) after `after`.
-    InsertSlides { after: Option<String>, slides: Vec<Slide> },
+    InsertSlides {
+        after: Option<String>,
+        slides: Vec<Slide>,
+    },
     /// JSON merge patch applied to slide properties (not their elements).
-    UpdateSlides { ids: Vec<String>, patch: Value },
-    AddElement { slide: String, kind: String, #[serde(default)] variant: String, #[serde(default)] props: Option<Value> },
+    UpdateSlides {
+        ids: Vec<String>,
+        patch: Value,
+    },
+    AddElement {
+        slide: String,
+        kind: String,
+        #[serde(default)]
+        variant: String,
+        #[serde(default)]
+        props: Option<Value>,
+    },
     /// Inserts copies of elements (paste), offset by `offset` pixels.
-    InsertElements { slide: String, elements: Vec<Element>, #[serde(default)] offset: f64 },
-    UpdateElements { slide: String, updates: Vec<ElementPatch> },
-    DeleteElements { slide: String, ids: Vec<String> },
+    InsertElements {
+        slide: String,
+        elements: Vec<Element>,
+        #[serde(default)]
+        offset: f64,
+    },
+    UpdateElements {
+        slide: String,
+        updates: Vec<ElementPatch>,
+    },
+    DeleteElements {
+        slide: String,
+        ids: Vec<String>,
+    },
     /// "front", "back", "forward" or "backward".
-    ArrangeElements { slide: String, ids: Vec<String>, action: String },
+    ArrangeElements {
+        slide: String,
+        ids: Vec<String>,
+        action: String,
+    },
     /// "left", "hcenter", "right", "top", "vcenter", "bottom",
     /// "distribute-h" or "distribute-v".
-    AlignElements { slide: String, ids: Vec<String>, mode: String, #[serde(default)] to_slide: bool },
+    AlignElements {
+        slide: String,
+        ids: Vec<String>,
+        mode: String,
+        #[serde(default)]
+        to_slide: bool,
+    },
     /// Sets build-in order following the given element order.
-    SetBuildOrder { slide: String, ids: Vec<String> },
+    SetBuildOrder {
+        slide: String,
+        ids: Vec<String>,
+    },
     /// JSON merge patch applied to deck properties (not its slides).
-    UpdateDeck { patch: Value },
+    UpdateDeck {
+        patch: Value,
+    },
     /// Changes the slide size, scaling content to fit.
-    ResizeDeck { width: u32, height: u32 },
+    ResizeDeck {
+        width: u32,
+        height: u32,
+    },
     /// Replaces the whole deck (imports, AI edits).
     ReplaceDeck {
         deck: Box<Deck>,
@@ -69,7 +121,11 @@ pub struct OpOutcome {
 }
 
 fn outcome(label: &str, slide: Option<String>, created: Vec<String>) -> OpOutcome {
-    OpOutcome { label: label.into(), slide, created }
+    OpOutcome {
+        label: label.into(),
+        slide,
+        created,
+    }
 }
 
 /// RFC 7396 JSON merge patch.
@@ -155,7 +211,9 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             let mut last = None;
             // Insert each copy right after the last selected slide, in order.
             let positions: Vec<usize> = ids.iter().filter_map(|id| deck.slide_index(id)).collect();
-            let Some(&insert_after) = positions.iter().max() else { anyhow::bail!("nothing to duplicate") };
+            let Some(&insert_after) = positions.iter().max() else {
+                anyhow::bail!("nothing to duplicate")
+            };
             let mut sorted = positions.clone();
             sorted.sort_unstable();
             let copies: Vec<Slide> = sorted.iter().map(|&i| deck.slides[i].duplicate()).collect();
@@ -191,17 +249,16 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             Ok(outcome("Move Slides", hint, vec![]))
         }
         Op::InsertSlides { after, slides } => {
-            let mut idx = after.and_then(|a| deck.slide_index(&a)).map(|i| i + 1).unwrap_or(deck.slides.len());
+            let start = after.and_then(|a| deck.slide_index(&a)).map(|i| i + 1).unwrap_or(deck.slides.len());
             let mut created = Vec::new();
-            for mut s in slides {
+            for (offset, mut s) in slides.into_iter().enumerate() {
                 s.id = new_id("s");
                 for el in &mut s.elements {
                     el.id = new_id("e");
                     sanitize_element(el);
                 }
                 created.push(s.id.clone());
-                deck.slides.insert(idx, s);
-                idx += 1;
+                deck.slides.insert(start + offset, s);
             }
             Ok(outcome("Paste Slides", created.last().cloned(), created))
         }
@@ -479,7 +536,11 @@ impl History {
         if merge && !self.undo.is_empty() {
             return;
         }
-        self.undo.push(Entry { deck: before.clone(), label: out.label.clone(), slide: out.slide.clone() });
+        self.undo.push(Entry {
+            deck: before.clone(),
+            label: out.label.clone(),
+            slide: out.slide.clone(),
+        });
         if self.undo.len() > MAX_HISTORY {
             self.undo.remove(0);
         }
@@ -493,18 +554,34 @@ impl History {
     pub fn undo(&mut self, current: &mut Deck) -> Option<OpOutcome> {
         let e = self.undo.pop()?;
         self.last_key = None;
-        let out = OpOutcome { label: e.label.clone(), slide: e.slide.clone(), created: vec![] };
+        let out = OpOutcome {
+            label: e.label.clone(),
+            slide: e.slide.clone(),
+            created: vec![],
+        };
         let prev = std::mem::replace(current, e.deck);
-        self.redo.push(Entry { deck: prev, label: e.label, slide: e.slide });
+        self.redo.push(Entry {
+            deck: prev,
+            label: e.label,
+            slide: e.slide,
+        });
         Some(out)
     }
 
     pub fn redo(&mut self, current: &mut Deck) -> Option<OpOutcome> {
         let e = self.redo.pop()?;
         self.last_key = None;
-        let out = OpOutcome { label: e.label.clone(), slide: e.slide.clone(), created: vec![] };
+        let out = OpOutcome {
+            label: e.label.clone(),
+            slide: e.slide.clone(),
+            created: vec![],
+        };
         let next = std::mem::replace(current, e.deck);
-        self.undo.push(Entry { deck: next, label: e.label, slide: e.slide });
+        self.undo.push(Entry {
+            deck: next,
+            label: e.label,
+            slide: e.slide,
+        });
         Some(out)
     }
 
@@ -551,7 +628,14 @@ mod tests {
     fn add_slide_after() {
         let mut d = deck3();
         let before = ids(&d);
-        let out = apply(&mut d, Op::AddSlide { after: Some(before[0].clone()), layout: "blank".into() }).unwrap();
+        let out = apply(
+            &mut d,
+            Op::AddSlide {
+                after: Some(before[0].clone()),
+                layout: "blank".into(),
+            },
+        )
+        .unwrap();
         assert_eq!(d.slides.len(), 4);
         assert_eq!(d.slides[1].id, out.created[0]);
     }
@@ -560,12 +644,33 @@ mod tests {
     fn move_slides_to_end_and_start() {
         let mut d = deck3();
         let s = ids(&d);
-        apply(&mut d, Op::MoveSlides { ids: vec![s[0].clone()], to: 3 }).unwrap();
+        apply(
+            &mut d,
+            Op::MoveSlides {
+                ids: vec![s[0].clone()],
+                to: 3,
+            },
+        )
+        .unwrap();
         assert_eq!(ids(&d), vec![s[1].clone(), s[2].clone(), s[0].clone()]);
-        apply(&mut d, Op::MoveSlides { ids: vec![s[0].clone()], to: 0 }).unwrap();
+        apply(
+            &mut d,
+            Op::MoveSlides {
+                ids: vec![s[0].clone()],
+                to: 0,
+            },
+        )
+        .unwrap();
         assert_eq!(ids(&d), s);
         // Moving two slides between others.
-        apply(&mut d, Op::MoveSlides { ids: vec![s[0].clone(), s[1].clone()], to: 3 }).unwrap();
+        apply(
+            &mut d,
+            Op::MoveSlides {
+                ids: vec![s[0].clone(), s[1].clone()],
+                to: 3,
+            },
+        )
+        .unwrap();
         assert_eq!(ids(&d), vec![s[2].clone(), s[0].clone(), s[1].clone()]);
     }
 
@@ -604,7 +709,16 @@ mod tests {
     fn failed_op_leaves_deck_untouched() {
         let mut d = deck3();
         let snapshot = d.clone();
-        assert!(apply(&mut d, Op::DeleteElements { slide: "missing".into(), ids: vec![] }).is_err());
+        assert!(
+            apply(
+                &mut d,
+                Op::DeleteElements {
+                    slide: "missing".into(),
+                    ids: vec![]
+                }
+            )
+            .is_err()
+        );
         assert_eq!(d, snapshot);
     }
 
@@ -624,7 +738,13 @@ mod tests {
     #[test]
     fn align_and_distribute() {
         let mut els: Vec<Element> = (0..3)
-            .map(|i| Element { x: i as f64 * 100.0 + 7.0, y: i as f64 * 10.0, w: 50.0, h: 50.0, ..Default::default() })
+            .map(|i| Element {
+                x: i as f64 * 100.0 + 7.0,
+                y: i as f64 * 10.0,
+                w: 50.0,
+                h: 50.0,
+                ..Default::default()
+            })
             .collect();
         let ids: Vec<String> = els.iter().map(|e| e.id.clone()).collect();
         align(&mut els, &ids, "top", false, 1280.0, 720.0);
@@ -645,7 +765,13 @@ mod tests {
             let before = d.clone();
             let out = apply(
                 &mut d,
-                Op::UpdateElements { slide: sid.clone(), updates: vec![ElementPatch { id: eid.clone(), patch: json!({"x": x}) }] },
+                Op::UpdateElements {
+                    slide: sid.clone(),
+                    updates: vec![ElementPatch {
+                        id: eid.clone(),
+                        patch: json!({"x": x}),
+                    }],
+                },
             )
             .unwrap();
             h.record(&before, &out, Some("drag"));

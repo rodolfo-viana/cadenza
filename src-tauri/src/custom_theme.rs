@@ -71,7 +71,14 @@ impl Default for ThemeDef {
             accent: "#7c6cff".into(),
             on_accent: "#ffffff".into(),
             link_color: String::new(),
-            palette: vec!["#7c6cff".into(), "#22d3ee".into(), "#f472b6".into(), "#facc15".into(), "#34d399".into(), "#fb923c".into()],
+            palette: vec![
+                "#7c6cff".into(),
+                "#22d3ee".into(),
+                "#f472b6".into(),
+                "#facc15".into(),
+                "#34d399".into(),
+                "#fb923c".into(),
+            ],
             heading_font: String::new(),
             body_font: String::new(),
             heading_weight: 700,
@@ -119,8 +126,16 @@ impl ThemeDef {
         }
         self.heading_weight = self.heading_weight.clamp(100, 900);
         self.base_size = if self.base_size.is_finite() { self.base_size.clamp(12.0, 96.0) } else { 34.0 };
-        self.heading_letter_spacing = if self.heading_letter_spacing.is_finite() { self.heading_letter_spacing.clamp(-0.2, 0.5) } else { 0.0 };
-        self.gradient_angle = if self.gradient_angle.is_finite() { self.gradient_angle % 360.0 } else { 160.0 };
+        self.heading_letter_spacing = if self.heading_letter_spacing.is_finite() {
+            self.heading_letter_spacing.clamp(-0.2, 0.5)
+        } else {
+            0.0
+        };
+        self.gradient_angle = if self.gradient_angle.is_finite() {
+            self.gradient_angle % 360.0
+        } else {
+            160.0
+        };
         self.fonts.retain(|f| crate::webfonts::valid_family(&f.family));
         self.format = FORMAT;
     }
@@ -156,15 +171,23 @@ impl ThemeDef {
         );
         let mut css = strip_imports(TEMPLATE);
         css = replace_block(&css, ":root{", &root);
-        css = replace_block(&css, ".reveal-viewport{", &format!(".reveal-viewport{{background:{};background-color:{bg}}}", self.background_css()));
+        css = replace_block(
+            &css,
+            ".reveal-viewport{",
+            &format!(".reveal-viewport{{background:{};background-color:{bg}}}", self.background_css()),
+        );
         // Light themes fix text on dark slide backgrounds and vice versa.
         if let Some(i) = css.rfind("section.has-") {
             css.truncate(i);
         }
         if self.dark {
-            css.push_str("section.has-light-background,section.has-light-background h1,section.has-light-background h2,section.has-light-background h3{color:#1f2937}");
+            css.push_str(
+                "section.has-light-background,section.has-light-background h1,section.has-light-background h2,section.has-light-background h3{color:#1f2937}",
+            );
         } else {
-            css.push_str("section.has-dark-background,section.has-dark-background h1,section.has-dark-background h2,section.has-dark-background h3{color:#fff}");
+            css.push_str(
+                "section.has-dark-background,section.has-dark-background h1,section.has-dark-background h2,section.has-dark-background h3{color:#fff}",
+            );
         }
         css
     }
@@ -252,11 +275,13 @@ pub fn extract_fonts(def: &ThemeDef, store: &dyn Fn(&[u8]) -> anyhow::Result<Str
         while let Some(i) = rest.find("data:") {
             css.push_str(&rest[..i]);
             let tail = &rest[i..];
-            let end = tail.find(|c: char| c == ')' || c == '"' || c == '\'').unwrap_or(tail.len());
+            let end = tail.find([')', '"', '\'']).unwrap_or(tail.len());
             let uri = &tail[..end];
             let name = match uri.split_once(";base64,") {
                 Some((_, b64)) => {
-                    let bytes = base64::engine::general_purpose::STANDARD.decode(b64.trim()).context("Corrupted font in theme")?;
+                    let bytes = base64::engine::general_purpose::STANDARD
+                        .decode(b64.trim())
+                        .context("Corrupted font in theme")?;
                     store(&bytes)?
                 }
                 None => bail!("Unsupported font data in theme"),
@@ -266,7 +291,11 @@ pub fn extract_fonts(def: &ThemeDef, store: &dyn Fn(&[u8]) -> anyhow::Result<Str
             rest = &tail[end..];
         }
         css.push_str(rest);
-        out.push(WebFont { family: f.family.clone(), source: f.source.clone(), css });
+        out.push(WebFont {
+            family: f.family.clone(),
+            source: f.source.clone(),
+            css,
+        });
     }
     Ok(out)
 }
@@ -365,7 +394,7 @@ pub fn from_builtin(id: &str) -> ThemeDef {
         def.background = bg.into();
         def.background2 = String::new();
     } else {
-        let colors: Vec<&str> = bg.split(|c| c == '(' || c == ',' || c == ')' || c == ' ').filter(|p| p.starts_with('#')).collect();
+        let colors: Vec<&str> = bg.split(['(', ',', ')', ' ']).filter(|p| p.starts_with('#')).collect();
         def.background = colors.first().copied().unwrap_or(if t.dark { "#111111" } else { "#ffffff" }).into();
         def.background2 = colors.get(1).copied().unwrap_or("").into();
     }
@@ -379,7 +408,11 @@ mod tests {
 
     #[test]
     fn generates_reveal_theme_css() {
-        let def = ThemeDef { heading_font: "'Lora'".into(), heading_uppercase: true, ..Default::default() };
+        let def = ThemeDef {
+            heading_font: "'Lora'".into(),
+            heading_uppercase: true,
+            ..Default::default()
+        };
         let css = def.css();
         assert!(css.contains("--r-heading-font:'Lora', Inter"));
         assert!(css.contains("--r-heading-text-transform:uppercase"));
@@ -391,7 +424,11 @@ mod tests {
 
     #[test]
     fn rejects_css_injection() {
-        let def = ThemeDef { accent: "red;}</style><script>".into(), heading_font: "x;}body{display:none".into(), ..Default::default() };
+        let def = ThemeDef {
+            accent: "red;}</style><script>".into(),
+            heading_font: "x;}body{display:none".into(),
+            ..Default::default()
+        };
         let css = def.css();
         assert!(!css.contains("<script>") && !css.contains("display:none"));
     }
@@ -400,8 +437,15 @@ mod tests {
     fn fonts_round_trip_through_data_uris() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("abc.woff2"), b"FONTDATA").unwrap();
-        let deck_fonts = vec![WebFont { family: "Lora".into(), source: "google".into(), css: "src:url(cz-asset:abc.woff2)".into() }];
-        let mut def = ThemeDef { heading_font: "'Lora'".into(), ..Default::default() };
+        let deck_fonts = vec![WebFont {
+            family: "Lora".into(),
+            source: "google".into(),
+            css: "src:url(cz-asset:abc.woff2)".into(),
+        }];
+        let mut def = ThemeDef {
+            heading_font: "'Lora'".into(),
+            ..Default::default()
+        };
         embed_fonts(&mut def, &deck_fonts, dir.path());
         assert_eq!(def.fonts.len(), 1);
         assert!(def.fonts[0].css.contains("data:font/woff2;base64,Rk9OVERBVEE="));

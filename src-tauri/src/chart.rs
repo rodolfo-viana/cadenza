@@ -38,7 +38,18 @@ pub fn nice_scale(min: f64, max: f64, ticks: usize) -> (f64, f64, f64) {
     let raw = (hi - lo) / ticks.max(1) as f64;
     let mag = 10f64.powf(raw.log10().floor());
     let norm = raw / mag;
-    let step = mag * if norm <= 1.0 { 1.0 } else if norm <= 2.0 { 2.0 } else if norm <= 2.5 { 2.5 } else if norm <= 5.0 { 5.0 } else { 10.0 };
+    let step = mag
+        * if norm <= 1.0 {
+            1.0
+        } else if norm <= 2.0 {
+            2.0
+        } else if norm <= 2.5 {
+            2.5
+        } else if norm <= 5.0 {
+            5.0
+        } else {
+            10.0
+        };
     lo = (lo / step).floor() * step;
     hi = (hi / step).ceil() * step;
     (lo, hi, step)
@@ -160,22 +171,58 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
         let p = vpos(v);
         if horizontal {
             if chart.show_grid {
-                let _ = write!(svg, r#"<line x1="{x}" y1="{}" x2="{x}" y2="{}" class="cz-grid" stroke="currentColor" stroke-opacity="0.18"/>"#, num(py), num(py + ph), x = num(p));
+                let _ = write!(
+                    svg,
+                    r#"<line x1="{x}" y1="{}" x2="{x}" y2="{}" class="cz-grid" stroke="currentColor" stroke-opacity="0.18"/>"#,
+                    num(py),
+                    num(py + ph),
+                    x = num(p)
+                );
             }
-            let _ = write!(svg, r#"<text x="{}" y="{}" text-anchor="middle" opacity="0.75">{}</text>"#, num(p), num(py + ph + f * 1.3), fmt_value(v));
+            let _ = write!(
+                svg,
+                r#"<text x="{}" y="{}" text-anchor="middle" opacity="0.75">{}</text>"#,
+                num(p),
+                num(py + ph + f * 1.3),
+                fmt_value(v)
+            );
         } else {
             if chart.show_grid {
-                let _ = write!(svg, r#"<line x1="{}" y1="{y}" x2="{}" y2="{y}" class="cz-grid" stroke="currentColor" stroke-opacity="0.18"/>"#, num(px), num(px + pw), y = num(p));
+                let _ = write!(
+                    svg,
+                    r#"<line x1="{}" y1="{y}" x2="{}" y2="{y}" class="cz-grid" stroke="currentColor" stroke-opacity="0.18"/>"#,
+                    num(px),
+                    num(px + pw),
+                    y = num(p)
+                );
             }
-            let _ = write!(svg, r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central" opacity="0.75">{}</text>"#, num(px - f * 0.5), num(p), fmt_value(v));
+            let _ = write!(
+                svg,
+                r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central" opacity="0.75">{}</text>"#,
+                num(px - f * 0.5),
+                num(p),
+                fmt_value(v)
+            );
         }
     }
     // Baseline.
     let zero = vpos(0.0);
     if horizontal {
-        let _ = write!(svg, r#"<line x1="{x}" y1="{}" x2="{x}" y2="{}" stroke="currentColor" stroke-opacity="0.5"/>"#, num(py), num(py + ph), x = num(zero));
+        let _ = write!(
+            svg,
+            r#"<line x1="{x}" y1="{}" x2="{x}" y2="{}" stroke="currentColor" stroke-opacity="0.5"/>"#,
+            num(py),
+            num(py + ph),
+            x = num(zero)
+        );
     } else {
-        let _ = write!(svg, r#"<line x1="{}" y1="{y}" x2="{}" y2="{y}" stroke="currentColor" stroke-opacity="0.5"/>"#, num(px), num(px + pw), y = num(zero));
+        let _ = write!(
+            svg,
+            r#"<line x1="{}" y1="{y}" x2="{}" y2="{y}" stroke="currentColor" stroke-opacity="0.5"/>"#,
+            num(px),
+            num(px + pw),
+            y = num(zero)
+        );
     }
 
     let band = if horizontal { ph } else { pw } / n as f64;
@@ -184,9 +231,21 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
         let label = chart.labels.get(i).map(String::as_str).unwrap_or("");
         let c = (i as f64 + 0.5) * band;
         if horizontal {
-            let _ = write!(svg, r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central">{}</text>"#, num(px - f * 0.5), num(py + c), esc(label));
+            let _ = write!(
+                svg,
+                r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central">{}</text>"#,
+                num(px - f * 0.5),
+                num(py + c),
+                esc(label)
+            );
         } else {
-            let _ = write!(svg, r#"<text x="{}" y="{}" text-anchor="middle">{}</text>"#, num(px + c), num(py + ph + f * 1.3), esc(label));
+            let _ = write!(
+                svg,
+                r#"<text x="{}" y="{}" text-anchor="middle">{}</text>"#,
+                num(px + c),
+                num(py + ph + f * 1.3),
+                esc(label)
+            );
         }
     }
 
@@ -210,16 +269,40 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
                         *b += value(s, i);
                     }
                 }
-                let line: String = pts.iter().enumerate().map(|(k, (x, y, _))| format!("{}{} {}", if k == 0 { "M" } else { "L" }, num(*x), num(*y))).collect();
+                let line: String = pts
+                    .iter()
+                    .enumerate()
+                    .map(|(k, (x, y, _))| format!("{}{} {}", if k == 0 { "M" } else { "L" }, num(*x), num(*y)))
+                    .collect();
                 if area {
                     let back: String = pts.iter().rev().map(|(x, _, y0)| format!("L{} {}", num(*x), num(*y0))).collect();
                     let _ = write!(svg, r#"<path d="{line}{back}Z" style="fill:{c};fill-opacity:0.28"/>"#, c = esc(&color));
                 }
-                let _ = write!(svg, r#"<path d="{}" fill="none" style="stroke:{}" stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"/>"#, line, esc(&color), num((f * 0.18).max(2.0)));
+                let _ = write!(
+                    svg,
+                    r#"<path d="{}" fill="none" style="stroke:{}" stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"/>"#,
+                    line,
+                    esc(&color),
+                    num((f * 0.18).max(2.0))
+                );
                 for (k, (x, y, _)) in pts.iter().enumerate() {
-                    let _ = write!(svg, r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#, num(*x), num(*y), num((f * 0.22).max(3.0)), esc(&color));
+                    let _ = write!(
+                        svg,
+                        r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#,
+                        num(*x),
+                        num(*y),
+                        num((f * 0.22).max(3.0)),
+                        esc(&color)
+                    );
                     if chart.show_values {
-                        let _ = write!(svg, r#"<text x="{}" y="{}" text-anchor="middle" font-size="{}">{}</text>"#, num(*x), num(y - f * 0.6), num(f * 0.8), fmt_value(value(s, k)));
+                        let _ = write!(
+                            svg,
+                            r#"<text x="{}" y="{}" text-anchor="middle" font-size="{}">{}</text>"#,
+                            num(*x),
+                            num(y - f * 0.6),
+                            num(f * 0.8),
+                            fmt_value(value(s, k))
+                        );
                     }
                 }
             }
@@ -247,14 +330,41 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
                     let (a, b) = (vpos(start), vpos(end));
                     let (lo_p, len) = (a.min(b), (a - b).abs());
                     let r = (bw * 0.12).min(6.0);
-                    let (x, y, rw, rh) = if horizontal { (lo_p, py + offset, len, bw) } else { (px + offset, lo_p, bw, len) };
-                    let _ = write!(svg, r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" style="fill:{}"/>"#, num(x), num(y), num(rw), num(rh), num(r), esc(&color));
+                    let (x, y, rw, rh) = if horizontal {
+                        (lo_p, py + offset, len, bw)
+                    } else {
+                        (px + offset, lo_p, bw, len)
+                    };
+                    let _ = write!(
+                        svg,
+                        r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" style="fill:{}"/>"#,
+                        num(x),
+                        num(y),
+                        num(rw),
+                        num(rh),
+                        num(r),
+                        esc(&color)
+                    );
                     if chart.show_values && v != 0.0 {
                         let label = fmt_value(v);
                         if horizontal {
-                            let _ = write!(svg, r#"<text x="{}" y="{}" dominant-baseline="central" font-size="{}">{}</text>"#, num(x + rw + f * 0.3), num(y + rh / 2.0), num(f * 0.8), label);
+                            let _ = write!(
+                                svg,
+                                r#"<text x="{}" y="{}" dominant-baseline="central" font-size="{}">{}</text>"#,
+                                num(x + rw + f * 0.3),
+                                num(y + rh / 2.0),
+                                num(f * 0.8),
+                                label
+                            );
                         } else {
-                            let _ = write!(svg, r#"<text x="{}" y="{}" text-anchor="middle" font-size="{}">{}</text>"#, num(x + rw / 2.0), num(y - f * 0.35), num(f * 0.8), label);
+                            let _ = write!(
+                                svg,
+                                r#"<text x="{}" y="{}" text-anchor="middle" font-size="{}">{}</text>"#,
+                                num(x + rw / 2.0),
+                                num(y - f * 0.35),
+                                num(f * 0.8),
+                                label
+                            );
                         }
                     }
                 }
@@ -284,7 +394,14 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
         let sweep = v / total * std::f64::consts::TAU;
         let color = slice_color(i);
         if (sweep - std::f64::consts::TAU).abs() < 1e-9 {
-            let _ = write!(svg, r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#, num(cx), num(cy), num(r), esc(&color));
+            let _ = write!(
+                svg,
+                r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#,
+                num(cx),
+                num(cy),
+                num(r),
+                esc(&color)
+            );
         } else {
             let a2 = angle + sweep;
             let large = if sweep > std::f64::consts::PI { 1 } else { 0 };
@@ -296,13 +413,37 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
                 let (x4, y4) = p(angle, hole);
                 format!(
                     "M{} {}A{r} {r} 0 {large} 1 {} {}L{} {}A{h} {h} 0 {large} 0 {} {}Z",
-                    num(x1), num(y1), num(x2), num(y2), num(x3), num(y3), num(x4), num(y4),
-                    r = num(r), h = num(hole), large = large
+                    num(x1),
+                    num(y1),
+                    num(x2),
+                    num(y2),
+                    num(x3),
+                    num(y3),
+                    num(x4),
+                    num(y4),
+                    r = num(r),
+                    h = num(hole),
+                    large = large
                 )
             } else {
-                format!("M{} {}L{} {}A{r} {r} 0 {large} 1 {} {}Z", num(cx), num(cy), num(x1), num(y1), num(x2), num(y2), r = num(r), large = large)
+                format!(
+                    "M{} {}L{} {}A{r} {r} 0 {large} 1 {} {}Z",
+                    num(cx),
+                    num(cy),
+                    num(x1),
+                    num(y1),
+                    num(x2),
+                    num(y2),
+                    r = num(r),
+                    large = large
+                )
             };
-            let _ = write!(svg, r#"<path d="{}" style="fill:{}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>"#, d, esc(&color));
+            let _ = write!(
+                svg,
+                r#"<path d="{}" style="fill:{}" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>"#,
+                d,
+                esc(&color)
+            );
         }
         if chart.show_values {
             let mid = angle + sweep / 2.0;
@@ -339,7 +480,12 @@ mod tests {
     fn every_chart_type_renders() {
         for (kind, _) in CHART_TYPES {
             for stacked in [false, true] {
-                let c = ChartContent { chart: kind.to_string(), stacked, show_values: true, ..Default::default() };
+                let c = ChartContent {
+                    chart: kind.to_string(),
+                    stacked,
+                    show_values: true,
+                    ..Default::default()
+                };
                 let svg = chart_svg(&c, 800.0, 450.0);
                 assert!(svg.contains("<svg") && svg.ends_with("</svg>"), "{kind}");
                 assert!(!svg.contains("NaN"), "{kind}");
@@ -349,7 +495,11 @@ mod tests {
 
     #[test]
     fn empty_chart_does_not_panic() {
-        let c = ChartContent { labels: vec![], series: vec![], ..Default::default() };
+        let c = ChartContent {
+            labels: vec![],
+            series: vec![],
+            ..Default::default()
+        };
         assert!(chart_svg(&c, 100.0, 100.0).contains("</svg>"));
     }
 }

@@ -124,7 +124,14 @@ fn line_svg(svg: &mut String, w: f64, h: f64, lw: f64, color: &str, dash: &str, 
         }
         "dot" => {
             let r = (lw * 1.8).max(5.0);
-            let _ = write!(svg, r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#, num(tip - dir * r), num(cy), num(r), esc(color));
+            let _ = write!(
+                svg,
+                r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#,
+                num(tip - dir * r),
+                num(cy),
+                num(r),
+                esc(color)
+            );
         }
         _ => {}
     };
@@ -315,9 +322,7 @@ pub fn shape_path(shape: &str, w: f64, h: f64, stroke: f64, radius: f64) -> Stri
         }
         "cloud" => {
             let p = |fx: f64, fy: f64| format!("{} {}", num(x0 + bw * fx), num(y0 + bh * fy));
-            let a = |rx: f64, ry: f64, fx: f64, fy: f64| {
-                format!("A{} {} 0 0 1 {}", num(bw * rx), num(bh * ry), p(fx, fy))
-            };
+            let a = |rx: f64, ry: f64, fx: f64, fy: f64| format!("A{} {} 0 0 1 {}", num(bw * rx), num(bh * ry), p(fx, fy));
             format!(
                 "M{}{}{}{}{}{}{}Z",
                 p(0.2, 0.92),
@@ -363,7 +368,13 @@ fn star(cx: f64, cy: f64, rx: f64, ry: f64, points: usize, inner: f64) -> String
     for k in 0..points * 2 {
         let a = -PI / 2.0 + PI * k as f64 / points as f64;
         let f = if k % 2 == 0 { 1.0 } else { inner };
-        let _ = write!(d, "{}{} {}", if k == 0 { "M" } else { "L" }, num(cx + rx * f * a.cos()), num(cy + ry * f * a.sin()));
+        let _ = write!(
+            d,
+            "{}{} {}",
+            if k == 0 { "M" } else { "L" },
+            num(cx + rx * f * a.cos()),
+            num(cy + ry * f * a.sin())
+        );
     }
     d.push('Z');
     d
@@ -375,7 +386,10 @@ mod tests {
 
     #[test]
     fn every_shape_produces_a_path() {
-        let style = BoxStyle { border_width: 4.0, ..Default::default() };
+        let style = BoxStyle {
+            border_width: 4.0,
+            ..Default::default()
+        };
         for (id, _) in SHAPES {
             let svg = shape_svg(id, 300.0, 200.0, &style, "none", "arrow");
             assert!(svg.starts_with("<svg"), "{id}");
@@ -391,7 +405,10 @@ mod tests {
 
     #[test]
     fn fill_is_escaped_and_validated() {
-        let style = BoxStyle { fill: "red\"/><script>".into(), ..Default::default() };
+        let style = BoxStyle {
+            fill: "red\"/><script>".into(),
+            ..Default::default()
+        };
         let svg = shape_svg("rect", 10.0, 10.0, &style, "none", "none");
         assert!(!svg.contains("<script>"));
     }

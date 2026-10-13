@@ -183,8 +183,15 @@ impl Document {
     fn render_all(&self) -> HashMap<String, SlideRender> {
         let assets = self.assets_dir();
         let url = move |name: &str| file_url(&assets.join(name));
-        let ctx = Ctx { mode: Mode::Editor, asset_url: &url };
-        self.deck.slides.iter().map(|s| (s.id.clone(), render::slide_for_editor(&self.deck, s, &ctx))).collect()
+        let ctx = Ctx {
+            mode: Mode::Editor,
+            asset_url: &url,
+        };
+        self.deck
+            .slides
+            .iter()
+            .map(|s| (s.id.clone(), render::slide_for_editor(&self.deck, s, &ctx)))
+            .collect()
     }
 
     /// Builds the view for the UI. With `full`, every slide is included;
@@ -194,7 +201,10 @@ impl Document {
         let slides = if full {
             all.clone()
         } else {
-            all.iter().filter(|(id, r)| self.rendered.get(*id) != Some(*r)).map(|(k, v)| (k.clone(), v.clone())).collect()
+            all.iter()
+                .filter(|(id, r)| self.rendered.get(*id) != Some(*r))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
         };
         self.rendered = all;
         DocView {
@@ -214,7 +224,13 @@ impl Document {
             deck_css: {
                 let assets = self.assets_dir();
                 let url = move |name: &str| file_url(&assets.join(name));
-                render::deck_css(&self.deck, &Ctx { mode: Mode::Editor, asset_url: &url })
+                render::deck_css(
+                    &self.deck,
+                    &Ctx {
+                        mode: Mode::Editor,
+                        asset_url: &url,
+                    },
+                )
             },
         }
     }
@@ -270,7 +286,11 @@ impl Document {
             return;
         }
         self.last_recovery = now;
-        let rec = RecoveryFile { path: self.path.clone(), saved_at: now, deck: self.deck.clone() };
+        let rec = RecoveryFile {
+            path: self.path.clone(),
+            saved_at: now,
+            deck: self.deck.clone(),
+        };
         if let Ok(json) = serde_json::to_vec(&rec) {
             let tmp = self.work_dir.join(".recovery.tmp");
             if fs::write(&tmp, json).is_ok() {
@@ -303,7 +323,13 @@ impl Document {
         } else {
             (0, 0)
         };
-        Ok(AssetInfo { url: self.asset_url(&name), name, kind: kind.into(), width, height })
+        Ok(AssetInfo {
+            url: self.asset_url(&name),
+            name,
+            kind: kind.into(),
+            width,
+            height,
+        })
     }
 }
 
@@ -313,7 +339,13 @@ pub fn store_asset(dir: &Path, bytes: &[u8], ext: &str) -> anyhow::Result<String
     if bytes.is_empty() {
         anyhow::bail!("The file is empty");
     }
-    let ext: String = ext.trim_start_matches('.').chars().filter(|c| c.is_ascii_alphanumeric()).take(8).collect::<String>().to_ascii_lowercase();
+    let ext: String = ext
+        .trim_start_matches('.')
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(8)
+        .collect::<String>()
+        .to_ascii_lowercase();
     let ext = if ext.is_empty() { sniff_extension(bytes).to_string() } else { ext };
     let hash = hex::encode(Sha256::digest(bytes));
     let name = format!("{}.{}", &hash[..20], ext);
@@ -356,7 +388,9 @@ pub fn list_recoverable(sessions_root: &Path) -> Vec<RecoveryInfo> {
     for entry in entries.flatten() {
         let dir = entry.path();
         let file = dir.join(RECOVERY_FILE);
-        let Some(id) = dir.file_name().map(|n| n.to_string_lossy().to_string()) else { continue };
+        let Some(id) = dir.file_name().map(|n| n.to_string_lossy().to_string()) else {
+            continue;
+        };
         match fs::read(&file).ok().and_then(|b| serde_json::from_slice::<RecoveryFile>(&b).ok()) {
             Some(rec) => out.push(RecoveryInfo {
                 session_id: id,
@@ -371,7 +405,7 @@ pub fn list_recoverable(sessions_root: &Path) -> Vec<RecoveryInfo> {
             }
         }
     }
-    out.sort_by(|a, b| b.saved_at.cmp(&a.saved_at));
+    out.sort_by_key(|r| std::cmp::Reverse(r.saved_at));
     out
 }
 
@@ -395,13 +429,26 @@ mod tests {
     fn view_sends_only_changed_slides() {
         let dir = tempfile::tempdir().unwrap();
         let mut doc = new_doc(dir.path());
-        doc.apply(Op::AddSlide { after: None, layout: "blank".into() }, None).unwrap();
+        doc.apply(
+            Op::AddSlide {
+                after: None,
+                layout: "blank".into(),
+            },
+            None,
+        )
+        .unwrap();
         let full = doc.view(true, None);
         assert_eq!(full.slides.len(), 2);
         let sid = doc.deck.slides[0].id.clone();
         let eid = doc.deck.slides[0].elements[0].id.clone();
         doc.apply(
-            Op::UpdateElements { slide: sid.clone(), updates: vec![ops::ElementPatch { id: eid, patch: json!({"x": 5}) }] },
+            Op::UpdateElements {
+                slide: sid.clone(),
+                updates: vec![ops::ElementPatch {
+                    id: eid,
+                    patch: json!({"x": 5}),
+                }],
+            },
             None,
         )
         .unwrap();
@@ -415,7 +462,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut doc = new_doc(dir.path());
         assert!(!doc.is_dirty());
-        doc.apply(Op::UpdateDeck { patch: json!({"title": "Hello"}) }, None).unwrap();
+        doc.apply(
+            Op::UpdateDeck {
+                patch: json!({"title": "Hello"}),
+            },
+            None,
+        )
+        .unwrap();
         assert!(doc.is_dirty());
         doc.undo();
         assert!(!doc.is_dirty());
@@ -449,7 +502,13 @@ mod tests {
     fn crashed_sessions_can_be_recovered() {
         let dir = tempfile::tempdir().unwrap();
         let mut doc = new_doc(dir.path());
-        doc.apply(Op::UpdateDeck { patch: json!({"title": "Unsaved work"}) }, None).unwrap();
+        doc.apply(
+            Op::UpdateDeck {
+                patch: json!({"title": "Unsaved work"}),
+            },
+            None,
+        )
+        .unwrap();
         doc.maybe_write_recovery(true);
         let id = doc.id.clone();
         drop(doc); // simulated crash: no dispose()

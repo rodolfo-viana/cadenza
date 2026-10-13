@@ -26,7 +26,11 @@ pub struct Secrets {
 
 impl Secrets {
     pub fn new(config_dir: &Path, keychain: bool) -> Self {
-        Secrets { fallback: config_dir.join("secrets.json"), keychain, lock: Mutex::new(()) }
+        Secrets {
+            fallback: config_dir.join("secrets.json"),
+            keychain,
+            lock: Mutex::new(()),
+        }
     }
 
     fn entry(&self, name: &str) -> Option<keyring::Entry> {
@@ -34,7 +38,11 @@ impl Secrets {
     }
 
     fn valid(name: &str) -> anyhow::Result<()> {
-        if NAMES.contains(&name) { Ok(()) } else { anyhow::bail!("unknown service {name}") }
+        if NAMES.contains(&name) {
+            Ok(())
+        } else {
+            anyhow::bail!("unknown service {name}")
+        }
     }
 
     fn read_fallback(&self) -> BTreeMap<String, String> {

@@ -93,7 +93,11 @@ impl Deck {
     /// Stylesheet of a built-in theme (None for custom themes, whose CSS is
     /// generated into the deck CSS).
     pub fn theme_href(&self) -> Option<&'static str> {
-        if self.active_custom_theme().is_some() { None } else { Some(crate::themes::find(&self.theme).css) }
+        if self.active_custom_theme().is_some() {
+            None
+        } else {
+            Some(crate::themes::find(&self.theme).css)
+        }
     }
 
     pub fn slide(&self, id: &str) -> Option<&Slide> {
@@ -151,7 +155,8 @@ impl Deck {
         tidy(&mut self.guides.x, w);
         tidy(&mut self.guides.y, h);
         let mut seen = BTreeSet::new();
-        self.web_fonts.retain(|f| crate::webfonts::valid_family(&f.family) && seen.insert(f.family.clone()));
+        self.web_fonts
+            .retain(|f| crate::webfonts::valid_family(&f.family) && seen.insert(f.family.clone()));
         if let Some(t) = &mut self.custom_theme {
             // Fonts of an applied theme live in `web_fonts` as assets.
             t.fonts.clear();
@@ -376,7 +381,12 @@ pub struct Gradient {
 
 impl Default for Gradient {
     fn default() -> Self {
-        Gradient { kind: "linear".into(), from: "#4f46e5".into(), to: "#0ea5e9".into(), angle: 135.0 }
+        Gradient {
+            kind: "linear".into(),
+            from: "#4f46e5".into(),
+            to: "#0ea5e9".into(),
+            angle: 135.0,
+        }
     }
 }
 
@@ -477,6 +487,7 @@ impl Default for BoxStyle {
 /// Build-in / build-out animations, mapped to reveal.js fragments.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
+#[derive(Default)]
 pub struct Build {
     /// reveal.js fragment style for the build-in ("" = none).
     pub effect: String,
@@ -485,12 +496,6 @@ pub struct Build {
     /// Fragment style for the build-out ("" = none), e.g. "fade-out".
     pub out_effect: String,
     pub out_order: u32,
-}
-
-impl Default for Build {
-    fn default() -> Self {
-        Build { effect: String::new(), order: 0, out_effect: String::new(), out_order: 0 }
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -504,7 +509,11 @@ pub struct Action {
 
 impl Default for Action {
     fn default() -> Self {
-        Action { kind: "none".into(), url: String::new(), slide: String::new() }
+        Action {
+            kind: "none".into(),
+            url: String::new(),
+            slide: String::new(),
+        }
     }
 }
 
@@ -566,6 +575,7 @@ impl Content {
 /// Sanitized rich text plus its paragraph-level style.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
+#[derive(Default)]
 pub struct RichText {
     pub html: String,
     /// Shown in the editor while `html` is empty; never presented.
@@ -573,20 +583,9 @@ pub struct RichText {
     pub style: TextStyle,
 }
 
-impl Default for RichText {
-    fn default() -> Self {
-        RichText { html: String::new(), placeholder: String::new(), style: TextStyle::default() }
-    }
-}
-
 impl RichText {
     pub fn is_empty(&self) -> bool {
-        let stripped = self
-            .html
-            .replace("<br>", "")
-            .replace("<p>", "")
-            .replace("</p>", "")
-            .replace("&nbsp;", "");
+        let stripped = self.html.replace("<br>", "").replace("<p>", "").replace("</p>", "").replace("&nbsp;", "");
         stripped.trim().is_empty()
     }
 }
@@ -669,7 +668,12 @@ impl Default for ShapeContent {
         text.style.valign = "middle".into();
         text.style.auto_height = false;
         text.style.font_size = 28.0;
-        ShapeContent { shape: "rect".into(), start_cap: "none".into(), end_cap: "none".into(), text }
+        ShapeContent {
+            shape: "rect".into(),
+            start_cap: "none".into(),
+            end_cap: "none".into(),
+            text,
+        }
     }
 }
 
@@ -801,7 +805,10 @@ pub struct EmbedContent {
 
 impl Default for EmbedContent {
     fn default() -> Self {
-        EmbedContent { url: String::new(), interactive: true }
+        EmbedContent {
+            url: String::new(),
+            interactive: true,
+        }
     }
 }
 
@@ -868,8 +875,16 @@ impl Default for ChartContent {
             chart: "column".into(),
             labels: vec!["Q1".into(), "Q2".into(), "Q3".into(), "Q4".into()],
             series: vec![
-                Series { name: "2025".into(), values: vec![12.0, 19.0, 15.0, 24.0], color: String::new() },
-                Series { name: "2026".into(), values: vec![16.0, 22.0, 21.0, 31.0], color: String::new() },
+                Series {
+                    name: "2025".into(),
+                    values: vec![12.0, 19.0, 15.0, 24.0],
+                    color: String::new(),
+                },
+                Series {
+                    name: "2026".into(),
+                    values: vec![16.0, 22.0, 21.0, 31.0],
+                    color: String::new(),
+                },
             ],
             show_legend: true,
             show_values: false,
@@ -955,7 +970,10 @@ mod tests {
     #[test]
     fn normalize_fixes_ids_and_first_slide() {
         let mut deck = Deck::default();
-        let mut s = Slide { nested: true, ..Default::default() };
+        let mut s = Slide {
+            nested: true,
+            ..Default::default()
+        };
         let e = Element::default();
         s.elements.push(e.clone());
         s.elements.push(e);

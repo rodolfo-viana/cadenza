@@ -48,10 +48,18 @@ pub fn request_url(family: &str, variants: &str) -> String {
         .collect();
     let uprights: Vec<u32> = available.iter().filter(|(i, _)| !i).map(|(_, w)| *w).collect();
     let pick_regular = |ws: &[u32]| -> Option<u32> {
-        if ws.contains(&400) { Some(400) } else { ws.iter().copied().min_by_key(|w| (*w as i32 - 400).abs()) }
+        if ws.contains(&400) {
+            Some(400)
+        } else {
+            ws.iter().copied().min_by_key(|w| (*w as i32 - 400).abs())
+        }
     };
     let pick_bold = |ws: &[u32]| -> Option<u32> {
-        if ws.contains(&700) { Some(700) } else { ws.iter().copied().filter(|w| *w >= 600).min() }
+        if ws.contains(&700) {
+            Some(700)
+        } else {
+            ws.iter().copied().filter(|w| *w >= 600).min()
+        }
     };
     let name = family.trim().replace(' ', "+");
     let mut wanted: Vec<(bool, u32)> = Vec::new();
@@ -112,7 +120,11 @@ pub fn parse_faces(css: &str) -> Vec<Face> {
                     let after = &rule[u + 4..];
                     if let Some(e) = after.find(')') {
                         let url = after[..e].trim_matches(|c| c == '"' || c == '\'').to_string();
-                        faces.push(Face { subset: subset.clone(), rule: rule.to_string(), url });
+                        faces.push(Face {
+                            subset: subset.clone(),
+                            rule: rule.to_string(),
+                            url,
+                        });
                     }
                 }
                 rest = &rest[r + close + 1..];
@@ -147,7 +159,12 @@ pub fn install(family: &str, variants: &str, store: &(dyn Fn(&[u8]) -> anyhow::R
         Ok(resp.body_mut().read_to_string()?)
     };
     let css = fetch_css(&request_url(family, variants))
-        .or_else(|_| fetch_css(&format!("https://fonts.googleapis.com/css2?family={}&display=swap", family.trim().replace(' ', "+"))))
+        .or_else(|_| {
+            fetch_css(&format!(
+                "https://fonts.googleapis.com/css2?family={}&display=swap",
+                family.trim().replace(' ', "+")
+            ))
+        })
         .context("Could not reach Google Fonts — check your internet connection")?;
     let faces = select_faces(parse_faces(&css));
     if faces.is_empty() {
@@ -183,7 +200,11 @@ pub fn install(family: &str, variants: &str, store: &(dyn Fn(&[u8]) -> anyhow::R
         out.push_str(&face.rule.replace(&face.url, &format!("{ASSET_PREFIX}{name}")));
         out.push('\n');
     }
-    Ok(WebFont { family: family.trim().to_string(), source: "google".into(), css: out })
+    Ok(WebFont {
+        family: family.trim().to_string(),
+        source: "google".into(),
+        css: out,
+    })
 }
 
 /// Replaces `cz-asset:<name>` references with real URLs.
@@ -193,7 +214,9 @@ pub fn resolve_css(css: &str, url: &dyn Fn(&str) -> String) -> String {
     while let Some(i) = rest.find(ASSET_PREFIX) {
         out.push_str(&rest[..i]);
         let tail = &rest[i + ASSET_PREFIX.len()..];
-        let end = tail.find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))).unwrap_or(tail.len());
+        let end = tail
+            .find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_')))
+            .unwrap_or(tail.len());
         let name = &tail[..end];
         out.push_str(&url(name));
         rest = &tail[end..];
@@ -224,8 +247,14 @@ mod tests {
             request_url("Open Sans", "300,400,700,400i,700i"),
             "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap"
         );
-        assert_eq!(request_url("Lobster", "400"), "https://fonts.googleapis.com/css2?family=Lobster:wght@400&display=swap");
-        assert_eq!(request_url("Thin Only", "100,900"), "https://fonts.googleapis.com/css2?family=Thin+Only:wght@100;900&display=swap");
+        assert_eq!(
+            request_url("Lobster", "400"),
+            "https://fonts.googleapis.com/css2?family=Lobster:wght@400&display=swap"
+        );
+        assert_eq!(
+            request_url("Thin Only", "100,900"),
+            "https://fonts.googleapis.com/css2?family=Thin+Only:wght@100;900&display=swap"
+        );
     }
 
     #[test]
@@ -243,7 +272,10 @@ mod tests {
     fn resolves_asset_references() {
         let css = "src: url(cz-asset:abc.woff2) format('woff2'); src: url(cz-asset:def.woff2)";
         assert_eq!(asset_names(css), vec!["abc.woff2", "def.woff2"]);
-        assert_eq!(resolve_css(css, &|n| format!("assets/{n}")), "src: url(assets/abc.woff2) format('woff2'); src: url(assets/def.woff2)");
+        assert_eq!(
+            resolve_css(css, &|n| format!("assets/{n}")),
+            "src: url(assets/abc.woff2) format('woff2'); src: url(assets/def.woff2)"
+        );
     }
 
     #[test]

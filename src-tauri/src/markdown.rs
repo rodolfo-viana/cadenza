@@ -177,18 +177,19 @@ fn set_text(el: &mut Element, html: &str) {
     }
 }
 
+/// An image found for a Markdown reference: asset name or URL, natural
+/// width and height.
+pub type ResolvedImage = (String, u32, u32);
+
 /// Converts parsed Markdown into slides. `resolve_image` maps an image
-/// reference to `(asset name or URL, natural width, natural height)`.
-pub fn to_slides(md: &[MdSlide], width: u32, height: u32, resolve_image: &mut dyn FnMut(&str) -> Option<(String, u32, u32)>) -> Vec<Slide> {
+/// reference to its [`ResolvedImage`].
+pub fn to_slides(md: &[MdSlide], width: u32, height: u32, resolve_image: &mut dyn FnMut(&str) -> Option<ResolvedImage>) -> Vec<Slide> {
     let mut out = Vec::new();
     for (i, m) in md.iter().enumerate() {
         let has_body = !m.body_html.is_empty();
         // A heading plus one short line reads as a title + subtitle.
-        let short_body = has_body
-            && !m.body_html.contains("<ul")
-            && !m.body_html.contains("<ol")
-            && m.body_html.matches("<p>").count() <= 1
-            && m.body_html.len() < 240;
+        let short_body =
+            has_body && !m.body_html.contains("<ul") && !m.body_html.contains("<ol") && m.body_html.matches("<p>").count() <= 1 && m.body_html.len() < 240;
         let image = m.images.first().and_then(|(alt, src)| resolve_image(src).map(|r| (alt.clone(), r)));
         let is_mermaid = m.code.as_ref().is_some_and(|(lang, _)| lang == "mermaid");
         let layout = if is_mermaid {
@@ -230,7 +231,11 @@ pub fn to_slides(md: &[MdSlide], width: u32, height: u32, resolve_image: &mut dy
                     }
                 }
                 (_, "statement", "title") => {
-                    let html = if m.body_html.is_empty() { format!("<p>{title}</p>") } else { m.body_html.clone() };
+                    let html = if m.body_html.is_empty() {
+                        format!("<p>{title}</p>")
+                    } else {
+                        m.body_html.clone()
+                    };
                     set_text(el, &html);
                 }
                 (_, _, "title") => set_text(el, &format!("<p>{title}</p>")),
@@ -250,7 +255,10 @@ pub fn to_slides(md: &[MdSlide], width: u32, height: u32, resolve_image: &mut dy
                     y: (h * top).round(),
                     w: (w * 0.86).round(),
                     h: (h * (0.92 - top)).round(),
-                    content: Content::Diagram(DiagramContent { source: source.clone(), ..Default::default() }),
+                    content: Content::Diagram(DiagramContent {
+                        source: source.clone(),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 });
             }
@@ -314,7 +322,12 @@ mod tests {
         let md = parse("## Flow\n\n```mermaid\ngraph TD; A-->B\n```\n");
         let slides = to_slides(&md, 1280, 720, &mut |_| None);
         assert_eq!(slides[0].layout, "title-only");
-        assert!(slides[0].elements.iter().any(|e| matches!(&e.content, Content::Diagram(d) if d.source.contains("A-->B"))));
+        assert!(
+            slides[0]
+                .elements
+                .iter()
+                .any(|e| matches!(&e.content, Content::Diagram(d) if d.source.contains("A-->B")))
+        );
     }
 
     #[test]

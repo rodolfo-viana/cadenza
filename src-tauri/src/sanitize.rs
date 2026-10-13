@@ -10,8 +10,28 @@ fn builder() -> &'static Builder<'static> {
     static B: OnceLock<Builder<'static>> = OnceLock::new();
     B.get_or_init(|| {
         let tags: HashSet<&str> = [
-            "p", "br", "div", "span", "b", "strong", "i", "em", "u", "s", "strike", "del", "sub", "sup", "a",
-            "ul", "ol", "li", "code", "mark", "small", "blockquote",
+            "p",
+            "br",
+            "div",
+            "span",
+            "b",
+            "strong",
+            "i",
+            "em",
+            "u",
+            "s",
+            "strike",
+            "del",
+            "sub",
+            "sup",
+            "a",
+            "ul",
+            "ol",
+            "li",
+            "code",
+            "mark",
+            "small",
+            "blockquote",
         ]
         .into_iter()
         .collect();

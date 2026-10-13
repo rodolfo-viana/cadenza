@@ -32,7 +32,11 @@ pub struct Ctx<'a> {
 
 impl Ctx<'_> {
     fn url(&self, src: &str) -> String {
-        if src.is_empty() || is_remote(src) { src.to_string() } else { (self.asset_url)(src) }
+        if src.is_empty() || is_remote(src) {
+            src.to_string()
+        } else {
+            (self.asset_url)(src)
+        }
     }
 
     fn editor(&self) -> bool {
@@ -61,7 +65,10 @@ pub fn slide_for_editor(deck: &Deck, slide: &Slide, ctx: &Ctx) -> SlideRender {
     for el in &slide.elements {
         html.push_str(&element(deck, el, ctx));
     }
-    SlideRender { html, classes: background_class(slide).to_string() }
+    SlideRender {
+        html,
+        classes: background_class(slide).to_string(),
+    }
 }
 
 /// reveal.js marks slides with a solid background color as dark or light so
@@ -72,7 +79,11 @@ pub fn background_class(slide: &Slide) -> &'static str {
     }
     match parse_color(&slide.background.color) {
         Some(c) if c.a > 0.0 => {
-            if brightness(c) < 128.0 { "has-dark-background" } else { "has-light-background" }
+            if brightness(c) < 128.0 {
+                "has-dark-background"
+            } else {
+                "has-light-background"
+            }
         }
         _ => "",
     }
@@ -147,7 +158,12 @@ fn section_attrs(slide: &Slide, ctx: &Ctx) -> String {
             );
         }
         "video" if !bg.video.is_empty() => {
-            let _ = write!(a, r#" data-background-video="{}" data-background-opacity="{}""#, esc(&ctx.url(&bg.video)), num(bg.opacity.clamp(0.0, 1.0)));
+            let _ = write!(
+                a,
+                r#" data-background-video="{}" data-background-opacity="{}""#,
+                esc(&ctx.url(&bg.video)),
+                num(bg.opacity.clamp(0.0, 1.0))
+            );
             if bg.video_loop {
                 a.push_str(" data-background-video-loop");
             }
@@ -366,7 +382,11 @@ pub fn element(deck: &Deck, el: &Element, ctx: &Ctx) -> String {
 }
 
 fn fragment_index(order: u32) -> String {
-    if order > 0 { format!(r#" data-fragment-index="{}""#, order) } else { String::new() }
+    if order > 0 {
+        format!(r#" data-fragment-index="{}""#, order)
+    } else {
+        String::new()
+    }
 }
 
 fn action_href(action: &Action) -> Option<String> {
@@ -567,7 +587,12 @@ fn image_element(i: &ImageContent, el: &Element, ctx: &Ctx) -> Option<String> {
         let _ = write!(img_style, "filter:{};", filters.join(" "));
     }
     if i.flip_x || i.flip_y {
-        let _ = write!(img_style, "transform:scale({},{});", if i.flip_x { -1 } else { 1 }, if i.flip_y { -1 } else { 1 });
+        let _ = write!(
+            img_style,
+            "transform:scale({},{});",
+            if i.flip_x { -1 } else { 1 },
+            if i.flip_y { -1 } else { 1 }
+        );
     }
     Some(format!(
         r#"<div class="cz-box cz-image-box" style="{}"><img src="{}" alt="{}" draggable="false" style="{}"></div>"#,
@@ -587,7 +612,10 @@ pub fn video_embed(src: &str) -> Option<(&'static str, String)> {
         if id.is_empty() { None } else { Some(id) }
     };
     if s.contains("youtube.com") || s.contains("youtu.be") {
-        let id = after("v=").or_else(|| after("youtu.be/")).or_else(|| after("/embed/")).or_else(|| after("/shorts/"))?;
+        let id = after("v=")
+            .or_else(|| after("youtu.be/"))
+            .or_else(|| after("/embed/"))
+            .or_else(|| after("/shorts/"))?;
         return Some(("youtube", id));
     }
     if s.contains("vimeo.com") {
@@ -613,7 +641,10 @@ fn video_element(v: &VideoContent, el: &Element, ctx: &Ctx) -> Option<String> {
     if let Some((provider, id)) = video_embed(&v.src) {
         if ctx.editor() {
             let thumb = if provider == "youtube" {
-                format!(r#"<img src="https://img.youtube.com/vi/{}/hqdefault.jpg" alt="" draggable="false" onerror="this.remove()">"#, esc(&id))
+                format!(
+                    r#"<img src="https://img.youtube.com/vi/{}/hqdefault.jpg" alt="" draggable="false" onerror="this.remove()">"#,
+                    esc(&id)
+                )
             } else {
                 String::new()
             };
@@ -656,7 +687,11 @@ fn video_element(v: &VideoContent, el: &Element, ctx: &Ctx) -> Option<String> {
     let fit = if v.fit == "cover" { "cover" } else { "contain" };
     let url = ctx.url(&v.src);
     if ctx.editor() {
-        let poster = if v.poster.is_empty() { String::new() } else { format!(r#" poster="{}""#, esc(&ctx.url(&v.poster))) };
+        let poster = if v.poster.is_empty() {
+            String::new()
+        } else {
+            format!(r#" poster="{}""#, esc(&ctx.url(&v.poster)))
+        };
         return Some(format!(
             r##"<div class="cz-box cz-video-box" style="{}"><video src="{}#t=0.1" preload="metadata" muted playsinline{} style="object-fit:{}"></video><span class="cz-video-badge"></span></div>"##,
             esc(&box_style),
@@ -693,8 +728,16 @@ fn video_element(v: &VideoContent, el: &Element, ctx: &Ctx) -> Option<String> {
 fn code_element(c: &CodeContent, el: &Element, _deck: &Deck) -> Option<String> {
     let mut box_style = box_css(&el.style, true);
     let _ = write!(box_style, "font-size:{}px;", num(c.font_size.clamp(6.0, 200.0)));
-    let lang = c.language.chars().filter(|ch| ch.is_ascii_alphanumeric() || *ch == '-' || *ch == '+' || *ch == '#').collect::<String>();
-    let steps: String = c.highlight_steps.chars().filter(|ch| ch.is_ascii_digit() || matches!(ch, '|' | ',' | '-' | ' ')).collect();
+    let lang = c
+        .language
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '-' || *ch == '+' || *ch == '#')
+        .collect::<String>();
+    let steps: String = c
+        .highlight_steps
+        .chars()
+        .filter(|ch| ch.is_ascii_digit() || matches!(ch, '|' | ',' | '-' | ' '))
+        .collect();
     let line_attr = if c.line_numbers || !steps.trim().is_empty() {
         format!(r#" data-line-numbers="{}""#, esc(steps.trim()))
     } else {
@@ -748,7 +791,11 @@ fn embed_element(e: &EmbedContent, el: &Element, ctx: &Ctx) -> Option<String> {
         return Some(format!(
             r#"<div class="cz-box cz-embed-box cz-embed-preview" style="{}"><div class="cz-placeholder-media"><span class="cz-ph-icon cz-ph-web"></span><span>{}</span></div></div>"#,
             esc(&box_style),
-            if valid { esc(url) } else { "Web page — set its address in the inspector".into() }
+            if valid {
+                esc(url)
+            } else {
+                "Web page — set its address in the inspector".into()
+            }
         ));
     }
     Some(format!(
@@ -821,7 +868,13 @@ fn diagram_element(d: &DiagramContent, el: &Element, deck: &Deck, ctx: &Ctx) -> 
         "light" => false,
         _ => deck.theme_is_dark(),
     };
-    let svg = if dark && !d.svg_dark.is_empty() { &d.svg_dark } else if !d.svg_light.is_empty() { &d.svg_light } else { &d.svg_dark };
+    let svg = if dark && !d.svg_dark.is_empty() {
+        &d.svg_dark
+    } else if !d.svg_light.is_empty() {
+        &d.svg_light
+    } else {
+        &d.svg_dark
+    };
     let box_style = box_css(&el.style, true);
     if svg.is_empty() || svg.len() > 8 * 1024 * 1024 {
         if !ctx.editor() {
@@ -1017,7 +1070,10 @@ mod tests {
     use super::*;
 
     fn ctx(mode: Mode) -> Ctx<'static> {
-        Ctx { mode, asset_url: &|n: &str| format!("assets/{n}") }
+        Ctx {
+            mode,
+            asset_url: &|n: &str| format!("assets/{n}"),
+        }
     }
 
     fn deck_with(content: Content) -> Deck {
@@ -1031,7 +1087,10 @@ mod tests {
     #[test]
     fn editor_marks_elements_and_hides_fragments() {
         let mut deck = deck_with(Content::Text(TextContent {
-            text: RichText { html: "<p>Hello</p>".into(), ..Default::default() },
+            text: RichText {
+                html: "<p>Hello</p>".into(),
+                ..Default::default()
+            },
         }));
         deck.slides[0].elements[0].build.effect = "fade-up".into();
         let r = slide_for_editor(&deck, &deck.slides[0], &ctx(Mode::Editor));
@@ -1055,7 +1114,10 @@ mod tests {
     fn nested_slides_form_stacks() {
         let mut deck = Deck::default();
         let a = Slide::default();
-        let b = Slide { nested: true, ..Default::default() };
+        let b = Slide {
+            nested: true,
+            ..Default::default()
+        };
         let c = Slide::default();
         let (bid, cid) = (b.id.clone(), c.id.clone());
         deck.slides = vec![a, b, c];
@@ -1068,9 +1130,18 @@ mod tests {
     #[test]
     fn hidden_slides_are_skipped() {
         let mut deck = Deck::default();
-        let a = Slide { hidden: true, ..Default::default() };
-        let b = Slide { nested: true, ..Default::default() };
-        let c = Slide { hidden: true, ..Default::default() };
+        let a = Slide {
+            hidden: true,
+            ..Default::default()
+        };
+        let b = Slide {
+            nested: true,
+            ..Default::default()
+        };
+        let c = Slide {
+            hidden: true,
+            ..Default::default()
+        };
         let d = Slide::default();
         let (aid, bid, cid, did) = (a.id.clone(), b.id.clone(), c.id.clone(), d.id.clone());
         deck.slides = vec![a, b, c, d];
@@ -1096,14 +1167,20 @@ mod tests {
 
     #[test]
     fn assets_resolve_through_context() {
-        let deck = deck_with(Content::Image(ImageContent { src: "abc.png".into(), ..Default::default() }));
+        let deck = deck_with(Content::Image(ImageContent {
+            src: "abc.png".into(),
+            ..Default::default()
+        }));
         let html = sections(&deck, &ctx(Mode::Show));
         assert!(html.contains(r#"src="assets/abc.png""#));
     }
 
     #[test]
     fn youtube_urls_are_recognized() {
-        assert_eq!(video_embed("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1"), Some(("youtube", "dQw4w9WgXcQ".into())));
+        assert_eq!(
+            video_embed("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1"),
+            Some(("youtube", "dQw4w9WgXcQ".into()))
+        );
         assert_eq!(video_embed("https://youtu.be/dQw4w9WgXcQ"), Some(("youtube", "dQw4w9WgXcQ".into())));
         assert_eq!(video_embed("https://vimeo.com/76979871"), Some(("vimeo", "76979871".into())));
         assert_eq!(video_embed("https://example.com/v.mp4"), None);
@@ -1112,21 +1189,29 @@ mod tests {
     #[test]
     fn inline_math_is_wrapped_and_loads_katex() {
         let deck = deck_with(Content::Text(TextContent {
-            text: RichText { html: "<p>Area $\\pi r^2$</p>".into(), ..Default::default() },
+            text: RichText {
+                html: "<p>Area $\\pi r^2$</p>".into(),
+                ..Default::default()
+            },
         }));
         let html = sections(&deck, &ctx(Mode::Show));
         assert!(html.contains(r#"<span class="cz-math-inline" data-latex="\pi r^2">"#), "{html}");
         assert!(needs(&deck).math);
         let plain = deck_with(Content::Text(TextContent {
-            text: RichText { html: "<p>Costs $5 or $10</p>".into(), ..Default::default() },
+            text: RichText {
+                html: "<p>Costs $5 or $10</p>".into(),
+                ..Default::default()
+            },
         }));
         assert!(!needs(&plain).math);
     }
 
     #[test]
     fn deck_css_embeds_fonts_and_overrides() {
-        let mut deck = Deck::default();
-        deck.heading_font = "'Lora'".into();
+        let mut deck = Deck {
+            heading_font: "'Lora'".into(),
+            ..Default::default()
+        };
         deck.web_fonts.push(crate::webfonts::WebFont {
             family: "Lora".into(),
             source: "google".into(),
@@ -1153,12 +1238,19 @@ mod tests {
         assert!(sections(&deck, &ctx(Mode::Show)).contains(&enc("<svg>L</svg>")));
         let empty = deck_with(Content::Diagram(DiagramContent::default()));
         assert!(!sections(&empty, &ctx(Mode::Show)).contains("cz-diagram"));
-        assert!(slide_for_editor(&empty, &empty.slides[0], &ctx(Mode::Editor)).html.contains("Rendering diagram"));
+        assert!(
+            slide_for_editor(&empty, &empty.slides[0], &ctx(Mode::Editor))
+                .html
+                .contains("Rendering diagram")
+        );
     }
 
     #[test]
     fn code_is_escaped() {
-        let deck = deck_with(Content::Code(CodeContent { code: "<script>x</script>".into(), ..Default::default() }));
+        let deck = deck_with(Content::Code(CodeContent {
+            code: "<script>x</script>".into(),
+            ..Default::default()
+        }));
         let html = sections(&deck, &ctx(Mode::Show));
         assert!(html.contains("&lt;script&gt;"));
         assert!(!html.contains("<script>x"));

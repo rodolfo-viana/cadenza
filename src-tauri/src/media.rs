@@ -44,7 +44,12 @@ pub struct MediaPage {
 }
 
 fn agent() -> ureq::Agent {
-    ureq::Agent::new_with_config(ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(25))).http_status_as_error(false).build())
+    ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(25)))
+            .http_status_as_error(false)
+            .build(),
+    )
 }
 
 fn get_json(url: &str, headers: &[(&str, &str)]) -> anyhow::Result<Value> {
@@ -125,14 +130,19 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
                             author: s(r, &["creator"]),
                             author_url: s(r, &["creator_url"]),
                             page_url: s(r, &["foreign_landing_url"]),
-                            license: format!("CC {} {}", s(r, &["license"]).to_uppercase(), s(r, &["license_version"])).trim().to_string(),
+                            license: format!("CC {} {}", s(r, &["license"]).to_uppercase(), s(r, &["license_version"]))
+                                .trim()
+                                .to_string(),
                             track_url: String::new(),
                         })
                         .collect()
                 })
                 .unwrap_or_default();
             let pages = n(&v, &["page_count"]);
-            Ok(MediaPage { items, next: (p < pages).then(|| (p + 1).to_string()) })
+            Ok(MediaPage {
+                items,
+                next: (p < pages).then(|| (p + 1).to_string()),
+            })
         }
         "unsplash" => {
             let key = key.filter(|k| !k.is_empty()).context("NEEDS_KEY")?;
@@ -143,7 +153,13 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
                 let v = get_json(&format!("https://api.unsplash.com/photos?page={p}&per_page=30&order_by=popular"), &headers)?;
                 (v, 50)
             } else {
-                let v = get_json(&format!("https://api.unsplash.com/search/photos?query={}&page={p}&per_page=30&content_filter=high", enc(q)), &headers)?;
+                let v = get_json(
+                    &format!(
+                        "https://api.unsplash.com/search/photos?query={}&page={p}&per_page=30&content_filter=high",
+                        enc(q)
+                    ),
+                    &headers,
+                )?;
                 let tp = n(&v, &["total_pages"]);
                 (v["results"].clone(), tp)
             };
@@ -159,7 +175,11 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
                                 kind: "image".into(),
                                 title: s(r, &["alt_description"]),
                                 thumb: s(r, &["urls", "small"]),
-                                url: if raw.is_empty() { s(r, &["urls", "regular"]) } else { format!("{raw}&w=2400&q=85&fm=jpg&fit=max") },
+                                url: if raw.is_empty() {
+                                    s(r, &["urls", "regular"])
+                                } else {
+                                    format!("{raw}&w=2400&q=85&fm=jpg&fit=max")
+                                },
                                 width: n(r, &["width"]),
                                 height: n(r, &["height"]),
                                 author: s(r, &["user", "name"]),
@@ -172,7 +192,10 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
                         .collect()
                 })
                 .unwrap_or_default();
-            Ok(MediaPage { items, next: (p < total_pages).then(|| (p + 1).to_string()) })
+            Ok(MediaPage {
+                items,
+                next: (p < total_pages).then(|| (p + 1).to_string()),
+            })
         }
         "giphy" => {
             let key = key.filter(|k| !k.is_empty()).context("NEEDS_KEY")?;
@@ -180,7 +203,11 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
             let url = if q.is_empty() {
                 format!("https://api.giphy.com/v1/gifs/trending?api_key={}&limit=30&offset={offset}&rating=pg", enc(key))
             } else {
-                format!("https://api.giphy.com/v1/gifs/search?api_key={}&q={}&limit=30&offset={offset}&rating=pg", enc(key), enc(q))
+                format!(
+                    "https://api.giphy.com/v1/gifs/search?api_key={}&q={}&limit=30&offset={offset}&rating=pg",
+                    enc(key),
+                    enc(q)
+                )
             };
             let v = get_json(&url, &[])?;
             let items: Vec<MediaItem> = v["data"]
@@ -215,7 +242,10 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
                 .unwrap_or_default();
             let total = n(&v, &["pagination", "total_count"]);
             let next = offset + items.len() as u32;
-            Ok(MediaPage { next: (!items.is_empty() && next < total.min(4999)).then(|| next.to_string()), items })
+            Ok(MediaPage {
+                next: (!items.is_empty() && next < total.min(4999)).then(|| next.to_string()),
+                items,
+            })
         }
         "youtube" => {
             let key = key.filter(|k| !k.is_empty()).context("NEEDS_KEY")?;
@@ -262,7 +292,11 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
 }
 
 fn html_unescape(s: &str) -> String {
-    s.replace("&#39;", "'").replace("&quot;", "\"").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    s.replace("&#39;", "'")
+        .replace("&quot;", "\"")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
 }
 
 /// Preview information for a YouTube or Vimeo link (no key needed).
@@ -296,13 +330,27 @@ pub fn download(url: &str) -> anyhow::Result<(Vec<u8>, String)> {
     if !lower.starts_with("https://") && !lower.starts_with("http://") {
         bail!("Invalid address");
     }
-    let mut resp = agent().get(url).header("User-Agent", UA).call().context("Download failed — check your internet connection")?;
+    let mut resp = agent()
+        .get(url)
+        .header("User-Agent", UA)
+        .call()
+        .context("Download failed — check your internet connection")?;
     let status = resp.status().as_u16();
     if !(200..300).contains(&status) {
         bail!("Download failed (HTTP {status})");
     }
-    let ctype = resp.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_ascii_lowercase();
-    let bytes = resp.body_mut().with_config().limit(MAX_DOWNLOAD).read_to_vec().context("The file is too large (40 MB max)")?;
+    let ctype = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let bytes = resp
+        .body_mut()
+        .with_config()
+        .limit(MAX_DOWNLOAD)
+        .read_to_vec()
+        .context("The file is too large (40 MB max)")?;
     let ext = match ctype.split(';').next().unwrap_or("").trim() {
         "image/jpeg" | "image/jpg" => "jpg",
         "image/png" => "png",

@@ -109,7 +109,13 @@ fn agent(streaming: bool) -> ureq::Agent {
 fn api_error(status: u16, body: &str) -> anyhow::Error {
     let msg = serde_json::from_str::<Value>(body)
         .ok()
-        .and_then(|v| v["error"]["message"].as_str().or(v["error"].as_str()).or(v["message"].as_str()).map(String::from))
+        .and_then(|v| {
+            v["error"]["message"]
+                .as_str()
+                .or(v["error"].as_str())
+                .or(v["message"].as_str())
+                .map(String::from)
+        })
         .unwrap_or_else(|| body.chars().take(300).collect());
     match status {
         400 | 422 => anyhow!(BadRequest(msg)),
@@ -126,7 +132,9 @@ fn get_json(url: &str, headers: &[(&str, String)]) -> anyhow::Result<Value> {
     for (k, v) in headers {
         req = req.header(*k, v.as_str());
     }
-    let mut resp = req.call().context("Could not reach the AI service. Check your internet connection (or that the server is running).")?;
+    let mut resp = req
+        .call()
+        .context("Could not reach the AI service. Check your internet connection (or that the server is running).")?;
     let status = resp.status().as_u16();
     let body = resp.body_mut().read_to_string().unwrap_or_default();
     if !(200..300).contains(&status) {
@@ -140,7 +148,10 @@ fn anthropic_headers(key: &str) -> Vec<(&'static str, String)> {
 }
 
 fn bearer(key: &Option<String>) -> Vec<(&'static str, String)> {
-    key.as_deref().filter(|k| !k.is_empty()).map(|k| vec![("Authorization", format!("Bearer {k}"))]).unwrap_or_default()
+    key.as_deref()
+        .filter(|k| !k.is_empty())
+        .map(|k| vec![("Authorization", format!("Bearer {k}"))])
+        .unwrap_or_default()
 }
 
 /// Models offered by the provider, for the model picker.
@@ -154,7 +165,10 @@ pub fn list_models(p: &Provider) -> anyhow::Result<Vec<ModelInfo>> {
                 a.iter()
                     .filter_map(|m| {
                         let id = m["id"].as_str()?.to_string();
-                        Some(ModelInfo { name: m["display_name"].as_str().unwrap_or(&id).to_string(), id })
+                        Some(ModelInfo {
+                            name: m["display_name"].as_str().unwrap_or(&id).to_string(),
+                            id,
+                        })
                     })
                     .collect()
             })
@@ -165,7 +179,20 @@ pub fn list_models(p: &Provider) -> anyhow::Result<Vec<ModelInfo>> {
     }
     let v = get_json(&format!("{}/models", p.openai_base()), &bearer(&p.key))?;
     // OpenAI lists every model it serves; keep the ones that can chat.
-    const NOT_CHAT: &[&str] = &["embed", "whisper", "tts", "dall-e", "moderation", "davinci", "babbage", "transcribe", "realtime", "audio", "image", "search"];
+    const NOT_CHAT: &[&str] = &[
+        "embed",
+        "whisper",
+        "tts",
+        "dall-e",
+        "moderation",
+        "davinci",
+        "babbage",
+        "transcribe",
+        "realtime",
+        "audio",
+        "image",
+        "search",
+    ];
     let mut models: Vec<(i64, ModelInfo)> = v["data"]
         .as_array()
         .map(|a| {
@@ -186,7 +213,9 @@ pub fn list_models(p: &Provider) -> anyhow::Result<Vec<ModelInfo>> {
 
 /// Effort control exists on current Claude models only.
 fn anthropic_effort(model: &str) -> bool {
-    ["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-5"].iter().any(|p| model.starts_with(p))
+    ["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-5"]
+        .iter()
+        .any(|p| model.starts_with(p))
 }
 
 /// Models whose safety classifiers can decline a request; server-side
@@ -196,17 +225,27 @@ fn anthropic_fallbacks(model: &str) -> bool {
 }
 
 fn anthropic_max_tokens(key: &str, model: &str) -> u32 {
-    get_json(&format!("{}/models/{}", anthropic_url(), crate::util::encode_uri_component(model)), &anthropic_headers(key))
-        .ok()
-        .and_then(|v| v["max_tokens"].as_u64())
-        .map(|m| m.min(32_000) as u32)
-        .unwrap_or(16_000)
+    get_json(
+        &format!("{}/models/{}", anthropic_url(), crate::util::encode_uri_component(model)),
+        &anthropic_headers(key),
+    )
+    .ok()
+    .and_then(|v| v["max_tokens"].as_u64())
+    .map(|m| m.min(32_000) as u32)
+    .unwrap_or(16_000)
 }
 
 /// Runs a completion that must produce JSON matching `schema`, streaming the
 /// text so far to `on_text`. Retries without optional features when the
 /// server rejects them (older models, local servers).
-pub fn complete(p: &Provider, system: &str, messages: &[Message], schema: &Value, cancel: &AtomicBool, on_text: &mut dyn FnMut(&str)) -> anyhow::Result<String> {
+pub fn complete(
+    p: &Provider,
+    system: &str,
+    messages: &[Message],
+    schema: &Value,
+    cancel: &AtomicBool,
+    on_text: &mut dyn FnMut(&str),
+) -> anyhow::Result<String> {
     let max_tokens = match (p.kind.as_str(), p.key.as_deref()) {
         ("anthropic", Some(k)) => anthropic_max_tokens(k, &p.model),
         _ => 16_000,
@@ -267,7 +306,9 @@ fn anthropic_stream(
     if fallbacks {
         req = req.header("anthropic-beta", "server-side-fallback-2026-07-01");
     }
-    let mut resp = req.send(body.to_string()).context("Could not reach Anthropic. Check your internet connection.")?;
+    let mut resp = req
+        .send(body.to_string())
+        .context("Could not reach Anthropic. Check your internet connection.")?;
     let status = resp.status().as_u16();
     if !(200..300).contains(&status) {
         let body = resp.body_mut().read_to_string().unwrap_or_default();
@@ -322,12 +363,17 @@ fn openai_stream(
         1 => body["response_format"] = json!({ "type": "json_object" }),
         _ => {}
     }
-    let mut req = agent(true).post(&format!("{}/chat/completions", p.openai_base())).header("User-Agent", UA).header("content-type", "application/json");
+    let mut req = agent(true)
+        .post(&format!("{}/chat/completions", p.openai_base()))
+        .header("User-Agent", UA)
+        .header("content-type", "application/json");
     for (k, v) in bearer(&p.key) {
         req = req.header(k, v.as_str());
     }
     let what = if p.kind == "openai" { "OpenAI" } else { "the AI server" };
-    let mut resp = req.send(body.to_string()).with_context(|| format!("Could not reach {what}. Check your internet connection (or that the server is running)."))?;
+    let mut resp = req
+        .send(body.to_string())
+        .with_context(|| format!("Could not reach {what}. Check your internet connection (or that the server is running)."))?;
     let status = resp.status().as_u16();
     if !(200..300).contains(&status) {
         let body = resp.body_mut().read_to_string().unwrap_or_default();
@@ -444,7 +490,20 @@ pub struct AiSeries {
     pub values: Vec<f64>,
 }
 
-const SLIDE_LAYOUTS: &[&str] = &["title", "section", "bullets", "two_column", "statement", "quote", "big_number", "code", "chart", "table", "diagram", "image_text"];
+const SLIDE_LAYOUTS: &[&str] = &[
+    "title",
+    "section",
+    "bullets",
+    "two_column",
+    "statement",
+    "quote",
+    "big_number",
+    "code",
+    "chart",
+    "table",
+    "diagram",
+    "image_text",
+];
 const ACTIONS: &[&str] = &["insert", "replace", "set_text", "notes", "delete", "set_theme", "set_title"];
 
 /// JSON schema of the plan (strict-mode compatible: every field required,
@@ -596,7 +655,13 @@ pub fn plain_text(html: &str) -> String {
         }
         out.push(c);
     }
-    let out = out.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&");
+    let out = out
+        .replace("&nbsp;", " ")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&amp;", "&");
     let lines: Vec<&str> = out.lines().map(str::trim_end).filter(|l| !l.trim().is_empty()).collect();
     lines.join("\n").trim().to_string()
 }
@@ -624,7 +689,9 @@ pub fn deck_context(deck: &Deck, current: Option<&str>, selected: &[String]) -> 
                         "series": c.series.iter().map(|x| json!({ "name": x.name, "values": x.values })).collect::<Vec<_>>() })),
                     Content::Table(t) => Some(json!({ "id": e.id, "kind": "table",
                         "rows": t.rows.iter().take(8).map(|r| r.iter().map(|c| plain_text(c)).collect::<Vec<_>>()).collect::<Vec<_>>() })),
-                    Content::Code(c) => Some(json!({ "id": e.id, "kind": "code", "language": c.language, "code": c.code.chars().take(1500).collect::<String>() })),
+                    Content::Code(c) => {
+                        Some(json!({ "id": e.id, "kind": "code", "language": c.language, "code": c.code.chars().take(1500).collect::<String>() }))
+                    }
                     Content::Diagram(d) => Some(json!({ "id": e.id, "kind": "diagram", "mermaid": d.source })),
                     Content::Math(m) => Some(json!({ "id": e.id, "kind": "equation", "latex": m.latex })),
                     Content::Image(img) => Some(json!({ "id": e.id, "kind": "image", "description": img.alt })),
@@ -875,13 +942,21 @@ fn chart_element(s: &AiSlide, width: u32, height: u32) -> Option<Element> {
         .map(|x| {
             let mut values: Vec<f64> = x.values.iter().map(|v| if v.is_finite() { *v } else { 0.0 }).collect();
             values.resize(labels.len(), 0.0);
-            Series { name: x.name.trim().to_string(), values, color: String::new() }
+            Series {
+                name: x.name.trim().to_string(),
+                values,
+                color: String::new(),
+            }
         })
         .collect();
     if labels.is_empty() || series.is_empty() {
         return None;
     }
-    let kind = if ["column", "bar", "line", "area", "pie", "donut"].contains(&s.chart_type.as_str()) { s.chart_type.as_str() } else { "column" };
+    let kind = if ["column", "bar", "line", "area", "pie", "donut"].contains(&s.chart_type.as_str()) {
+        s.chart_type.as_str()
+    } else {
+        "column"
+    };
     let mut el = layouts::new_element("chart", kind, width, height);
     if let Content::Chart(c) = &mut el.content {
         c.labels = labels;
@@ -1013,7 +1088,10 @@ pub fn build_slide(s: &AiSlide, width: u32, height: u32, image: Option<&FoundIma
             } else {
                 Element {
                     name: "Diagram".into(),
-                    content: Content::Diagram(DiagramContent { source: s.diagram.trim().to_string(), ..Default::default() }),
+                    content: Content::Diagram(DiagramContent {
+                        source: s.diagram.trim().to_string(),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }
             };
@@ -1102,23 +1180,24 @@ pub fn apply_plan(deck: &mut Deck, plan: &Plan, images: &HashMap<String, FoundIm
             "insert" => {
                 let key = sid.to_string();
                 let anchor = last_insert.get(&key).cloned().unwrap_or(key.clone());
-                let mut idx = if anchor.eq_ignore_ascii_case("start") {
+                let start = if anchor.eq_ignore_ascii_case("start") {
                     0
                 } else {
                     deck.slide_index(&anchor).map(|i| i + 1).unwrap_or(deck.slides.len())
                 };
-                for s in &a.slides {
+                for (offset, s) in a.slides.iter().enumerate() {
                     let slide = build(s);
                     sum.slide.get_or_insert(slide.id.clone());
                     sum.created.push(slide.id.clone());
                     last_insert.insert(key.clone(), slide.id.clone());
-                    deck.slides.insert(idx, slide);
-                    idx += 1;
+                    deck.slides.insert(start + offset, slide);
                     sum.inserted += 1;
                 }
             }
             "replace" => {
-                let (Some(i), Some(s)) = (deck.slide_index(sid), a.slides.first()) else { continue };
+                let (Some(i), Some(s)) = (deck.slide_index(sid), a.slides.first()) else {
+                    continue;
+                };
                 let mut slide = build(s);
                 let old = &deck.slides[i];
                 slide.nested = old.nested;
@@ -1137,7 +1216,9 @@ pub fn apply_plan(deck: &mut Deck, plan: &Plan, images: &HashMap<String, FoundIm
             "set_text" => {
                 let Some(i) = deck.slide_index(sid) else { continue };
                 let eid = a.element_id.as_deref().unwrap_or("");
-                let Some(el) = deck.slides[i].elements.iter_mut().find(|e| e.id == eid) else { continue };
+                let Some(el) = deck.slides[i].elements.iter_mut().find(|e| e.id == eid) else {
+                    continue;
+                };
                 let Some(t) = el.content.text() else { continue };
                 let list = t.html.contains("<ul") || t.html.contains("<ol");
                 let ordered = t.html.contains("<ol");
@@ -1196,7 +1277,11 @@ mod tests {
     use super::*;
 
     fn slide(layout: &str) -> AiSlide {
-        AiSlide { layout: layout.into(), title: "Hello".into(), ..Default::default() }
+        AiSlide {
+            layout: layout.into(),
+            title: "Hello".into(),
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -1246,7 +1331,10 @@ mod tests {
             s.body2 = vec!["Three".into()];
             s.code = "print(1)".into();
             s.chart_labels = vec!["A".into(), "B".into()];
-            s.chart_series = vec![AiSeries { name: "S".into(), values: vec![1.0] }];
+            s.chart_series = vec![AiSeries {
+                name: "S".into(),
+                values: vec![1.0],
+            }];
             s.table = vec![vec!["H1".into(), "H2".into()], vec!["a".into(), "b".into()]];
             s.diagram = "graph TD; A-->B".into();
             let built = build_slide(&s, 1280, 720, None);
@@ -1258,16 +1346,25 @@ mod tests {
         // Charts pad missing values; empty charts become bullet slides.
         let mut s = slide("chart");
         s.chart_labels = vec!["A".into(), "B".into()];
-        s.chart_series = vec![AiSeries { name: "S".into(), values: vec![3.0] }];
+        s.chart_series = vec![AiSeries {
+            name: "S".into(),
+            values: vec![3.0],
+        }];
         let b = build_slide(&s, 1280, 720, None);
-        assert!(b.elements.iter().any(|e| matches!(&e.content, Content::Chart(c) if c.series[0].values == vec![3.0, 0.0])));
+        assert!(
+            b.elements
+                .iter()
+                .any(|e| matches!(&e.content, Content::Chart(c) if c.series[0].values == vec![3.0, 0.0]))
+        );
         assert_eq!(build_slide(&slide("chart"), 1280, 720, None).layout, "title-content");
     }
 
     #[test]
     fn long_text_shrinks_and_rtl_aligns() {
         let mut s = slide("bullets");
-        s.body = (0..7).map(|i| format!("A rather long bullet point number {i} that keeps going on and on, well past the width of a single line")).collect();
+        s.body = (0..7)
+            .map(|i| format!("A rather long bullet point number {i} that keeps going on and on, well past the width of a single line"))
+            .collect();
         let b = build_slide(&s, 1280, 720, None);
         let body = b.elements.iter().find(|e| e.content.text().is_some_and(|t| t.style.role == "body")).unwrap();
         assert!(body.content.text().unwrap().style.font_size < 32.0);
@@ -1285,12 +1382,41 @@ mod tests {
         let plan = Plan {
             reply: "done".into(),
             actions: vec![
-                Action { action: "insert".into(), slide_id: Some(first.clone()), slides: vec![slide("bullets"), slide("statement")], ..Default::default() },
-                Action { action: "insert".into(), slide_id: Some(first.clone()), slides: vec![slide("quote")], ..Default::default() },
-                Action { action: "set_text".into(), slide_id: Some(first.clone()), element_id: Some(title_el.clone()), text: vec!["New *title*".into()], ..Default::default() },
-                Action { action: "notes".into(), slide_id: Some(first.clone()), value: Some("Say hi".into()), ..Default::default() },
-                Action { action: "set_theme".into(), value: Some("nope".into()), ..Default::default() },
-                Action { action: "set_title".into(), value: Some("Deck".into()), ..Default::default() },
+                Action {
+                    action: "insert".into(),
+                    slide_id: Some(first.clone()),
+                    slides: vec![slide("bullets"), slide("statement")],
+                    ..Default::default()
+                },
+                Action {
+                    action: "insert".into(),
+                    slide_id: Some(first.clone()),
+                    slides: vec![slide("quote")],
+                    ..Default::default()
+                },
+                Action {
+                    action: "set_text".into(),
+                    slide_id: Some(first.clone()),
+                    element_id: Some(title_el.clone()),
+                    text: vec!["New *title*".into()],
+                    ..Default::default()
+                },
+                Action {
+                    action: "notes".into(),
+                    slide_id: Some(first.clone()),
+                    value: Some("Say hi".into()),
+                    ..Default::default()
+                },
+                Action {
+                    action: "set_theme".into(),
+                    value: Some("nope".into()),
+                    ..Default::default()
+                },
+                Action {
+                    action: "set_title".into(),
+                    value: Some("Deck".into()),
+                    ..Default::default()
+                },
             ],
         };
         let sum = apply_plan(&mut deck, &plan, &HashMap::new(), &|t| t == "black");
@@ -1302,14 +1428,25 @@ mod tests {
         assert_eq!(deck.title, "Deck");
         // Deleting never empties the deck.
         let ids: Vec<String> = deck.slides.iter().map(|s| s.id.clone()).collect();
-        let del = Plan { actions: ids.iter().map(|id| Action { action: "delete".into(), slide_id: Some(id.clone()), ..Default::default() }).collect(), ..Default::default() };
+        let del = Plan {
+            actions: ids
+                .iter()
+                .map(|id| Action {
+                    action: "delete".into(),
+                    slide_id: Some(id.clone()),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        };
         apply_plan(&mut deck, &del, &HashMap::new(), &|_| false);
         assert_eq!(deck.slides.len(), 1);
     }
 
     #[test]
     fn progress_reads_partial_json() {
-        let (n, t) = progress(r#"{"reply":"","actions":[{"action":"insert","slides":[{"layout":"title","title":"Intro \"x\""},{"layout":"bullets","title":"Mark"#);
+        let (n, t) =
+            progress(r#"{"reply":"","actions":[{"action":"insert","slides":[{"layout":"title","title":"Intro \"x\""},{"layout":"bullets","title":"Mark"#);
         assert_eq!(n, 2);
         assert_eq!(t, "Intro \"x\"");
     }

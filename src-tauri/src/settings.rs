@@ -156,8 +156,10 @@ mod tests {
     fn settings_round_trip() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("cfg/settings.json");
-        let mut s = Settings::default();
-        s.ui_theme = "light".into();
+        let s = Settings {
+            ui_theme: "light".into(),
+            ..Default::default()
+        };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
         assert_eq!(Settings::load(&dir.path().join("missing.json")), Settings::default());

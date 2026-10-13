@@ -140,7 +140,7 @@ pub fn resolve(provider: &str, nav: &Url) -> Option<Picked> {
         }
         "giphy" if host.ends_with("giphy.com") => {
             // /gifs/some-title-ID or /stickers/some-title-ID
-            let last = page_url.path_segments()?.filter(|s| !s.is_empty()).last()?.to_string();
+            let last = page_url.path_segments()?.rfind(|s| !s.is_empty())?.to_string();
             let id = last.rsplit('-').next()?.to_string();
             (id.chars().all(|c| c.is_ascii_alphanumeric()) && !id.is_empty()).then(|| Picked {
                 provider: "giphy".into(),
@@ -183,13 +183,18 @@ mod tests {
         let p = resolve("youtube", &nav("https://www.youtube.com/watch?v=aqz-KE-bpKQ&t=10s", "Big Buck Bunny")).unwrap();
         assert_eq!(p.url, "https://www.youtube.com/watch?v=aqz-KE-bpKQ");
         assert_eq!(p.title, "Big Buck Bunny");
-        assert_eq!(resolve("vimeo", &nav("https://vimeo.com/22439234", "")).unwrap().url, "https://vimeo.com/22439234");
+        assert_eq!(
+            resolve("vimeo", &nav("https://vimeo.com/22439234", "")).unwrap().url,
+            "https://vimeo.com/22439234"
+        );
         assert_eq!(
             resolve("giphy", &nav("https://giphy.com/gifs/happy-dance-l0MYt5jPR6QX5pnqM", "")).unwrap().url,
             "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif"
         );
         assert_eq!(
-            resolve("unsplash", &nav("https://unsplash.com/photos/a-lake-in-the-mountains-AbC12_xyz", "")).unwrap().url,
+            resolve("unsplash", &nav("https://unsplash.com/photos/a-lake-in-the-mountains-AbC12_xyz", ""))
+                .unwrap()
+                .url,
             "https://unsplash.com/photos/AbC12_xyz/download?force=true"
         );
     }
