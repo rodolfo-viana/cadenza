@@ -23,7 +23,7 @@ export const LANGUAGES = [
   { code: 'it', name: 'Italiano', english: 'Italian' },
   { code: 'ja', name: '日本語', english: 'Japanese' },
   { code: 'pl', name: 'Polski', english: 'Polish' },
-  { code: 'pt-PT', name: 'Português (Portugal)', english: 'Portuguese (Portugal)' },
+  { code: 'pt-PT', name: 'Português', english: 'Portuguese' },
   { code: 'pt-BR', name: 'Português (Brasil)', english: 'Portuguese (Brazil)' },
   { code: 'ru', name: 'Русский', english: 'Russian' },
   { code: 'es', name: 'Español', english: 'Spanish' },

@@ -51,7 +51,7 @@ with [Tauri](https://tauri.app). It runs on Linux first and on Windows.
 **Languages**
 
 The interface is available in Arabic, Bengali, Chinese (Simplified), Dutch, English, French, German,
-Hindi, Italian, Japanese, Polish, Portuguese (Portugal), Portuguese (Brazil), Russian, Spanish and
+Hindi, Italian, Japanese, Polish, Portuguese, Portuguese (Brazil), Russian, Spanish and
 Turkish. English is the default; change it in **Settings ▸ Language**.
 
 ## Download
