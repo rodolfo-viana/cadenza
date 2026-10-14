@@ -5,7 +5,7 @@ description = "Cadenza — a presentation studio built on reveal.js"
 authors = ["Rodolfo Viana"]
 license = "MIT"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.90"
 default-run = "cadenza"
 
 [lib]

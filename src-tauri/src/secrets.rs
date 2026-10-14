@@ -87,10 +87,10 @@ impl Secrets {
     pub fn get(&self, name: &str) -> Option<String> {
         Self::valid(name).ok()?;
         let _g = self.lock.lock().ok()?;
-        if let Some(entry) = self.entry(name) {
-            if let Ok(v) = entry.get_password() {
-                return Some(v);
-            }
+        if let Some(entry) = self.entry(name)
+            && let Ok(v) = entry.get_password()
+        {
+            return Some(v);
         }
         self.read_fallback().get(name).cloned()
     }

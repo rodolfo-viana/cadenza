@@ -68,10 +68,10 @@ pub fn request_url(family: &str, variants: &str) -> String {
         if let Some(r) = pick_regular(&ws) {
             wanted.push((italic, r));
         }
-        if let Some(b) = pick_bold(&ws) {
-            if !wanted.contains(&(italic, b)) {
-                wanted.push((italic, b));
-            }
+        if let Some(b) = pick_bold(&ws)
+            && !wanted.contains(&(italic, b))
+        {
+            wanted.push((italic, b));
         }
     }
     if wanted.is_empty() || (uprights.is_empty() && available.is_empty()) {

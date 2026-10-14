@@ -241,14 +241,14 @@ fn theme_from_builtin(id: String) -> custom_theme::ThemeDef {
 fn full_theme(state: &AppState, label: &str, mut def: custom_theme::ThemeDef) -> custom_theme::ThemeDef {
     def.normalize();
     let mut fonts = custom_theme::find(&state.config_dir, &def.id).map(|t| t.fonts).unwrap_or_default();
-    if let Ok(docs) = state.docs.lock() {
-        if let Some(doc) = docs.get(label) {
-            let mut from_deck = def.clone();
-            custom_theme::embed_fonts(&mut from_deck, &doc.deck.web_fonts, &doc.assets_dir());
-            for f in from_deck.fonts {
-                fonts.retain(|x| x.family != f.family);
-                fonts.push(f);
-            }
+    if let Ok(docs) = state.docs.lock()
+        && let Some(doc) = docs.get(label)
+    {
+        let mut from_deck = def.clone();
+        custom_theme::embed_fonts(&mut from_deck, &doc.deck.web_fonts, &doc.assets_dir());
+        for f in from_deck.fonts {
+            fonts.retain(|x| x.family != f.family);
+            fonts.push(f);
         }
     }
     let used: Vec<String> = [&def.heading_font, &def.body_font]
@@ -784,10 +784,10 @@ fn run_media_browser(context: tauri::Context<tauri::Wry>, provider: String, lang
                         return true;
                     }
                     use std::io::Write;
-                    if let Some(picked) = browse::resolve(&prov, url) {
-                        if let Ok(json) = serde_json::to_string(&picked) {
-                            println!("{json}");
-                        }
+                    if let Some(picked) = browse::resolve(&prov, url)
+                        && let Ok(json) = serde_json::to_string(&picked)
+                    {
+                        println!("{json}");
                     }
                     let _ = std::io::stdout().flush();
                     std::process::exit(0);
@@ -1129,10 +1129,10 @@ fn open_editor_window(app: &AppHandle, file: Option<PathBuf>) -> tauri::Result<(
     let state = app.state::<AppState>();
     let n = state.window_counter.fetch_add(1, Ordering::SeqCst);
     let label = format!("editor-{n}");
-    if let Some(f) = file {
-        if let Ok(mut p) = state.pending_open.lock() {
-            p.insert(label.clone(), f);
-        }
+    if let Some(f) = file
+        && let Ok(mut p) = state.pending_open.lock()
+    {
+        p.insert(label.clone(), f);
     }
     WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("Cadenza")
@@ -1154,12 +1154,12 @@ fn window_focus_document(app: AppHandle, state: State<AppState>, path: String) -
     let target = PathBuf::from(&path);
     let docs = state.docs.lock().map_err(err)?;
     for (label, doc) in docs.iter() {
-        if doc.path.as_deref() == Some(target.as_path()) {
-            if let Some(w) = app.get_webview_window(label) {
-                let _ = w.unminimize();
-                let _ = w.set_focus();
-                return Ok(true);
-            }
+        if doc.path.as_deref() == Some(target.as_path())
+            && let Some(w) = app.get_webview_window(label)
+        {
+            let _ = w.unminimize();
+            let _ = w.set_focus();
+            return Ok(true);
         }
     }
     Ok(false)
@@ -1187,11 +1187,11 @@ static STARTUP_FILES: Mutex<Option<Vec<PathBuf>>> = Mutex::new(Some(Vec::new()))
 
 /// Opens presentations in new windows, or keeps them for startup.
 fn open_files(app: &AppHandle, files: Vec<PathBuf>) {
-    if let Ok(mut startup) = STARTUP_FILES.lock() {
-        if let Some(pending) = startup.as_mut() {
-            pending.extend(files);
-            return;
-        }
+    if let Ok(mut startup) = STARTUP_FILES.lock()
+        && let Some(pending) = startup.as_mut()
+    {
+        pending.extend(files);
+        return;
     }
     for f in files {
         let _ = open_editor_window(app, Some(f));
@@ -1217,11 +1217,11 @@ fn refresh_app_menu(app: &AppHandle) {
 /// Quitting with presentations still open (Quit in the macOS Dock, logging
 /// out): unsaved work is kept for recovery at the next start.
 fn keep_unsaved_work(app: &AppHandle) {
-    if let Some(state) = app.try_state::<AppState>() {
-        if let Ok(mut docs) = state.docs.lock() {
-            for doc in docs.values_mut() {
-                doc.maybe_write_recovery(true);
-            }
+    if let Some(state) = app.try_state::<AppState>()
+        && let Ok(mut docs) = state.docs.lock()
+    {
+        for doc in docs.values_mut() {
+            doc.maybe_write_recovery(true);
         }
     }
 }
@@ -1309,10 +1309,8 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                 if let Err(e) = state.secrets.forget_retired() {
                     eprintln!("Could not remove retired API keys; will retry on next launch: {e}");
                 }
-                if forget_ai_settings {
-                    if let Ok(s) = state.settings.lock() {
-                        let _ = s.save(&state.settings_path);
-                    }
+                if forget_ai_settings && let Ok(s) = state.settings.lock() {
+                    let _ = s.save(&state.settings_path);
                 }
             });
 

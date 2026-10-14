@@ -87,7 +87,7 @@ inside presentations.
 
 ## Building from source
 
-You need Rust 1.85 or newer ([rustup](https://rustup.rs)) and the system libraries Tauri uses. On
+You need Rust 1.90 or newer ([rustup](https://rustup.rs)) and the system libraries Tauri uses. On
 Debian or Ubuntu:
 
 ```sh

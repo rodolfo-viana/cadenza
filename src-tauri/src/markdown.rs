@@ -53,12 +53,12 @@ pub fn parse(md: &str) -> Vec<MdSlide> {
 }
 
 fn strip_front_matter(md: &str) -> &str {
-    if let Some(rest) = md.strip_prefix("---\n") {
-        if let Some(end) = rest.find("\n---\n") {
-            let head = &rest[..end];
-            if head.lines().all(|l| l.contains(':') || l.trim().is_empty()) {
-                return &rest[end + 5..];
-            }
+    if let Some(rest) = md.strip_prefix("---\n")
+        && let Some(end) = rest.find("\n---\n")
+    {
+        let head = &rest[..end];
+        if head.lines().all(|l| l.contains(':') || l.trim().is_empty()) {
+            return &rest[end + 5..];
         }
     }
     md
@@ -245,23 +245,21 @@ pub fn to_slides(md: &[MdSlide], width: u32, height: u32, resolve_image: &mut dy
                 _ => {}
             }
         }
-        if is_mermaid {
-            if let Some((_, source)) = &m.code {
-                let (w, h) = (width as f64, height as f64);
-                let top = if m.title.is_some() { 0.26 } else { 0.08 };
-                slide.elements.push(Element {
-                    name: "Diagram".into(),
-                    x: (w * 0.07).round(),
-                    y: (h * top).round(),
-                    w: (w * 0.86).round(),
-                    h: (h * (0.92 - top)).round(),
-                    content: Content::Diagram(DiagramContent {
-                        source: source.clone(),
-                        ..Default::default()
-                    }),
+        if is_mermaid && let Some((_, source)) = &m.code {
+            let (w, h) = (width as f64, height as f64);
+            let top = if m.title.is_some() { 0.26 } else { 0.08 };
+            slide.elements.push(Element {
+                name: "Diagram".into(),
+                x: (w * 0.07).round(),
+                y: (h * top).round(),
+                w: (w * 0.86).round(),
+                h: (h * (0.92 - top)).round(),
+                content: Content::Diagram(DiagramContent {
+                    source: source.clone(),
                     ..Default::default()
-                });
-            }
+                }),
+                ..Default::default()
+            });
         }
         // Remove empty placeholders that the Markdown did not fill, except
         // the main ones a user would expect to type into.
