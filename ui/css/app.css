@@ -355,7 +355,9 @@ body.dragging-slides, body.dragging-slides * { cursor: grabbing !important; }
 .ruler-h { cursor: row-resize; }
 .ruler-v { cursor: col-resize; }
 .canvas-wrap { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: auto; background: var(--canvas); }
-.stage { position: relative; }
+/* Clipped so overlay bits (guides, selection, tips) never add scrollbars:
+   they would shrink the fit zoom mid-drag and make snapping flicker. */
+.stage { position: relative; overflow: clip; }
 .slide-frame {
   position: absolute;
   overflow: hidden;
@@ -407,8 +409,8 @@ body.dragging-slides, body.dragging-slides * { cursor: grabbing !important; }
 }
 .lock-badge { position: absolute; right: -9px; top: -9px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #9aa0b4; color: #fff; }
 .guide { position: absolute; background: var(--guide); }
-.guide.v { top: -2000px; bottom: -2000px; width: 1px; }
-.guide.h { left: -2000px; right: -2000px; height: 1px; }
+.guide.v { width: 1px; }
+.guide.h { height: 1px; }
 .uguide { position: absolute; pointer-events: auto; z-index: 1; }
 .uguide::after { content: ''; position: absolute; background: #22d3ee; opacity: 0.85; }
 .uguide.v { width: 9px; margin-left: -4px; cursor: ew-resize; }

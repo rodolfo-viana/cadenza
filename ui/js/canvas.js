@@ -701,8 +701,8 @@ export function Canvas() {
                 onDblClick=${guideDoubleClick}
               />`,
         )}
-        ${guides?.x != null && html`<div class="guide v" style=${{ left: guides.x * scale + 'px' }} />`}
-        ${guides?.y != null && html`<div class="guide h" style=${{ top: guides.y * scale + 'px' }} />`}
+        ${guides?.x != null && html`<div class="guide v" style=${{ left: guides.x * scale + 'px', top: -frameY + 'px', height: stageH + 'px' }} />`}
+        ${guides?.y != null && html`<div class="guide h" style=${{ top: guides.y * scale + 'px', left: -frameX + 'px', width: stageW + 'px' }} />`}
         ${marquee && html`<div class="marquee" style=${box2screen(marquee)} />`}
         ${tip && html`<div class="geo-tip" style=${{ left: tip.x * scale + 'px', top: tip.y * scale + 'px' }}>${tip.text}</div>`}
       </div>
