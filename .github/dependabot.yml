@@ -1,0 +1,33 @@
+version: 2
+
+# Weekly update PRs for the Rust crates and the GitHub Actions used by the
+# release workflow. The UI's libraries live in ui/vendor and are updated by
+# hand, as is the Tauri CLI version pinned in release.yml.
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    groups:
+      # Tauri and its plugins are released together and should move together.
+      tauri:
+        patterns:
+          - tauri
+          - tauri-*
+      cargo-minor:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Pinned to the version Tauri's webview layer uses; bump it alongside
+      # Tauri instead.
+      - dependency-name: webkit2gtk
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - '*'
