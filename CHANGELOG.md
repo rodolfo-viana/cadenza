@@ -2,6 +2,23 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## 0.2.1 — 2026-10-14
+
+Cadenza now has a teleprompter in the presenter display, and with one screen you can switch between the slides and the presenter display during a video call.
+
+### New
+
+- A teleprompter in the presenter display. It scrolls the current slide's speaker notes and moves on to the next slide's notes when you advance. Drag it anywhere, resize it, and set its speed, font, text size, line spacing, colors and transparency. It can also mirror the text for teleprompter glass and show a reading line. Turn it on in the Play menu or in Settings, or press T during the show. The audience window never shows it.
+- With one screen, press X during the show to switch between the slides and the presenter display. In a video call, share only the presentation window: the audience sees the slides, and you read the presenter display and the teleprompter.
+
+### Changes
+
+- Changing the language or app theme in Settings updates every open window, not only the one where you changed it.
+
+### Fixes
+
+- In right-to-left languages, speaker notes written in a left-to-right language are shown in the right direction in the presenter display.
+
 ## 0.2.0 — 2026-10-13
 
 Cadenza now runs on macOS, and the AI assistant has been removed. Presentations from 0.1.x open as before.
