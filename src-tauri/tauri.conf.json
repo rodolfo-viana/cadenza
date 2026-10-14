@@ -48,6 +48,9 @@
       }
     ],
     "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
       "deb": {
         "section": "office",
         "desktopTemplate": "linux/cadenza.desktop",
