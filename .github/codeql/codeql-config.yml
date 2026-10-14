@@ -1,0 +1,6 @@
+name: Cadenza CodeQL config
+
+# Third-party libraries copied into the app (reveal.js, mermaid, KaTeX…).
+# Problems in them belong upstream, and they're updated by replacing them.
+paths-ignore:
+  - ui/vendor
