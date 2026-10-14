@@ -29,8 +29,8 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
 - Per-presentation custom CSS for anything else.
 
 **Media**
-- A Media Library with openly licensed photos and GIFs from Openverse, plus Unsplash and GIPHY with
-  a free API key.
+- A Media Library with openly licensed photos and GIFs from Openverse and Wikimedia Commons, plus
+  Pexels, Pixabay and GIPHY with a free API key.
 - YouTube and Vimeo videos: browse the sites as usual and click **Insert**, or paste a link. No key
   needed.
 

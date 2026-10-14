@@ -297,7 +297,8 @@ function Palette() {
 export { set };
 
 const SERVICES = [
-  ['unsplash', 'Unsplash', N_('Free high-quality photos')],
+  ['pexels', 'Pexels', N_('Free high-quality photos')],
+  ['pixabay', 'Pixabay', N_('Free photos and illustrations')],
   ['giphy', 'GIPHY', N_('Animated GIFs')],
   ['youtube', 'YouTube', N_('Video search (pasting links works without a key)')],
 ];

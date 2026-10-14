@@ -655,7 +655,7 @@ fn secret_delete(state: State<AppState>, name: String) -> CmdResult<()> {
 
 fn provider_key(state: &AppState, provider: &str) -> Option<String> {
     match provider {
-        "unsplash" | "giphy" | "youtube" => state.secrets.get(provider),
+        "pexels" | "pixabay" | "giphy" | "youtube" => state.secrets.get(provider),
         _ => None,
     }
 }
@@ -677,7 +677,7 @@ async fn media_oembed(url: String) -> CmdResult<media::MediaItem> {
         .map_err(err)
 }
 
-/// Opens a provider's website (YouTube, Vimeo, GIPHY, Unsplash) with an
+/// Opens a provider's website (YouTube, Vimeo, GIPHY) with an
 /// "Insert" bar. The site runs in a separate helper process (this same
 /// executable with `--media-browser`), so a crash in the web engine can never
 /// take the editor — and unsaved work — down with it. The pick comes back as
@@ -782,8 +782,7 @@ fn run_media_browser(context: tauri::Context<tauri::Wry>, provider: String, lang
     let name = match provider.as_str() {
         "youtube" => "YouTube",
         "vimeo" => "Vimeo",
-        "giphy" => "GIPHY",
-        _ => "Unsplash",
+        _ => "GIPHY",
     };
     tauri::Builder::default()
         .setup(move |app| {
@@ -840,20 +839,14 @@ fn harden_browser(_w: &tauri::WebviewWindow, _safe: bool) {}
 
 /// Downloads a picture/GIF into the presentation's assets.
 #[tauri::command]
-async fn media_import(window: Window, state: State<'_, AppState>, url: String, provider: String, track_url: Option<String>) -> CmdResult<AssetInfo> {
+async fn media_import(window: Window, state: State<'_, AppState>, url: String) -> CmdResult<AssetInfo> {
     if !state.docs.lock().map_err(err)?.contains_key(window.label()) {
         return Err("No presentation is open".into());
     }
-    let unsplash_key = if provider == "unsplash" { state.secrets.get("unsplash") } else { None };
-    let (bytes, ext) = tauri::async_runtime::spawn_blocking(move || {
-        if let (Some(t), Some(k)) = (track_url.as_deref(), unsplash_key.as_deref()) {
-            media::track_unsplash(t, k);
-        }
-        media::download(&url)
-    })
-    .await
-    .map_err(err)?
-    .map_err(err)?;
+    let (bytes, ext) = tauri::async_runtime::spawn_blocking(move || media::download(&url))
+        .await
+        .map_err(err)?
+        .map_err(err)?;
     state.with_doc(window.label(), |doc| doc.import_bytes(&bytes, &ext))
 }
 

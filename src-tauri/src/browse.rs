@@ -1,6 +1,6 @@
-//! "Browse" mode for online media: the real YouTube / Vimeo / GIPHY /
-//! Unsplash website opens in a Cadenza window, the user searches as usual and
-//! clicks "Insert" on the item they want. No API keys involved.
+//! "Browse" mode for online media: the real YouTube / Vimeo / GIPHY website
+//! opens in a Cadenza window, the user searches as usual and clicks "Insert"
+//! on the item they want. No API keys involved.
 //!
 //! The site never gets access to Cadenza: an injected bar triggers a
 //! navigation to `https://cadenza.invalid/...`, which the window's
@@ -15,7 +15,6 @@ pub fn start_url(provider: &str) -> Option<&'static str> {
         "youtube" => "https://www.youtube.com/",
         "vimeo" => "https://vimeo.com/watch",
         "giphy" => "https://giphy.com/",
-        "unsplash" => "https://unsplash.com/",
         _ => return None,
     })
 }
@@ -26,8 +25,7 @@ pub fn bar_script(provider: &str, tr: &dyn Fn(&str) -> String) -> String {
     let (item_re, label, hint) = match provider {
         "youtube" => (r"youtube\.com\/(watch\?|shorts\/)", "Insert this video", "Open a video to insert it"),
         "vimeo" => (r"vimeo\.com\/(\d+)(\/|\?|$)", "Insert this video", "Open a video to insert it"),
-        "giphy" => (r"giphy\.com\/(gifs|stickers)\/", "Insert this GIF", "Open a GIF to insert it"),
-        _ => (r"unsplash\.com\/photos\/", "Insert this photo", "Open a photo to insert it"),
+        _ => (r"giphy\.com\/(gifs|stickers)\/", "Insert this GIF", "Open a GIF to insert it"),
     };
     // JSON string literals: translations may contain quotes.
     let js = |s: &str| serde_json::to_string(&tr(s)).unwrap_or_else(|_| "\"\"".into());
@@ -95,7 +93,7 @@ pub fn bar_script(provider: &str, tr: &dyn Fn(&str) -> String) -> String {
 #[serde(rename_all = "camelCase")]
 pub struct Picked {
     pub provider: String,
-    /// "video", "gif" or "image".
+    /// "video" or "gif".
     pub kind: String,
     /// Video page URL (embedded) or the file to download.
     pub url: String,
@@ -150,17 +148,6 @@ pub fn resolve(provider: &str, nav: &Url) -> Option<Picked> {
                 page_url: page.clone(),
             })
         }
-        "unsplash" if host.ends_with("unsplash.com") => {
-            let slug = page_url.path().strip_prefix("/photos/")?.split('/').next()?.to_string();
-            let id = slug.rsplit('-').next()?.to_string();
-            (id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !id.is_empty()).then(|| Picked {
-                provider: "unsplash".into(),
-                kind: "image".into(),
-                url: format!("https://unsplash.com/photos/{id}/download?force=true"),
-                title,
-                page_url: page.clone(),
-            })
-        }
         _ => None,
     }
 }
@@ -191,12 +178,7 @@ mod tests {
             resolve("giphy", &nav("https://giphy.com/gifs/happy-dance-l0MYt5jPR6QX5pnqM", "")).unwrap().url,
             "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif"
         );
-        assert_eq!(
-            resolve("unsplash", &nav("https://unsplash.com/photos/a-lake-in-the-mountains-AbC12_xyz", ""))
-                .unwrap()
-                .url,
-            "https://unsplash.com/photos/AbC12_xyz/download?force=true"
-        );
+        assert!(resolve("unsplash", &nav("https://unsplash.com/photos/a-lake-AbC12_xyz", "")).is_none());
     }
 
     #[test]

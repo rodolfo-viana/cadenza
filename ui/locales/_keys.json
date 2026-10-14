@@ -55,12 +55,6 @@
   ]
  },
  {
-  "key": "Access Key",
-  "files": [
-   "media.js"
-  ]
- },
- {
   "key": "Actual Size",
   "files": [
    "commands.js",
@@ -131,12 +125,6 @@
  },
  {
   "key": "Adding GIF…",
-  "files": [
-   "media.js"
-  ]
- },
- {
-  "key": "Adding photo…",
   "files": [
    "media.js"
   ]
@@ -626,12 +614,6 @@
   "key": "Browse the web",
   "files": [
    "toolbar.js"
-  ]
- },
- {
-  "key": "Browse Unsplash…",
-  "files": [
-   "commands.js"
   ]
  },
  {
@@ -1923,6 +1905,12 @@
   ]
  },
  {
+  "key": "Free photos and illustrations",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
   "key": "From",
   "files": [
    "inspector.js"
@@ -2238,6 +2226,12 @@
   ]
  },
  {
+  "key": "Image by {author} from Pixabay",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
   "key": "image fit::Fill",
   "files": [
    "inspector.js",
@@ -2353,12 +2347,6 @@
  },
  {
   "key": "Insert this GIF",
-  "files": [
-   "browse.rs"
-  ]
- },
- {
-  "key": "Insert this photo",
   "files": [
    "browse.rs"
   ]
@@ -3081,12 +3069,6 @@
   ]
  },
  {
-  "key": "Open a photo to insert it",
-  "files": [
-   "browse.rs"
-  ]
- },
- {
   "key": "Open a presentation to pick Google Fonts here.",
   "files": [
    "themebuilder.js"
@@ -3168,12 +3150,6 @@
  },
  {
   "key": "Or search GIFs right here with an API key…",
-  "files": [
-   "media.js"
-  ]
- },
- {
-  "key": "Or search photos right here with an API key…",
   "files": [
    "media.js"
   ]
@@ -3315,13 +3291,7 @@
   ]
  },
  {
-  "key": "Photo",
-  "files": [
-   "media.js"
-  ]
- },
- {
-  "key": "Photo by {author} on Unsplash",
+  "key": "Photo by {author} on Pexels",
   "files": [
    "media.js"
   ]
@@ -3333,15 +3303,9 @@
   ]
  },
  {
-  "key": "Photos (Unsplash, Openverse)…",
+  "key": "Photos (Openverse, Wikimedia, Pexels, Pixabay)…",
   "files": [
    "commands.js"
-  ]
- },
- {
-  "key": "Photos from {service} — free to use, credit appreciated",
-  "files": [
-   "media.js"
   ]
  },
  {

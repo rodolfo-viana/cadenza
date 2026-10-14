@@ -1,5 +1,5 @@
-// Media Library: photos (Unsplash, Openverse), GIFs (GIPHY, Openverse) and
-// videos (YouTube search, YouTube/Vimeo links).
+// Media Library: photos (Openverse, Wikimedia Commons, Pexels, Pixabay), GIFs
+// (GIPHY, Openverse) and videos (YouTube search, YouTube/Vimeo links).
 
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
@@ -13,24 +13,33 @@ import { t, N_ } from './i18n.js';
 
 // [where to get a key, service name, what the key is called]
 const KEY_LINKS = {
-  unsplash: ['https://unsplash.com/oauth/applications', 'Unsplash', N_('Access Key')],
+  pexels: ['https://www.pexels.com/api/', 'Pexels', N_('API Key')],
+  pixabay: ['https://pixabay.com/api/docs/', 'Pixabay', N_('API Key')],
   giphy: ['https://developers.giphy.com/dashboard/', 'GIPHY', N_('API Key')],
   youtube: ['https://console.cloud.google.com/apis/library/youtube.googleapis.com', 'YouTube', N_('Data API key')],
 };
 
 const TABS = [
-  { id: 'photos', label: N_('Photos'), icon: 'images', providers: [['openverse', 'Openverse (CC)'], ['unsplash', 'Unsplash']] },
+  {
+    id: 'photos',
+    label: N_('Photos'),
+    icon: 'images',
+    providers: [['openverse', 'Openverse (CC)'], ['wikimedia', 'Wikimedia Commons'], ['pexels', 'Pexels'], ['pixabay', 'Pixabay']],
+  },
   { id: 'gifs', label: N_('GIFs'), icon: 'sticker', providers: [['giphy', 'GIPHY'], ['openverse-gif', 'Openverse GIFs']] },
   { id: 'videos', label: N_('Videos'), icon: 'square-play', providers: [['youtube', 'YouTube'], ['vimeo', 'Vimeo']] },
 ];
 
-const SITE = { unsplash: 'Unsplash', giphy: 'GIPHY', youtube: 'YouTube', vimeo: 'Vimeo' };
+// Services that can also be browsed on their own website (no key needed).
+const SITE = { giphy: 'GIPHY', youtube: 'YouTube', vimeo: 'Vimeo' };
+
+// Services whose search needs the user's own API key.
+const KEYED = ['pexels', 'pixabay', 'giphy', 'youtube'];
 
 const WEB = {
   youtube: 'https://www.youtube.com/',
   vimeo: 'https://vimeo.com/watch',
   giphy: 'https://giphy.com/',
-  unsplash: 'https://unsplash.com/',
 };
 
 /**
@@ -77,20 +86,17 @@ export function browseProvider(provider) {
   invoke('media_browse', { provider }).catch((e) => toast(String(e), 'error'));
 }
 
-/** Shows a translated sentence with the value of its `{key}` placeholder in bold. */
-function withBold(sentence, key, value) {
+/** Shows a translated sentence with the value of its `{key}` placeholder in bold (a link with `url`). */
+function withBold(sentence, key, value, url) {
   const [before, after = ''] = sentence.split(`{${key}}`);
-  return html`${before}<b>${value}</b>${after}`;
+  const bold = html`<b>${value}</b>`;
+  const shown = url ? html`<a href="#" onClick=${(e) => { e.preventDefault(); opener.openUrl(url); }}>${bold}</a>` : bold;
+  return html`${before}${shown}${after}`;
 }
 
 function BrowseCard({ provider, onKey }) {
   const name = SITE[provider];
-  const searchHere =
-    provider === 'unsplash'
-      ? t('Or search photos right here with an API key…')
-      : provider === 'giphy'
-        ? t('Or search GIFs right here with an API key…')
-        : t('Or search videos right here with an API key…');
+  const searchHere = provider === 'giphy' ? t('Or search GIFs right here with an API key…') : t('Or search videos right here with an API key…');
   const howTo = t('Search {site} just like you normally do — then click {button} in the Cadenza bar at the bottom of the page.', { site: name });
   return html`<div class="browse-card">
     <div class="browse-text">
@@ -169,20 +175,23 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
 
   const [showKey, setShowKey] = useState(false);
 
-  // Default provider per tab: in-app search where it needs no key.
+  // Default provider per tab: a stock photo service once its key is set,
+  // otherwise one that needs no key. Saving a key keeps the current one.
+  const keysLoaded = keys !== null;
   useEffect(() => {
-    if (!keys) return;
+    if (!keysLoaded) return;
     const tabInfo = TABS.find((x) => x.id === tab);
-    setProvider(tab === 'photos' && keys.unsplash ? 'unsplash' : tabInfo.providers[0][0]);
+    const stock = ['pexels', 'pixabay'].find((p) => keys[p]);
+    setProvider(tab === 'photos' && stock ? stock : tabInfo.providers[0][0]);
     setShowKey(false);
     setItems([]);
     setNext(null);
     setError(null);
     setPreview(null);
     setTimeout(() => searchRef.current?.focus(), 30);
-  }, [tab, keys]);
+  }, [tab, keysLoaded]);
 
-  const needsKey = provider && (provider === 'vimeo' || (['unsplash', 'giphy', 'youtube'].includes(provider) && keys && !keys[provider]));
+  const needsKey = provider && (provider === 'vimeo' || (KEYED.includes(provider) && keys && !keys[provider]));
 
   async function search(cursor = null) {
     const q = query.trim();
@@ -201,7 +210,7 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
     }
     setPreview(null);
     if (!provider || needsKey) return;
-    if (!q && !['unsplash', 'giphy'].includes(provider)) {
+    if (!q && !['pexels', 'pixabay', 'giphy'].includes(provider)) {
       setItems([]);
       setNext(null);
       return;
@@ -248,7 +257,7 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
     }
     setInserting(item.id);
     try {
-      const asset = await invoke('media_import', { url: item.url, provider: item.provider, trackUrl: item.trackUrl || null });
+      const asset = await invoke('media_import', { url: item.url });
       const alt = attribution(item);
       if (replaceId) {
         await apply({
@@ -304,7 +313,8 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
       </div>
     </div>
     <div class="media-body">
-      ${needsKey && !(tab === 'videos' && isLink(query)) &&
+      ${needsKey && !(tab === 'videos' && isLink(query)) && !SITE[provider] && html`<${KeyPrompt} name=${provider} onSaved=${loadKeys} />`}
+      ${needsKey && !(tab === 'videos' && isLink(query)) && SITE[provider] &&
       html`<${BrowseCard} provider=${provider} onKey=${provider !== 'vimeo' && !showKey ? () => setShowKey(true) : null} />
         ${showKey && html`<${KeyPrompt} name=${provider} onSaved=${loadKeys} />`}
         ${tab === 'videos' && html`<p class="muted small center">${t('Tip: you can also paste any YouTube or Vimeo link in the box above.')}</p>`}`}
@@ -326,7 +336,7 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
       <div class=${cls('media-grid', tab === 'videos' && 'videos')}>
         ${items.map(
           (it) => html`<button type="button" key=${it.provider + it.id} class=${cls('media-item', inserting === it.id && 'busy')} onClick=${() => insertItem(it)} title=${it.title}>
-            <img src=${it.thumb} alt=${it.title} loading="lazy" style=${it.width && it.height && tab !== 'videos' ? { aspectRatio: `${it.width} / ${it.height}` } : null} />
+            <img src=${it.thumb} alt=${it.title} loading="lazy" onError=${(e) => thumbFailed(e.currentTarget, it)} style=${it.width && it.height && tab !== 'videos' ? { aspectRatio: `${it.width} / ${it.height}` } : null} />
             ${tab === 'videos' && html`<span class="media-title">${it.title}</span>`}
             <span class="media-credit">${it.author ? `${it.author}` : it.license}</span>
             ${inserting === it.id && html`<span class="media-busy"><span class="spinner" /></span>`}
@@ -337,19 +347,31 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
     </div>
     <div class="media-foot">
       ${provider === 'giphy' && html`<span class="powered">${withBold(t('Powered by {service}'), 'service', 'GIPHY')}</span>`}
-      ${provider === 'unsplash' &&
-      html`<span class="powered">${withBold(t('Photos from {service} — free to use, credit appreciated'), 'service', 'Unsplash')}</span>`}
+      ${provider === 'pexels' && html`<span class="powered">${withBold(t('Powered by {service}'), 'service', 'Pexels', 'https://www.pexels.com/')}</span>`}
+      ${provider === 'pixabay' && html`<span class="powered">${withBold(t('Powered by {service}'), 'service', 'Pixabay', 'https://pixabay.com/')}</span>`}
       ${provider?.startsWith('openverse') &&
       html`<span class="powered">${withBold(t('Openly licensed media via {service} — check each license'), 'service', 'Openverse')}</span>`}
+      ${provider === 'wikimedia' &&
+      html`<span class="powered">${withBold(t('Openly licensed media via {service} — check each license'), 'service', 'Wikimedia Commons')}</span>`}
     </div>
   <//>`;
 }
 
+/**
+ * Some services' thumbnails fail (Openverse answers 424 for many GIFs): show
+ * the full image instead, and drop the result if that fails too.
+ */
+function thumbFailed(img, it) {
+  if (it.kind !== 'video' && it.url && img.src !== it.url) img.src = it.url;
+  else img.closest('.media-item')?.remove();
+}
+
 /** Credit line for the image's description (and optional caption). */
 function attribution(it) {
-  if (it.provider === 'unsplash') return t('Photo by {author} on Unsplash', { author: it.author });
+  if (it.provider === 'pexels') return t('Photo by {author} on Pexels', { author: it.author });
+  if (it.provider === 'pixabay') return t('Image by {author} from Pixabay', { author: it.author });
   if (it.provider === 'giphy') return it.title || t('GIF via GIPHY');
-  if (it.provider === 'openverse') {
+  if (it.provider === 'openverse' || it.provider === 'wikimedia') {
     const { title, author } = it;
     const work = title
       ? author ? t('“{title}” by {author}', { title, author }) : t('“{title}”', { title })
@@ -390,11 +412,10 @@ export async function insertPicked(p) {
     await A.insert('video', '', { name: N_('Video'), content: { kind: 'video', src: p.url, autoplay: false } });
     return;
   }
-  set({ busy: p.kind === 'gif' ? t('Adding GIF…') : t('Adding photo…') });
+  set({ busy: t('Adding GIF…') });
   try {
-    const asset = await invoke('media_import', { url: p.url, provider: 'browse', trackUrl: null });
-    const alt = p.provider === 'unsplash' ? `${p.title || t('Photo')} — Unsplash` : p.title || t('GIF via GIPHY');
-    await A.insertAsset(asset, null, 0, { alt });
+    const asset = await invoke('media_import', { url: p.url });
+    await A.insertAsset(asset, null, 0, { alt: p.title || t('GIF via GIPHY') });
   } catch (e) {
     toast(String(e), 'error');
   } finally {

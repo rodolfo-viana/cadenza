@@ -15,7 +15,7 @@ use std::sync::Mutex;
 const SERVICE: &str = "app.cadenza.studio";
 
 /// Services Cadenza knows how to use.
-pub const NAMES: &[&str] = &["unsplash", "giphy", "youtube"];
+pub const NAMES: &[&str] = &["pexels", "pixabay", "giphy", "youtube"];
 
 /// Services of the AI assistant that Cadenza 0.1 had.
 const RETIRED: &[&str] = &["anthropic", "openai", "compatible"];
@@ -188,17 +188,17 @@ mod tests {
             let file = dir.path().join("secrets.json");
             let mut keys = BTreeMap::from([("anthropic", "a"), ("openai", "o"), ("compatible", "c")]);
             if keep_media_key {
-                keys.insert("unsplash", "u");
+                keys.insert("giphy", "u");
             }
             fs::write(&file, serde_json::to_vec(&keys).unwrap()).unwrap();
             let secrets = Secrets::new(dir.path(), false);
             assert_eq!(secrets.get("anthropic"), None);
             secrets.forget_retired().unwrap();
             secrets.forget_retired().unwrap();
-            assert_eq!(secrets.get("unsplash").as_deref(), keep_media_key.then_some("u"));
+            assert_eq!(secrets.get("giphy").as_deref(), keep_media_key.then_some("u"));
             if keep_media_key {
                 let left: BTreeMap<String, String> = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
-                assert_eq!(left.keys().collect::<Vec<_>>(), ["unsplash"]);
+                assert_eq!(left.keys().collect::<Vec<_>>(), ["giphy"]);
             } else {
                 assert!(!file.exists());
             }
@@ -278,7 +278,7 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let secrets = Secrets::new(dir.path(), false);
             let contents = if keep_media_key {
-                r#"{"openai":"o","unsplash":"u"}"#
+                r#"{"openai":"o","giphy":"u"}"#
             } else {
                 r#"{"openai":"o"}"#
             };
@@ -301,7 +301,7 @@ mod tests {
             assert_eq!(fs::read_to_string(&secrets.fallback).unwrap(), contents);
             Secrets::new(dir.path(), false).forget_retired().unwrap();
             assert!(!secrets.read_fallback().contains_key("openai"));
-            assert_eq!(secrets.get("unsplash").as_deref(), keep_media_key.then_some("u"));
+            assert_eq!(secrets.get("giphy").as_deref(), keep_media_key.then_some("u"));
         }
     }
 }

@@ -67,7 +67,6 @@ function mediaMenu() {
     '-',
     { heading: t('Browse the web') },
     cmd('browse.youtube'),
-    cmd('browse.unsplash'),
     cmd('browse.giphy'),
     '-',
     { heading: t('From this computer') },

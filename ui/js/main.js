@@ -22,7 +22,7 @@ const listen = (name, handler) => currentWindow().listen(name, handler).catch(()
 // Media chosen in a provider's website (Browse mode).
 listen('cz-media-picked', (e) => insertPicked(e.payload));
 listen('cz-media-browser-closed', (e) => {
-  const name = { youtube: 'YouTube', vimeo: 'Vimeo', giphy: 'GIPHY', unsplash: 'Unsplash' }[e.payload?.provider];
+  const name = { youtube: 'YouTube', vimeo: 'Vimeo', giphy: 'GIPHY' }[e.payload?.provider];
   const message = name
     ? t('{name} closed unexpectedly (a problem in the system web engine). Your presentation is safe.', { name })
     : t('The website closed unexpectedly (a problem in the system web engine). Your presentation is safe.');

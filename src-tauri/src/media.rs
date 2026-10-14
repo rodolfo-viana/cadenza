@@ -1,8 +1,9 @@
-//! Online media: photos (Unsplash, Openverse), GIFs (GIPHY, Openverse) and
-//! videos (YouTube search; YouTube/Vimeo link previews via oEmbed).
+//! Online media: photos (Openverse, Wikimedia Commons, Pexels, Pixabay), GIFs
+//! (GIPHY, Openverse) and videos (YouTube search; YouTube/Vimeo link previews
+//! via oEmbed).
 //!
-//! Openverse and oEmbed need no key. Unsplash, GIPHY and YouTube search use
-//! the user's own API keys (see [`crate::secrets`]).
+//! Openverse, Wikimedia Commons and oEmbed need no key. Pexels, Pixabay, GIPHY
+//! and YouTube search use the user's own API keys (see [`crate::secrets`]).
 
 use std::time::Duration;
 
@@ -10,7 +11,12 @@ use anyhow::{Context, bail};
 use serde::Serialize;
 use serde_json::Value;
 
-const UA: &str = concat!("Cadenza/", env!("CARGO_PKG_VERSION"), " (presentation app; +https://github.com/)");
+// Wikimedia asks API clients for a User-Agent that says how to reach them.
+const UA: &str = concat!(
+    "Cadenza/",
+    env!("CARGO_PKG_VERSION"),
+    " (presentation app; +https://github.com/rodolfo-viana/cadenza)"
+);
 const MAX_DOWNLOAD: u64 = 40 * 1024 * 1024;
 
 #[derive(Serialize, Debug, Clone, Default)]
@@ -31,8 +37,6 @@ pub struct MediaItem {
     /// Page of the item on the provider's site.
     pub page_url: String,
     pub license: String,
-    /// Unsplash: endpoint that must be pinged when a photo is used.
-    pub track_url: String,
 }
 
 #[derive(Serialize, Debug, Clone, Default)]
@@ -62,7 +66,10 @@ fn get_json(url: &str, headers: &[(&str, &str)]) -> anyhow::Result<Value> {
     let body = resp.body_mut().read_to_string().unwrap_or_default();
     match status {
         200..=299 => Ok(serde_json::from_str(&body)?),
-        401 | 403 => bail!("The service rejected the API key (HTTP {status}). Check it in Settings ▸ Integrations."),
+        // Pixabay answers a bad key with 400.
+        400 | 401 | 403 if status != 400 || body.contains("API key") => {
+            bail!("The service rejected the API key (HTTP {status}). Check it in Settings ▸ Integrations.")
+        }
         429 => bail!("Too many requests — please wait a moment and try again."),
         _ => bail!("The service answered with HTTP {status}"),
     }
@@ -86,15 +93,6 @@ fn n(v: &Value, path: &[&str]) -> u32 {
         cur = &cur[*p];
     }
     cur.as_u64().or_else(|| cur.as_str().and_then(|x| x.parse().ok())).unwrap_or(0) as u32
-}
-
-const UTM: &str = "utm_source=cadenza&utm_medium=referral";
-
-fn with_utm(url: &str) -> String {
-    if url.is_empty() {
-        return String::new();
-    }
-    format!("{url}{}{UTM}", if url.contains('?') { "&" } else { "?" })
 }
 
 /// Searches a provider. `page` is the cursor returned by the previous page.
@@ -133,7 +131,6 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
                             license: format!("CC {} {}", s(r, &["license"]).to_uppercase(), s(r, &["license_version"]))
                                 .trim()
                                 .to_string(),
-                            track_url: String::new(),
                         })
                         .collect()
                 })
@@ -144,58 +141,32 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
                 next: (p < pages).then(|| (p + 1).to_string()),
             })
         }
-        "unsplash" => {
+        "wikimedia" => {
+            if q.is_empty() {
+                return Ok(MediaPage::default());
+            }
+            let offset: u32 = page.and_then(|p| p.parse().ok()).unwrap_or(0);
+            let url = format!(
+                "https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2&generator=search&gsrsearch={}&gsrnamespace=6&gsrlimit=30&gsroffset={offset}&prop=imageinfo&iiprop=url%7Csize%7Cmime%7Cextmetadata&iiurlwidth=400&iiextmetadatafilter=Artist%7CLicenseShortName%7CObjectName",
+                enc(&format!("{q} filetype:bitmap"))
+            );
+            Ok(wikimedia_page(&get_json(&url, &[])?))
+        }
+        "pexels" => {
             let key = key.filter(|k| !k.is_empty()).context("NEEDS_KEY")?;
             let p: u32 = page.and_then(|p| p.parse().ok()).unwrap_or(1);
-            let auth = format!("Client-ID {key}");
-            let headers = [("Authorization", auth.as_str()), ("Accept-Version", "v1")];
-            let (list, total_pages) = if q.is_empty() {
-                let v = get_json(&format!("https://api.unsplash.com/photos?page={p}&per_page=30&order_by=popular"), &headers)?;
-                (v, 50)
+            let url = if q.is_empty() {
+                format!("https://api.pexels.com/v1/curated?page={p}&per_page=30")
             } else {
-                let v = get_json(
-                    &format!(
-                        "https://api.unsplash.com/search/photos?query={}&page={p}&per_page=30&content_filter=high",
-                        enc(q)
-                    ),
-                    &headers,
-                )?;
-                let tp = n(&v, &["total_pages"]);
-                (v["results"].clone(), tp)
+                format!("https://api.pexels.com/v1/search?query={}&page={p}&per_page=30", enc(q))
             };
-            let items = list
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .map(|r| {
-                            let raw = s(r, &["urls", "raw"]);
-                            MediaItem {
-                                id: s(r, &["id"]),
-                                provider: "unsplash".into(),
-                                kind: "image".into(),
-                                title: s(r, &["alt_description"]),
-                                thumb: s(r, &["urls", "small"]),
-                                url: if raw.is_empty() {
-                                    s(r, &["urls", "regular"])
-                                } else {
-                                    format!("{raw}&w=2400&q=85&fm=jpg&fit=max")
-                                },
-                                width: n(r, &["width"]),
-                                height: n(r, &["height"]),
-                                author: s(r, &["user", "name"]),
-                                author_url: with_utm(&s(r, &["user", "links", "html"])),
-                                page_url: with_utm(&s(r, &["links", "html"])),
-                                license: "Unsplash License".into(),
-                                track_url: s(r, &["links", "download_location"]),
-                            }
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            Ok(MediaPage {
-                items,
-                next: (p < total_pages).then(|| (p + 1).to_string()),
-            })
+            Ok(pexels_page(&get_json(&url, &[("Authorization", key)])?, p))
+        }
+        "pixabay" => {
+            let key = key.filter(|k| !k.is_empty()).context("NEEDS_KEY")?;
+            let p: u32 = page.and_then(|p| p.parse().ok()).unwrap_or(1);
+            let url = format!("https://pixabay.com/api/?key={}&q={}&page={p}&per_page=30&safesearch=true", enc(key), enc(q));
+            Ok(pixabay_page(&get_json(&url, &[])?, p))
         }
         "giphy" => {
             let key = key.filter(|k| !k.is_empty()).context("NEEDS_KEY")?;
@@ -234,7 +205,6 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
                                 author_url: s(r, &["user", "profile_url"]),
                                 page_url: s(r, &["url"]),
                                 license: "GIPHY".into(),
-                                track_url: String::new(),
                             }
                         })
                         .collect()
@@ -288,6 +258,141 @@ pub fn search(provider: &str, query: &str, page: Option<&str>, key: Option<&str>
             Ok(MediaPage { items, next })
         }
         _ => bail!("Unknown media provider"),
+    }
+}
+
+fn id(v: &Value) -> String {
+    v.as_str().map(str::to_string).or_else(|| v.as_u64().map(|n| n.to_string())).unwrap_or_default()
+}
+
+/// Plain text of an HTML snippet (Wikimedia's metadata is HTML).
+fn plain(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for c in html.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => out.push(c),
+            _ => {}
+        }
+    }
+    html_unescape(&out).split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn pexels_page(v: &Value, p: u32) -> MediaPage {
+    let items = v["photos"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|r| MediaItem {
+                    id: id(&r["id"]),
+                    provider: "pexels".into(),
+                    kind: "image".into(),
+                    title: s(r, &["alt"]),
+                    thumb: s(r, &["src", "medium"]),
+                    url: s(r, &["src", "large2x"]),
+                    width: n(r, &["width"]),
+                    height: n(r, &["height"]),
+                    author: s(r, &["photographer"]),
+                    author_url: s(r, &["photographer_url"]),
+                    page_url: s(r, &["url"]),
+                    license: "Pexels License".into(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    MediaPage {
+        items,
+        next: v["next_page"].as_str().map(|_| (p + 1).to_string()),
+    }
+}
+
+fn pixabay_page(v: &Value, p: u32) -> MediaPage {
+    let items: Vec<MediaItem> = v["hits"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|r| MediaItem {
+                    id: id(&r["id"]),
+                    provider: "pixabay".into(),
+                    kind: "image".into(),
+                    title: s(r, &["tags"]),
+                    thumb: s(r, &["webformatURL"]),
+                    url: s(r, &["largeImageURL"]),
+                    width: n(r, &["imageWidth"]),
+                    height: n(r, &["imageHeight"]),
+                    author: s(r, &["user"]),
+                    author_url: format!("https://pixabay.com/users/{}-{}/", s(r, &["user"]), id(&r["user_id"])),
+                    page_url: s(r, &["pageURL"]),
+                    license: "Pixabay Content License".into(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    // Pixabay returns at most 500 results per query.
+    let total = n(v, &["totalHits"]).min(500);
+    MediaPage {
+        next: (!items.is_empty() && p * 30 < total).then(|| (p + 1).to_string()),
+        items,
+    }
+}
+
+/// A Wikimedia thumbnail URL (`…/500px-Name.jpg?…`) at another width.
+fn resized_thumb(thumb: &str, width: u32) -> Option<String> {
+    let (path, query) = thumb.split_once('?').map_or((thumb, ""), |(p, q)| (p, q));
+    let (dir, file) = path.rsplit_once('/')?;
+    let (px, rest) = file.split_once("px-")?;
+    if px.is_empty() || !px.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some(format!("{dir}/{width}px-{rest}{}{query}", if query.is_empty() { "" } else { "?" }))
+}
+
+fn wikimedia_page(v: &Value) -> MediaPage {
+    let mut pages: Vec<&Value> = v["query"]["pages"].as_array().map(|a| a.iter().collect()).unwrap_or_default();
+    pages.sort_by_key(|p| p["index"].as_u64().unwrap_or(u64::MAX));
+    let items = pages
+        .into_iter()
+        .filter_map(|r| {
+            let info = &r["imageinfo"][0];
+            let mime = s(info, &["mime"]);
+            // Only formats every web engine shows (no TIFF, no XCF…).
+            if !matches!(mime.as_str(), "image/jpeg" | "image/png" | "image/gif" | "image/webp") {
+                return None;
+            }
+            let (original, thumb) = (s(info, &["url"]), s(info, &["thumburl"]));
+            let width = n(info, &["width"]);
+            // Big photos come as a 1920px rendition; GIFs stay original (animation).
+            let url = if width > 1920 && mime != "image/gif" {
+                resized_thumb(&thumb, 1920).unwrap_or(original)
+            } else {
+                original
+            };
+            let meta = &info["extmetadata"];
+            let file = s(r, &["title"]);
+            let name = file.trim_start_matches("File:");
+            let name = name.rsplit_once('.').map_or(name, |(stem, _)| stem);
+            let title = plain(&s(meta, &["ObjectName", "value"]));
+            Some(MediaItem {
+                id: id(&r["pageid"]),
+                provider: "wikimedia".into(),
+                kind: if mime == "image/gif" { "gif".into() } else { "image".into() },
+                title: if title.is_empty() { name.to_string() } else { title },
+                thumb,
+                url,
+                width,
+                height: n(info, &["height"]),
+                author: plain(&s(meta, &["Artist", "value"])),
+                author_url: String::new(),
+                page_url: s(info, &["descriptionurl"]),
+                license: plain(&s(meta, &["LicenseShortName", "value"])),
+            })
+        })
+        .collect();
+    MediaPage {
+        items,
+        next: v["continue"]["gsroffset"].as_u64().map(|o| o.to_string()),
     }
 }
 
@@ -365,9 +470,81 @@ pub fn download(url: &str) -> anyhow::Result<(Vec<u8>, String)> {
     Ok((bytes, ext.to_string()))
 }
 
-/// Unsplash requires pinging this endpoint when a photo is used.
-pub fn track_unsplash(track_url: &str, key: &str) {
-    if track_url.starts_with("https://api.unsplash.com/") {
-        let _ = get_json(track_url, &[("Authorization", &format!("Client-ID {key}")), ("Accept-Version", "v1")]);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn reads_pexels_results() {
+        let v = json!({
+            "page": 1, "per_page": 30, "next_page": "https://api.pexels.com/v1/search/?page=2&per_page=30&query=lake",
+            "photos": [{
+                "id": 2014422, "width": 3024, "height": 3024, "url": "https://www.pexels.com/photo/lake-2014422/",
+                "photographer": "Joey Farina", "photographer_url": "https://www.pexels.com/@joey",
+                "alt": "A calm lake", "src": { "medium": "https://images.pexels.com/m.jpeg", "large2x": "https://images.pexels.com/l2.jpeg" }
+            }]
+        });
+        let page = pexels_page(&v, 1);
+        let it = &page.items[0];
+        assert_eq!((it.id.as_str(), it.provider.as_str(), it.title.as_str()), ("2014422", "pexels", "A calm lake"));
+        assert_eq!(
+            (it.thumb.as_str(), it.url.as_str()),
+            ("https://images.pexels.com/m.jpeg", "https://images.pexels.com/l2.jpeg")
+        );
+        assert_eq!((it.author.as_str(), it.width), ("Joey Farina", 3024));
+        assert_eq!(page.next.as_deref(), Some("2"));
+        assert_eq!(pexels_page(&json!({ "photos": [] }), 3).next, None);
+    }
+
+    #[test]
+    fn reads_pixabay_results() {
+        let v = json!({
+            "total": 4692, "totalHits": 500,
+            "hits": [{
+                "id": 195893, "pageURL": "https://pixabay.com/en/blossom-bloom-flower-195893/", "tags": "blossom, bloom, flower",
+                "webformatURL": "https://pixabay.com/get/w.jpg", "largeImageURL": "https://pixabay.com/get/l.jpg",
+                "imageWidth": 4000, "imageHeight": 2250, "user_id": 48777, "user": "Josch13"
+            }]
+        });
+        let page = pixabay_page(&v, 1);
+        let it = &page.items[0];
+        assert_eq!(
+            (it.id.as_str(), it.title.as_str(), it.url.as_str()),
+            ("195893", "blossom, bloom, flower", "https://pixabay.com/get/l.jpg")
+        );
+        assert_eq!(it.author_url, "https://pixabay.com/users/Josch13-48777/");
+        assert_eq!(page.next.as_deref(), Some("2"));
+        assert_eq!(pixabay_page(&v, 17).next, None);
+    }
+
+    #[test]
+    fn reads_wikimedia_results() {
+        let info = |mime: &str, width: u32, thumb: &str| {
+            json!([{
+                "url": "https://upload.wikimedia.org/o.jpg", "thumburl": thumb, "width": width, "height": 1000, "mime": mime,
+                "descriptionurl": "https://commons.wikimedia.org/wiki/File:X.jpg",
+                "extmetadata": {
+                    "Artist": { "value": "<a href=\"//commons.wikimedia.org/wiki/User:Ann\">Ann &amp; Bo</a>" },
+                    "LicenseShortName": { "value": "CC BY-SA 4.0" }
+                }
+            }])
+        };
+        let v = json!({
+            "continue": { "gsroffset": 30, "continue": "gsroffset||" },
+            "query": { "pages": [
+                { "pageid": 2, "index": 2, "title": "File:Small lake.png", "imageinfo": info("image/png", 800, "https://t/400px-Small.png") },
+                { "pageid": 1, "index": 1, "title": "File:Big lake.jpg", "imageinfo": info("image/jpeg", 6000, "https://t/a/500px-Big.jpg?utm=x") },
+                { "pageid": 3, "index": 3, "title": "File:Scan.tif", "imageinfo": info("image/tiff", 6000, "https://t/400px-Scan.jpg") }
+            ] }
+        });
+        let page = wikimedia_page(&v);
+        assert_eq!(page.items.len(), 2, "TIFF is skipped");
+        let (big, small) = (&page.items[0], &page.items[1]);
+        assert_eq!((big.id.as_str(), big.title.as_str()), ("1", "Big lake"));
+        assert_eq!(big.url, "https://t/a/1920px-Big.jpg?utm=x");
+        assert_eq!(small.url, "https://upload.wikimedia.org/o.jpg");
+        assert_eq!((big.author.as_str(), big.license.as_str()), ("Ann & Bo", "CC BY-SA 4.0"));
+        assert_eq!(page.next.as_deref(), Some("30"));
     }
 }
