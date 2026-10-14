@@ -44,6 +44,61 @@
   .paused-banner { display: none; color: #fbbf24; font-weight: 600; }
   .paused-banner.on { display: inline; }
   kbd { font: 11px/1 var(--font); padding: 3px 5px; border-radius: 4px; background: #252733; border: 1px solid #343747; color: var(--muted); }
+  button[aria-pressed="true"] { background: #2f2a57; border-color: var(--accent); }
+
+  /* Teleprompter (teleprompter.js): only ever in this window. */
+  .tp {
+    position: fixed; z-index: 50; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--tp-bg); color: var(--tp-fg); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  }
+  .tp[hidden], .tp-panel[hidden] { display: none; }
+  .tp-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .tp.mirror .tp-stage { transform: scaleX(-1); }
+  .tp-text {
+    padding: 0.35em 0.8em 0; font-family: var(--tp-font); font-size: var(--tp-size); line-height: var(--tp-line);
+    white-space: pre-wrap; overflow-wrap: break-word; will-change: transform;
+  }
+  .tp.empty .tp-text { opacity: 0.55; font-style: italic; }
+  .tp-guide { display: none; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: currentColor; opacity: 0.3; pointer-events: none; }
+  .tp.guide .tp-guide { display: block; }
+  .tp-bar {
+    position: relative; display: flex; align-items: center; gap: 2px; padding: 5px 8px 4px; flex: none;
+    background: rgba(14, 15, 19, 0.85); color: var(--text); font-size: 12px; cursor: move; touch-action: none; transition: opacity 0.2s;
+  }
+  .tp.playing:not(:hover) .tp-bar { opacity: 0.3; }
+  .tp-bar button { padding: 4px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+  .tp-bar button:hover, .tp-bar button.on { background: rgba(255, 255, 255, 0.14); }
+  .tp-speed { display: inline-flex; align-items: center; }
+  .tp-speed-val { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .tp-spacer { flex: 1; }
+  .tp-progress { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: rgba(255, 255, 255, 0.08); }
+  .tp-progress i { display: block; height: 100%; width: 0; background: var(--accent); }
+  .tp-h { position: absolute; z-index: 2; touch-action: none; }
+  .tp-h-n, .tp-h-s { left: 12px; right: 12px; height: 6px; cursor: ns-resize; }
+  .tp-h-n { top: 0; }
+  .tp-h-s { bottom: 0; }
+  .tp-h-e, .tp-h-w { top: 12px; bottom: 12px; width: 6px; cursor: ew-resize; }
+  .tp-h-e { right: 0; }
+  .tp-h-w { left: 0; }
+  .tp-h-ne, .tp-h-nw, .tp-h-se, .tp-h-sw { width: 12px; height: 12px; }
+  .tp-h-ne { top: 0; right: 0; cursor: nesw-resize; }
+  .tp-h-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+  .tp-h-nw { top: 0; left: 0; cursor: nwse-resize; }
+  .tp-h-se { bottom: 0; right: 0; cursor: nwse-resize; }
+  .tp-panel {
+    position: fixed; z-index: 60; width: 280px; display: grid; gap: 10px; padding: 14px; font-size: 13px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  }
+  .tp-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; }
+  .tp-row input[type="range"] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--accent); }
+  .tp-row output { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tp-row select { max-width: 170px; font: inherit; color: var(--text); background: #252733; border: 1px solid #30323f; border-radius: 6px; padding: 4px 6px; }
+  .tp-row input[type="color"] { width: 44px; height: 26px; padding: 0 2px; border: 1px solid #30323f; border-radius: 6px; background: #252733; cursor: pointer; }
+  .tp-check { display: flex; align-items: center; gap: 8px; }
+  .tp-check input { margin: 0; accent-color: var(--accent); }
+  .tp-panel-foot { display: flex; justify-content: flex-end; padding-top: 2px; }
+  .tp-panel-foot button { padding: 5px 10px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -52,6 +107,7 @@
     <span class="timer" id="timer">00:00</span>
     <button id="timer-toggle" title="Pause/resume timer (P)" data-i18n-title="Pause/resume timer (P)">Pause</button>
     <button id="timer-reset" title="Reset timer (R)" data-i18n-title="Reset timer (R)" data-i18n="Reset">Reset</button>
+    <button id="tp-toggle" aria-pressed="false" title="Show or hide the teleprompter (T)" data-i18n-title="Show or hide the teleprompter (T)" data-i18n="Teleprompter">Teleprompter</button>
     <span class="count" id="count" data-i18n="Starting…">Starting…</span>
     <span class="paused-banner" id="paused" data-i18n="Screen blacked out — press B to resume">Screen blacked out — press B to resume</span>
     <span class="clock" id="clock"></span>
@@ -71,13 +127,13 @@
         <div class="label"><span data-i18n="Notes">Notes</span> <span class="spacer"></span>
           <button id="smaller" title="Smaller notes (-)" data-i18n-title="Smaller notes (-)">A−</button><button id="larger" title="Larger notes (+)" data-i18n-title="Larger notes (+)">A+</button>
         </div>
-        <div class="notes empty" id="notes">No notes for this slide.</div>
+        <div class="notes empty" id="notes" dir="auto">No notes for this slide.</div>
       </div>
     </div>
   </main>
   <footer>
     <button class="big" id="prev">◀ <span data-i18n="Previous">Previous</span></button>
-    <span style="color:var(--muted)"><kbd>←</kbd> <kbd>→</kbd> <span data-i18n="navigate">navigate</span> · <kbd>B</kbd> <span data-i18n="black screen">black screen</span> · <kbd>Esc</kbd> <span data-i18n="end">end</span></span>
+    <span style="color:var(--muted)"><kbd>←</kbd> <kbd>→</kbd> <span data-i18n="navigate">navigate</span> · <kbd>B</kbd> <span data-i18n="black screen">black screen</span> · <kbd>T</kbd> <span data-i18n="teleprompter">teleprompter</span> · <kbd>X</kbd> <span data-i18n="switch windows">switch windows</span> · <kbd>Esc</kbd> <span data-i18n="end">end</span></span>
     <button class="big primary" id="nextbtn"><span data-i18n="Next">Next</span> ▶</button>
   </footer>
 </div>

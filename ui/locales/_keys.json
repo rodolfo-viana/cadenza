@@ -439,9 +439,16 @@
   ]
  },
  {
+  "key": "Back to the top",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
   "key": "Background",
   "files": [
    "inspector.js",
+   "teleprompter.js",
    "themebuilder.js"
   ]
  },
@@ -1751,6 +1758,12 @@
   ]
  },
  {
+  "key": "Faster (])",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
   "key": "File",
   "files": [
    "commands.js",
@@ -1826,7 +1839,8 @@
  {
   "key": "Font",
   "files": [
-   "panels.js"
+   "panels.js",
+   "teleprompter.js"
   ]
  },
  {
@@ -2167,6 +2181,12 @@
   ]
  },
  {
+  "key": "Hide the teleprompter (T)",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
   "key": "Highlight",
   "files": [
    "panels.js"
@@ -2369,6 +2389,12 @@
   ]
  },
  {
+  "key": "Interface font",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
   "key": "Invalid address",
   "files": [
    "media.rs"
@@ -2529,6 +2555,12 @@
   "key": "Line numbers",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Line spacing",
+  "files": [
+   "teleprompter.js"
   ]
  },
  {
@@ -2725,6 +2757,12 @@
   ]
  },
  {
+  "key": "Mirror the text (for teleprompter glass)",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
   "key": "Mixed",
   "files": [
    "panels.js"
@@ -2902,7 +2940,8 @@
  {
   "key": "No notes for this slide.",
   "files": [
-   "presenter.js"
+   "presenter.js",
+   "teleprompter.js"
   ]
  },
  {
@@ -3031,7 +3070,8 @@
   "files": [
    "controls.js",
    "inspector.js",
-   "panels.js"
+   "panels.js",
+   "teleprompter.js"
   ]
  },
  {
@@ -3254,6 +3294,12 @@
   "key": "Pause",
   "files": [
    "presenter.js"
+  ]
+ },
+ {
+  "key": "Pause scrolling (S)",
+  "files": [
+   "teleprompter.js"
   ]
  },
  {
@@ -3496,6 +3542,12 @@
   ]
  },
  {
+  "key": "Reading line",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
   "key": "Recent",
   "files": [
    "controls.js",
@@ -3660,6 +3712,12 @@
   "key": "Reset timer (R)",
   "files": [
    "presenter.html"
+  ]
+ },
+ {
+  "key": "Restore defaults",
+  "files": [
+   "teleprompter.js"
   ]
  },
  {
@@ -4043,9 +4101,21 @@
   ]
  },
  {
+  "key": "Show or hide the teleprompter (T)",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
   "key": "Show Rulers",
   "files": [
    "canvas.js"
+  ]
+ },
+ {
+  "key": "Show the teleprompter in the presenter display (scrolls your speaker notes)",
+  "files": [
+   "dialogs.js"
   ]
  },
  {
@@ -4171,6 +4241,12 @@
   "key": "Slow",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Slower ([)",
+  "files": [
+   "teleprompter.js"
   ]
  },
  {
@@ -4300,6 +4376,18 @@
   ]
  },
  {
+  "key": "Start scrolling (S)",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
+  "key": "Start scrolling on each slide",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
   "key": "Starting…",
   "files": [
    "presenter.html"
@@ -4392,6 +4480,12 @@
   ]
  },
  {
+  "key": "switch windows",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
   "key": "System",
   "files": [
    "dialogs.js"
@@ -4431,6 +4525,26 @@
   ]
  },
  {
+  "key": "Teleprompter",
+  "files": [
+   "teleprompter.js",
+   "toolbar.js",
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "teleprompter",
+  "files": [
+   "presenter.html"
+  ]
+ },
+ {
+  "key": "Teleprompter settings",
+  "files": [
+   "teleprompter.js"
+  ]
+ },
+ {
   "key": "Template",
   "files": [
    "panels.js"
@@ -4454,7 +4568,8 @@
  {
   "key": "Text color",
   "files": [
-   "panels.js"
+   "panels.js",
+   "teleprompter.js"
   ]
  },
  {
@@ -4466,7 +4581,8 @@
  {
   "key": "Text size",
   "files": [
-   "panels.js"
+   "panels.js",
+   "teleprompter.js"
   ]
  },
  {
@@ -5059,6 +5175,12 @@
   ]
  },
  {
+  "key": "With one screen, press X during the show to switch between the slides and the presenter display. In a video call, share only the presentation window: the audience never sees the presenter display or the teleprompter.",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
   "key": "With two screens, the audience sees the presentation on the other screen while the presenter display stays on yours.",
   "files": [
    "dialogs.js"
@@ -5195,6 +5317,12 @@
    "inspector.js"
   ],
   "one": "{n} object selected"
+ },
+ {
+  "key": "{n} px/s",
+  "files": [
+   "teleprompter.js"
+  ]
  },
  {
   "key": "{n} slides",

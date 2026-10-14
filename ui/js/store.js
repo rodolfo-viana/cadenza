@@ -457,14 +457,19 @@ export async function discardRecovery(sessionId) {
 
 export async function updateSettings(patch) {
   try {
-    const s = await invoke('settings_update', { patch });
-    if (patch.language) await setLanguage(s.language);
-    set({ info: { ...state.info, settings: s } });
-    applyUiTheme();
-    if (patch.language) updateWindowTitle();
+    await adoptSettings(await invoke('settings_update', { patch }));
   } catch (e) {
     toast(String(e), 'error');
   }
+}
+
+/** Uses settings saved by this or another window (e.g. the presenter display). */
+async function adoptSettings(s) {
+  const languageChanged = s.language !== settings().language;
+  if (languageChanged) await setLanguage(s.language);
+  set({ info: { ...state.info, settings: s } });
+  applyUiTheme();
+  if (languageChanged) updateWindowTitle();
 }
 
 export function applyUiTheme() {
@@ -532,6 +537,7 @@ export async function boot() {
   applyUiTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyUiTheme);
 
+  events.listen('cz-settings', (e) => adoptSettings(e.payload));
   events.listen('cz-present-started', () => set({ presenting: true }));
   events.listen('cz-present-ended', (e) => {
     set({ presenting: false });

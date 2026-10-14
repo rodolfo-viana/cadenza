@@ -133,7 +133,8 @@
       cfg.hideInactiveCursor = false;
       cfg.previewLinks = false;
     } else if (mode === 'show') {
-      cfg.keyboard = { 27: endShow, 81: endShow };
+      // X: with one screen, bring the presenter display to the front.
+      cfg.keyboard = { 27: endShow, 81: endShow, 88: function () { tauri.core.invoke('present_swap').catch(function () {}); } };
       cfg.help = true;
     } else {
       cfg.controls = false;

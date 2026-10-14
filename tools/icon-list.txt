@@ -171,3 +171,5 @@ languages
 circle-stop
 file-plus-2
 list-plus
+pause
+rotate-ccw

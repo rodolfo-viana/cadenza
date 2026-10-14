@@ -110,8 +110,22 @@ function Settings() {
       <p class="ihint">${t('Optional online services for the Media Library. Keys are stored in your system keychain and never saved in presentations.')}</p>
       <${Integrations} />
       <h4>${t('Presenting')}</h4>
-      <${Row}><${Toggle} value=${s.presenterView} label=${t('Open the presenter display (notes, timer, next slide)')} onChange=${(v) => updateSettings({ presenterView: v })} /><//>
+      <${Row}>
+        <${Toggle}
+          value=${s.presenterView}
+          label=${t('Open the presenter display (notes, timer, next slide)')}
+          onChange=${(v) => updateSettings(v ? { presenterView: true } : { presenterView: false, teleprompter: { enabled: false } })}
+        />
+      <//>
+      <${Row}>
+        <${Toggle}
+          value=${!!s.teleprompter?.enabled}
+          label=${t('Show the teleprompter in the presenter display (scrolls your speaker notes)')}
+          onChange=${(v) => updateSettings(v ? { presenterView: true, teleprompter: { enabled: true } } : { teleprompter: { enabled: false } })}
+        />
+      <//>
       <p class="ihint">${t('With two screens, the audience sees the presentation on the other screen while the presenter display stays on yours.')}</p>
+      <p class="ihint">${t('With one screen, press X during the show to switch between the slides and the presenter display. In a video call, share only the presentation window: the audience never sees the presenter display or the teleprompter.')}</p>
     </div>
   <//>`;
 }

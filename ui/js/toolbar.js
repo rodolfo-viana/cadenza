@@ -116,7 +116,13 @@ function playMenu() {
     {
       label: t('Use Presenter Display'),
       checked: settings().presenterView,
-      run: () => updateSettings({ presenterView: !settings().presenterView }),
+      // The teleprompter is part of the presenter display.
+      run: () => updateSettings(settings().presenterView ? { presenterView: false, teleprompter: { enabled: false } } : { presenterView: true }),
+    },
+    {
+      label: t('Teleprompter'),
+      checked: !!settings().teleprompter?.enabled,
+      run: () => updateSettings(settings().teleprompter?.enabled ? { teleprompter: { enabled: false } } : { presenterView: true, teleprompter: { enabled: true } }),
     },
   ];
 }

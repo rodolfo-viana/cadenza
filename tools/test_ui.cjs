@@ -490,3 +490,45 @@ test('a delayed image paste keeps its original slide and supports ordinary inser
   assert.equal(edit.args.docId, 'document-a');
   assert.equal(edit.args.op.props.content.src, 'photo.png');
 });
+
+async function teleprompter() {
+  const context = vm.createContext({});
+  const stubs = { 'i18n.js': { t: (s) => s }, 'icon-data.js': { ICONS: {} } };
+  const mod = new vm.SourceTextModule(fs.readFileSync(path.join(root, 'teleprompter.js'), 'utf8'), { context, identifier: 'teleprompter.js' });
+  await mod.link((specifier) => {
+    const exports = stubs[path.basename(specifier)];
+    return new vm.SyntheticModule(Object.keys(exports), function () {
+      for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
+    }, { context });
+  });
+  await mod.evaluate();
+  return mod.namespace;
+}
+
+test('the teleprompter box stays inside the presenter display', async () => {
+  const P = await teleprompter();
+  const plain = (r) => ({ ...r });
+  assert.deepEqual(plain(P.boxRect({ x: 0.25, y: 0.02, width: 0.5, height: 0.3 }, 1000, 800)), { left: 250, top: 16, width: 500, height: 240 });
+  // Off-screen or oversized boxes are pulled back in; tiny ones get a usable size.
+  assert.deepEqual(plain(P.boxRect({ x: 0.9, y: -1, width: 0.5, height: 2 }, 1000, 800)), { left: 500, top: 0, width: 500, height: 800 });
+  assert.deepEqual(plain(P.boxRect({ x: 0, y: 0, width: 0.01, height: 0.01 }, 1000, 800)), { left: 0, top: 0, width: 240, height: 120 });
+
+  const r = { left: 100, top: 100, width: 400, height: 200 };
+  assert.deepEqual(plain(P.dragRect(r, null, 5000, -5000, 1000, 800)), { left: 600, top: 0, width: 400, height: 200 });
+  assert.deepEqual(plain(P.dragRect(r, 'w', -50, 0, 1000, 800)), { left: 50, top: 100, width: 450, height: 200 });
+  // Shrinking stops at the minimum size and keeps the opposite edge in place.
+  assert.deepEqual(plain(P.dragRect(r, 'nw', 1000, 1000, 1000, 800)), { left: 260, top: 180, width: 240, height: 120 });
+  assert.deepEqual(plain(P.dragRect(r, 'se', 5000, 5000, 1000, 800)), { left: 100, top: 100, width: 900, height: 700 });
+});
+
+test('teleprompter scrolling is steady and stops at the end of the notes', async () => {
+  const P = await teleprompter();
+  assert.equal(P.advance(0, 40, 0.05, 1000), 2);
+  assert.equal(P.advance(0, 40, 5, 1000), 4, 'a stalled frame does not jump ahead');
+  assert.equal(P.advance(990, 200, 0.1, 1000), 1000);
+  assert.equal(P.clampSpeed(43), 45);
+  assert.equal(P.clampSpeed(0), P.SPEED_MIN);
+  assert.equal(P.clampSpeed(1e6), P.SPEED_MAX);
+  assert.equal(P.rgba('#ff8000', 0.5), 'rgba(255, 128, 0, 0.5)');
+  assert.equal(P.rgba('not a color', 2), 'rgba(17, 24, 39, 1)');
+});

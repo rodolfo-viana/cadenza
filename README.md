@@ -36,6 +36,10 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
 
 **Presenting and sharing**
 - Fullscreen show with a presenter display: speaker notes, timer, clock and the next slide.
+- A teleprompter in the presenter display that scrolls each slide's speaker notes as you present. Move
+  and resize it anywhere, and set its speed, font, size and colors. The audience never sees it.
+- With one screen, press X during the show to switch between the slides and the presenter display.
+  In a video call, share only the presentation window.
 - Vertical sub-slides, skipped slides and auto-advance.
 - Export to a web page, either as a folder for any web server or as a single self-contained `.html`
   file, or print to PDF.

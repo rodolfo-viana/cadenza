@@ -159,6 +159,8 @@ fn settings_update(app: AppHandle, state: State<AppState>, patch: Value) -> CmdR
     if language_changed {
         refresh_app_menu(&app);
     }
+    // Other windows (editors, the presenter display) keep a copy.
+    let _ = app.emit("cz-settings", &updated);
     Ok(updated)
 }
 
@@ -918,12 +920,17 @@ struct PresentData {
     height: u32,
     /// Interface language for the presenter display.
     language: String,
+    teleprompter: settings::Teleprompter,
 }
 
 /// Everything a presentation window needs to start reveal.js.
 #[tauri::command]
 fn present_data(window: Window, state: State<AppState>) -> CmdResult<PresentData> {
     let owner = owner_label(window.label()).to_string();
+    let (language, teleprompter) = {
+        let s = state.settings.lock().map_err(err)?;
+        (s.language.clone(), s.teleprompter.clone())
+    };
     let docs = state.docs.lock().map_err(err)?;
     let doc = docs.get(&owner).ok_or("The presentation is no longer open")?;
     let deck = &doc.deck;
@@ -960,14 +967,16 @@ fn present_data(window: Window, state: State<AppState>) -> CmdResult<PresentData
         slides,
         width: deck.width,
         height: deck.height,
-        language: state.settings.lock().map(|s| s.language.clone()).unwrap_or_default(),
+        language,
+        teleprompter,
     })
 }
 
 #[tauri::command]
 fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_slide: Option<String>, presenter: Option<bool>) -> CmdResult<()> {
     let owner = window.label().to_string();
-    let presenter = presenter.unwrap_or_else(|| state.settings.lock().map(|s| s.presenter_view).unwrap_or(true));
+    // The teleprompter lives in the presenter display.
+    let presenter = presenter.unwrap_or_else(|| state.settings.lock().map(|s| s.presenter_view || s.teleprompter.enabled).unwrap_or(true));
     let (h, v) = {
         let docs = state.docs.lock().map_err(err)?;
         let doc = docs.get(&owner).ok_or("No presentation is open")?;
@@ -1003,6 +1012,8 @@ fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_sl
     let _ = w.set_fullscreen(true);
     let _ = w.show();
     let _ = w.set_focus();
+    #[cfg(target_os = "macos")]
+    keep_drawing_when_hidden(&w);
 
     if presenter {
         let pl = format!("presenter-{owner}");
@@ -1018,12 +1029,62 @@ fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_sl
         }
         let _ = p.maximize();
         let _ = p.show();
-        // Keep keyboard focus on the screen the presenter is looking at.
+        // Keep keyboard focus on the screen the presenter is looking at. With
+        // one screen the slides stay in front (the screen may be mirrored to a
+        // projector); X brings the presenter display forward (present_swap).
         if monitors.len() > 1 {
             let _ = p.set_focus();
         }
     }
     let _ = app.emit("cz-present-started", json!({ "doc": owner }));
+    Ok(())
+}
+
+/// WebKit on macOS stops drawing covered windows. The audience window must keep
+/// drawing behind the presenter display so it can be shared in a video call or
+/// recorded.
+#[cfg(target_os = "macos")]
+fn keep_drawing_when_hidden(w: &tauri::WebviewWindow) {
+    let _ = w.with_webview(|webview| {
+        use objc2::runtime::AnyObject;
+        use objc2::{msg_send, sel};
+        // SAFETY: inner() is the window's WKWebView; the selector is checked first.
+        unsafe {
+            let view = webview.inner() as *mut AnyObject;
+            let sel = sel!(_setWindowOcclusionDetectionEnabled:);
+            let supported: bool = msg_send![view, respondsToSelector: sel];
+            if supported {
+                let _: () = msg_send![view, _setWindowOcclusionDetectionEnabled: false];
+            }
+        }
+    });
+}
+
+/// The other window of a show: the audience window for the presenter display
+/// and vice versa.
+fn swap_label(label: &str) -> Option<String> {
+    let owner = owner_label(label);
+    if label.starts_with("presenter-") {
+        Some(format!("present-{owner}"))
+    } else if label.starts_with("present-") {
+        Some(format!("presenter-{owner}"))
+    } else {
+        None
+    }
+}
+
+/// Brings the other window of the show to the front when both share one
+/// screen (one screen: share the slides in a call, read the presenter display).
+#[tauri::command]
+fn present_swap(app: AppHandle, window: Window) -> CmdResult<()> {
+    let Some(other) = swap_label(window.label()).and_then(|l| app.get_webview_window(&l)) else {
+        return Ok(());
+    };
+    let here = window.current_monitor().map_err(err)?.map(|m| *m.position());
+    let there = other.current_monitor().map_err(err)?.map(|m| *m.position());
+    if here == there {
+        other.set_focus().map_err(err)?;
+    }
     Ok(())
 }
 
@@ -1336,6 +1397,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             present_data,
             present_start,
             present_stop,
+            present_swap,
             present_toggle_fullscreen,
             ui_log,
             window_new,
@@ -1365,6 +1427,14 @@ mod tests {
         assert_eq!(owner_label("presenter-editor-2"), "editor-2");
         assert_eq!(owner_label("print-editor-3"), "editor-3");
         assert_eq!(owner_label("editor-4"), "editor-4");
+    }
+
+    #[test]
+    fn swap_labels() {
+        assert_eq!(swap_label("presenter-editor-1").as_deref(), Some("present-editor-1"));
+        assert_eq!(swap_label("present-editor-1").as_deref(), Some("presenter-editor-1"));
+        assert_eq!(swap_label("editor-1"), None);
+        assert_eq!(swap_label("print-editor-1"), None);
     }
 
     #[test]

@@ -32,6 +32,61 @@ pub struct Settings {
     pub show_rulers: bool,
     /// Show (and snap to) the document's guides.
     pub show_guides: bool,
+    /// The teleprompter box of the presenter display.
+    pub teleprompter: Teleprompter,
+}
+
+/// The teleprompter: a box in the presenter display that scrolls the current
+/// slide's speaker notes. It never appears in the audience window.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Teleprompter {
+    /// Show the box when a show starts.
+    pub enabled: bool,
+    /// Scrolling speed in pixels per second.
+    pub speed: f64,
+    /// Start scrolling by itself on every slide.
+    pub auto_start: bool,
+    pub font_size: f64,
+    /// Font family; empty for the interface font.
+    pub font_family: String,
+    pub line_height: f64,
+    pub text_color: String,
+    pub background: String,
+    /// Background opacity, 0–1.
+    pub opacity: f64,
+    /// Mirrored text, for teleprompter glass.
+    pub mirror: bool,
+    /// Reading line across the middle of the box.
+    pub guide: bool,
+    /// Position and size as fractions of the presenter display.
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Default for Teleprompter {
+    fn default() -> Self {
+        Teleprompter {
+            enabled: false,
+            speed: 40.0,
+            auto_start: true,
+            font_size: 32.0,
+            font_family: String::new(),
+            line_height: 1.5,
+            text_color: "#f8fafc".into(),
+            background: "#111827".into(),
+            opacity: 0.9,
+            mirror: false,
+            guide: true,
+            // Top center, below where laptop webcams usually are.
+            x: 0.25,
+            y: 0.02,
+            width: 0.5,
+            height: 0.3,
+        }
+    }
 }
 
 impl Default for Settings {
@@ -50,6 +105,7 @@ impl Default for Settings {
             show_notes: true,
             show_rulers: true,
             show_guides: true,
+            teleprompter: Teleprompter::default(),
         }
     }
 }
@@ -156,6 +212,20 @@ mod tests {
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
         assert_eq!(Settings::load(&dir.path().join("missing.json")), Settings::default());
+    }
+
+    #[test]
+    fn partial_teleprompter_settings_keep_the_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("settings.json");
+        fs::write(&p, r#"{"uiTheme": "dark"}"#).unwrap();
+        assert_eq!(Settings::load(&p).teleprompter, Teleprompter::default());
+        fs::write(&p, r#"{"teleprompter": {"enabled": true, "speed": 80}}"#).unwrap();
+        let s = Settings::load(&p);
+        assert!(s.teleprompter.enabled);
+        assert_eq!(s.teleprompter.speed, 80.0);
+        assert_eq!(s.teleprompter.font_size, Teleprompter::default().font_size);
+        assert!(s.presenter_view);
     }
 
     #[test]

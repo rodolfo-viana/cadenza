@@ -1,7 +1,7 @@
 /*
  * Presenter display: current and next slide (live reveal.js previews with
- * the right build state), speaker notes, timer and clock. Drives the
- * audience window through Tauri events.
+ * the right build state), speaker notes, teleprompter, timer and clock.
+ * Drives the audience window through Tauri events.
  */
 (function () {
   'use strict';
@@ -16,6 +16,9 @@
   var data = null;
   var lastState = null;
   var framesReady = 0;
+  // Teleprompter (teleprompter.js) and the slide whose notes it shows.
+  var tp = null;
+  var tpSlide = null;
   // Interface translation (replaced by i18n.js once the language is known).
   var t = function (s, v) { return v ? s.replace(/\{(\w+)\}/g, function (m, k) { return k in v ? v[k] : m; }) : s; };
 
@@ -86,6 +89,7 @@
   $('end').onclick = function () { tauri.core.invoke('present_stop', { slide: lastState && lastState.slideId }); };
   $('timer-toggle').onclick = toggleTimer;
   $('timer-reset').onclick = resetTimer;
+  $('tp-toggle').onclick = function () { if (tp) tp.toggle(); };
 
   var notesSize = 22;
   try { notesSize = parseInt(localStorage.getItem('cz-notes-size'), 10) || 22; } catch (e) { /* storage unavailable */ }
@@ -100,6 +104,11 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // Typing in the teleprompter settings.
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName || '')) {
+      if (e.key === 'Escape' && tp) tp.closePanel();
+      return;
+    }
     switch (e.key) {
       case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': case 'Enter': case 'n': case 'N':
         send('next'); break;
@@ -108,11 +117,17 @@
       case 'Home': send('first'); break;
       case 'End': send('last'); break;
       case 'b': case 'B': case '.': send('pause'); break;
-      case 'Escape': $('end').click(); break;
+      case 'Escape': if (!(tp && tp.closePanel())) $('end').click(); break;
       case 'P': toggleTimer(); break;
       case 'r': case 'R': resetTimer(); break;
       case '+': case '=': setNotesSize(notesSize + 2); break;
       case '-': case '_': setNotesSize(notesSize - 2); break;
+      case 't': case 'T': if (tp) tp.toggle(); break;
+      case 's': case 'S': if (tp) tp.playPause(); break;
+      case '[': if (tp) tp.slower(); break;
+      case ']': if (tp) tp.faster(); break;
+      // One screen: bring the slides to the front (and back, from there).
+      case 'x': case 'X': tauri.core.invoke('present_swap').catch(function () {}); break;
       default: return;
     }
     e.preventDefault();
@@ -141,6 +156,10 @@
     $('notes').textContent = notes || t('No notes for this slide.');
     $('notes').classList.toggle('empty', !notes);
     $('notes').scrollTop = 0;
+    if (tp && st.slideId !== tpSlide) {
+      tpSlide = st.slideId;
+      tp.setSlide(notes);
+    }
   }
 
   function bootFrame(id) {
@@ -167,7 +186,17 @@
         document.title = t('Presenter — {title}', { title: d.title || t('Presentation') });
         tick();
         applyState(lastState);
+        return import('./teleprompter.js');
       });
+    }).then(function (m) {
+      tp = m.createTeleprompter({
+        settings: d.teleprompter,
+        invoke: tauri.core.invoke,
+        onVisibilityChange: function (on) { $('tp-toggle').setAttribute('aria-pressed', String(on)); },
+      });
+      applyState(lastState);
+    }).catch(function (e) {
+      tauri.core.invoke('ui_log', { level: 'error', message: 'teleprompter: ' + e }).catch(function () {});
     });
     document.title = t('Presenter — {title}', { title: d.title || t('Presentation') });
     bootFrame('current');
