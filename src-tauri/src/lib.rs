@@ -697,6 +697,18 @@ fn media_browse(app: AppHandle, window: Window, state: State<AppState>, provider
     if safe == Some(true) {
         cmd.arg("--safe");
     }
+    // WebKitGTK 2.52 with NVIDIA's EGL driver crashes on YouTube video pages
+    // (WebKit's own MiniBrowser crashes the same way). Mesa's EGL avoids it;
+    // without a GPU driver of its own it renders on the CPU, which is fine for
+    // picking a video. A value the user set themselves is kept.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("__EGL_VENDOR_LIBRARY_FILENAMES").is_none()
+        && let Some(mesa) = ["/usr/share/glvnd/egl_vendor.d/50_mesa.json", "/etc/glvnd/egl_vendor.d/50_mesa.json"]
+            .into_iter()
+            .find(|p| Path::new(p).exists())
+    {
+        cmd.env("__EGL_VENDOR_LIBRARY_FILENAMES", mesa);
+    }
     let mut child = cmd
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
