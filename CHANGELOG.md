@@ -2,6 +2,29 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## 0.3.0 — 2026-10-14
+
+Videos now play in presentations (YouTube, videos from your computer and slide backgrounds), and the Media Library has free photos from Wikimedia Commons, Pexels and Pixabay.
+
+### New
+
+- Photos from Wikimedia Commons in the Media Library, with no key needed, and from Pexels and Pixabay with a free API key (Settings ▸ Integrations). Turn on "Add photo credit" to add the credit line each license asks for.
+
+### Changes
+
+- Unsplash is no longer in the Media Library: it now blocks downloads from apps. Photos you already inserted stay in your presentations.
+- The Linux AppImage now includes GStreamer, so videos and audio play in it.
+
+### Fixes
+
+- YouTube videos showed "Error 153" instead of playing, during presentations and in exported presentations opened from disk.
+- On Linux, videos from your computer didn't play during presentations, and the editor showed no preview frame for them.
+- Slide background images and videos didn't appear during presentations.
+- On Linux with NVIDIA graphics, Browse YouTube closed with "YouTube closed unexpectedly" before a video could be inserted.
+- Many GIFs found through Openverse showed a broken thumbnail.
+- The canvas flickered while dragging an element to the center of the slide.
+- Updated two libraries (time and serde_with) to fix security advisories.
+
 ## 0.2.1 — 2026-10-14
 
 Cadenza now has a teleprompter in the presenter display, and with one screen you can switch between the slides and the presenter display during a video call.
