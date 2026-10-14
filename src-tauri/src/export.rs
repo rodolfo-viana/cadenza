@@ -104,6 +104,7 @@ pub fn export_folder(deck: &Deck, assets_dir: &Path, dir: &Path, read: UiReader)
     let ctx = Ctx {
         mode: Mode::Show,
         asset_url: &url,
+        youtube_host: None,
     };
     let linker = FolderLinker {
         used: RefCell::new(BTreeSet::new()),
@@ -167,6 +168,7 @@ pub fn export_single(deck: &Deck, assets_dir: &Path, file: &Path, read: UiReader
     let ctx = Ctx {
         mode: Mode::Show,
         asset_url: &url,
+        youtube_host: None,
     };
     let html = render::document(deck, &ctx, &InlineLinker { read });
     if let Some(parent) = file.parent() {

@@ -47,6 +47,43 @@ pub fn encode_uri_component(s: &str) -> String {
     out
 }
 
+/// Percent-encodes a file path for use in a URL path. `/` and the other
+/// characters a URL path may hold literally are kept, so that
+/// `encodeURI(decodeURI(url))` (as reveal.js does for backgrounds) gives the
+/// same URL back.
+pub fn encode_url_path(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => out.push(b as char),
+            b':' | b'@' | b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' => out.push(b as char),
+            _ => {
+                let _ = write!(out, "%{:02X}", b);
+            }
+        }
+    }
+    out
+}
+
+/// Decodes `%XX` escapes; `None` if an escape is malformed or the result
+/// isn't UTF-8.
+pub fn decode_percent(s: &str) -> Option<String> {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = std::str::from_utf8(bytes.get(i + 1..i + 3)?).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
 /// Formats a number compactly for CSS/SVG output (no trailing zeros).
 pub fn num(v: f64) -> String {
     if !v.is_finite() {
@@ -184,6 +221,16 @@ mod tests {
     #[test]
     fn encodes_like_js() {
         assert_eq!(encode_uri_component("/home/a b/ç.png"), "%2Fhome%2Fa%20b%2F%C3%A7.png");
+    }
+
+    #[test]
+    fn encodes_paths_keeping_slashes() {
+        let encoded = encode_url_path("/home/a b/ç (1).png");
+        assert_eq!(encoded, "/home/a%20b/%C3%A7%20(1).png");
+        assert_eq!(decode_percent(&encoded).as_deref(), Some("/home/a b/ç (1).png"));
+        assert_eq!(encode_url_path("C:/Users/x#y?z"), "C:/Users/x%23y%3Fz");
+        assert!(decode_percent("%zz").is_none());
+        assert!(decode_percent("%4").is_none());
     }
 
     #[test]

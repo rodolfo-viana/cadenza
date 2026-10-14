@@ -12,6 +12,7 @@ pub mod chart;
 pub mod clipboard;
 pub mod custom_theme;
 pub mod document;
+pub mod embed;
 pub mod export;
 pub mod fonts;
 pub mod layouts;
@@ -360,6 +361,7 @@ fn theme_preview(window: Window, state: State<AppState>, def: custom_theme::Them
     let ctx = Ctx {
         mode: Mode::Editor,
         asset_url: &url,
+        youtube_host: None,
     };
     let slides: Vec<render::SlideRender> = deck.slides.iter().map(|s| render::slide_for_editor(&deck, s, &ctx)).collect();
     Ok(json!({ "css": render::deck_css(&deck, &ctx), "slides": slides, "width": deck.width, "height": deck.height }))
@@ -951,6 +953,7 @@ fn present_data(window: Window, state: State<AppState>) -> CmdResult<PresentData
     let ctx = Ctx {
         mode: Mode::Show,
         asset_url: &url,
+        youtube_host: embed::host(),
     };
     let mut slides = Vec::new();
     for (h, group) in render::visible_groups(deck).iter().enumerate() {
@@ -1295,6 +1298,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             std::fs::create_dir_all(&sessions_root)?;
             // Media of open documents is served to the webview from here.
             app.asset_protocol_scope().allow_directory(&sessions_root, true)?;
+            embed::allow_dir(&sessions_root);
             let recoverable = document::list_recoverable(&sessions_root);
             let settings_path = config.join("settings.json");
             let forget_ai_settings = settings::has_ai_settings(&settings_path);

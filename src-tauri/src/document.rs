@@ -19,7 +19,7 @@ use crate::model::Deck;
 use crate::ops::{self, History, Op, OpOutcome};
 use crate::package;
 use crate::render::{self, Ctx, Mode, SlideRender};
-use crate::util::{encode_uri_component, now_ms};
+use crate::util::{encode_url_path, now_ms};
 
 const RECOVERY_FILE: &str = "recovery.json";
 const RECOVERY_INTERVAL_MS: u64 = 4000;
@@ -102,8 +102,21 @@ pub fn asset_protocol_base() -> &'static str {
     if cfg!(windows) { "http://asset.localhost/" } else { "asset://localhost/" }
 }
 
+/// URL of a file of an open document. Slashes stay as they are, because
+/// reveal.js re-encodes background URLs (`%2F` would become `%252F`). On
+/// Linux, video and audio come from the local server instead: WebKitGTK's
+/// media player can't read `asset://` (see `embed`).
 pub fn file_url(path: &Path) -> String {
-    format!("{}{}", asset_protocol_base(), encode_uri_component(&path.to_string_lossy()))
+    #[cfg(target_os = "linux")]
+    if let Some(ext) = path.extension().and_then(|e| e.to_str())
+        && matches!(asset_kind(&ext.to_ascii_lowercase()), "video" | "audio")
+        && let Some(url) = crate::embed::file_url(path)
+    {
+        return url;
+    }
+    // Unix paths start with `/`; the asset protocol drops one leading slash.
+    let path = path.to_string_lossy().replace('\\', "/");
+    format!("{}{}", asset_protocol_base(), encode_url_path(&path))
 }
 
 impl Document {
@@ -200,6 +213,7 @@ impl Document {
         let ctx = Ctx {
             mode: Mode::Editor,
             asset_url: &url,
+            youtube_host: None,
         };
         self.deck
             .slides
@@ -245,6 +259,7 @@ impl Document {
                     &Ctx {
                         mode: Mode::Editor,
                         asset_url: &url,
+                        youtube_host: None,
                     },
                 )
             },

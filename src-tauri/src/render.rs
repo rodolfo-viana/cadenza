@@ -28,6 +28,9 @@ pub enum Mode {
 pub struct Ctx<'a> {
     pub mode: Mode,
     pub asset_url: &'a dyn Fn(&str) -> String,
+    /// In-app presentations: the local server that wraps YouTube players
+    /// (see `embed`); exports embed YouTube directly.
+    pub youtube_host: Option<&'a str>,
 }
 
 impl Ctx<'_> {
@@ -660,7 +663,10 @@ fn video_element(v: &VideoContent, el: &Element, ctx: &Ctx) -> Option<String> {
             ));
         }
         let url = if provider == "youtube" {
-            let mut u = format!("https://www.youtube.com/embed/{id}?rel=0&enablejsapi=1");
+            let mut u = match ctx.youtube_host {
+                Some(host) => format!("{host}/youtube.com/embed/{id}?rel=0&enablejsapi=1"),
+                None => format!("https://www.youtube.com/embed/{id}?rel=0&enablejsapi=1"),
+            };
             if v.muted {
                 u.push_str("&mute=1");
             }
@@ -1078,6 +1084,7 @@ mod tests {
         Ctx {
             mode,
             asset_url: &|n: &str| format!("assets/{n}"),
+            youtube_host: None,
         }
     }
 
@@ -1189,6 +1196,24 @@ mod tests {
         assert_eq!(video_embed("https://youtu.be/dQw4w9WgXcQ"), Some(("youtube", "dQw4w9WgXcQ".into())));
         assert_eq!(video_embed("https://vimeo.com/76979871"), Some(("vimeo", "76979871".into())));
         assert_eq!(video_embed("https://example.com/v.mp4"), None);
+    }
+
+    #[test]
+    fn youtube_goes_through_the_local_wrapper_in_the_app() {
+        let deck = deck_with(Content::Video(VideoContent {
+            src: "https://www.youtube.com/watch?v=dQw4w9WgXcQ".into(),
+            ..Default::default()
+        }));
+        let exported = sections(&deck, &ctx(Mode::Show));
+        assert!(exported.contains(r#"data-src="https://www.youtube.com/embed/dQw4w9WgXcQ?"#), "{exported}");
+        let app = sections(
+            &deck,
+            &Ctx {
+                youtube_host: Some("http://127.0.0.1:9"),
+                ..ctx(Mode::Show)
+            },
+        );
+        assert!(app.contains(r#"data-src="http://127.0.0.1:9/youtube.com/embed/dQw4w9WgXcQ?"#), "{app}");
     }
 
     #[test]
