@@ -227,7 +227,7 @@ def main() -> None:
         # About 1/1500 of the country's size, in a few steps (meters).
         interval = next((m for m in (60, 200, 600, 2000, 6000) if km / 1500 * 1000 <= m * 1.8), 6000)
         buckets.setdefault(interval, []).append(country)
-    regions = []
+    records = []
     for interval, countries in sorted(buckets.items()):
         out = tmp / f"states-{interval}.json"
         codes = ",".join(json.dumps(c) for c in countries)
@@ -250,9 +250,35 @@ def main() -> None:
             # 1/40 of the region itself (shown alone in an inset).
             shape = polygons(f["geometry"])
             shape = drop_islets(shape, min((sizes[p["adm0_a3"]] / 150) ** 2, (extent_km(shape) / 40) ** 2))
-            regions.append(encode_region(rid, p["adm0_a3"], name, alts, langs, shape))
+            records.append({"country": p["adm0_a3"], "id": rid, "adm1": p.get("adm1_code"), "name": name, "alts": alts, "langs": langs, "shape": shape})
         print(f"  {interval} m: {len(countries)} countries")
-    write(ROOT / "src-tauri/maps/states.bin", regions)
+    write(ROOT / "src-tauri/maps/states.bin", [encode_region(r["id"], r["country"], r["name"], r["alts"], r["langs"], r["shape"]) for r in unique_codes(records)])
+
+
+def unique_codes(records: list) -> list:
+    """Natural Earth gives some codes to more than one feature. Pieces of one
+    region (same code and name: Cebu, Mbarara) become one region. Otherwise
+    the largest keeps the code and the others take their own Natural Earth
+    code (a city that shares its province's code), so that every region can
+    be named by its code."""
+    groups: dict[tuple, list] = {}
+    for r in records:
+        groups.setdefault((r["country"], r["id"]), []).append(r)
+    out, merged = [], set()
+    for r in records:
+        key = (r["country"], r["id"])
+        group = groups[key]
+        if len(group) > 1 and len({g["name"] for g in group}) == 1:
+            if key in merged:
+                continue
+            merged.add(key)
+            r = {**r, "shape": [poly for g in group for poly in g["shape"]]}
+        elif len(group) > 1:
+            keeper = max(group, key=lambda g: sum(area_km2(poly) for poly in g["shape"]))
+            if r is not keeper:
+                r = {**r, "id": r["adm1"], "alts": [a for a in r["alts"] if clean(a) != r["id"]]}
+        out.append(r)
+    return out
 
 
 if __name__ == "__main__":

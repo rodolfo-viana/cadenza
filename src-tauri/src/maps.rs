@@ -55,11 +55,16 @@ impl Region {
             .map_or(self.name.as_str(), |(_, n)| n.as_str())
     }
 
-    fn names(&self) -> impl Iterator<Item = &str> {
-        std::iter::once(self.id.as_str())
-            .chain(std::iter::once(self.name.as_str()))
-            .chain(self.alts.iter().map(String::as_str))
-            .chain(self.langs.iter().map(|(_, n)| n.as_str()))
+    /// The names a row can use for the region, by rank: its code, its
+    /// English name, other English names and codes, names in other
+    /// languages.
+    fn names(&self, rank: usize) -> Vec<&str> {
+        match rank {
+            0 => vec![self.id.as_str()],
+            1 => vec![self.name.as_str()],
+            2 => self.alts.iter().map(String::as_str).collect(),
+            _ => self.langs.iter().map(|(_, n)| n.as_str()).collect(),
+        }
     }
 }
 
@@ -353,15 +358,28 @@ fn view(map: &str) -> View<'static> {
     }
 }
 
+/// Which region each name or code (folded) finds. A name goes to the
+/// region with the higher-ranked name: Saint Martin's Dutch name
+/// "Sint-Maarten" never takes Sint Maarten's English name.
+fn name_index(regions: &[&Region]) -> HashMap<String, usize> {
+    let mut index: HashMap<String, usize> = HashMap::new();
+    for rank in 0..4 {
+        for (i, r) in regions.iter().enumerate() {
+            for n in r.names(rank) {
+                index.entry(fold(n)).or_insert(i);
+            }
+        }
+    }
+    index
+}
+
 /// The region each row (category label) names, by any of its names or
 /// codes, if any.
 fn row_regions(regions: &[&Region], labels: &[String]) -> Vec<Option<usize>> {
-    let mut index: HashMap<String, usize> = HashMap::new();
-    for (i, r) in regions.iter().enumerate() {
-        for n in r.names() {
-            index.entry(fold(n)).or_insert(i);
-        }
-    }
+    rows_in(&name_index(regions), labels)
+}
+
+fn rows_in(index: &HashMap<String, usize>, labels: &[String]) -> Vec<Option<usize>> {
     labels.iter().map(|l| index.get(&fold(l)).copied().filter(|_| !l.trim().is_empty())).collect()
 }
 
@@ -390,12 +408,25 @@ pub fn countries(language: &str) -> Vec<(String, String)> {
     out
 }
 
+/// A region of a map, for the chart editor.
+#[derive(Serialize, Debug)]
+pub struct MapRegion {
+    pub id: String,
+    /// The name in the editor's language.
+    pub name: String,
+    /// Whether a row names the region.
+    pub named: bool,
+    /// What a new row for the region says: its name, or its code where the
+    /// name finds another region first ("Sanaa" the city and the province).
+    pub label: String,
+}
+
 /// What the chart editor shows about a map's rows.
 #[derive(Serialize, Debug)]
 pub struct MapRows {
-    /// The map's regions as (id, name in the language, whether a row names
-    /// it), sorted by name.
-    pub regions: Vec<(String, String, bool)>,
+    /// The map's regions, sorted by name. Areas without a name (a few
+    /// islands) are drawn but have no row.
+    pub regions: Vec<MapRegion>,
     /// Labels that name no region.
     pub unmatched: Vec<String>,
     /// Labels naming a region that an earlier row names already ("BR-AC"
@@ -406,15 +437,26 @@ pub struct MapRows {
 /// The regions of `map` and how the rows (labels) name them.
 pub fn regions(map: &str, language: &str, labels: &[String]) -> MapRows {
     let v = view(map);
-    let rows = row_regions(&v.regions, labels);
+    let index = name_index(&v.regions);
+    let rows = rows_in(&index, labels);
     let named: HashSet<usize> = rows.iter().flatten().copied().collect();
-    let mut regions: Vec<(String, String, bool)> = v
+    let mut regions: Vec<MapRegion> = v
         .regions
         .iter()
         .enumerate()
-        .map(|(i, r)| (r.id.clone(), r.name_in(language).to_string(), named.contains(&i)))
+        .filter(|(_, r)| !r.name.trim().is_empty())
+        .map(|(i, r)| {
+            let name = r.name_in(language);
+            let own = index.get(&fold(name)) == Some(&i);
+            MapRegion {
+                id: r.id.clone(),
+                name: name.to_string(),
+                named: named.contains(&i),
+                label: if own { name } else { &r.id }.to_string(),
+            }
+        })
         .collect();
-    regions.sort_by_cached_key(|(_, n, _)| fold(n));
+    regions.sort_by_cached_key(|r| fold(&r.name));
     let (mut unmatched, mut repeated, mut seen) = (Vec::new(), Vec::new(), HashSet::new());
     for (label, region) in labels.iter().zip(&rows) {
         match region {
@@ -690,7 +732,7 @@ mod tests {
         let found = regions("BRA", "pt-BR", &labels);
         assert_eq!(found.unmatched, ["Atlantis"]);
         assert!(found.repeated.is_empty());
-        assert_eq!(found.regions.iter().filter(|r| r.2).count(), 3);
+        assert_eq!(found.regions.iter().filter(|r| r.named).count(), 3);
         let world = view("world");
         let rows = match_rows(&world.regions, &["Allemagne".into(), "DEU".into(), "Deutschland".into(), "日本".into()]);
         assert_eq!(rows.len(), 2, "French and German names find Germany, Japanese finds Japan");
@@ -704,9 +746,49 @@ mod tests {
         let found = regions("BRA", "en", &labels);
         assert_eq!(found.repeated, ["Acre"]);
         assert!(found.unmatched.is_empty());
-        let named: Vec<&str> = found.regions.iter().filter(|r| r.2).map(|r| r.0.as_str()).collect();
+        let named: Vec<&str> = found.regions.iter().filter(|r| r.named).map(|r| r.id.as_str()).collect();
         assert_eq!(named, ["BR-AC", "BR-BA"]);
         assert_eq!(found.regions.len(), 27);
+        // Sint Maarten's English name finds it, not Saint Martin's Dutch name.
+        let world = view("world");
+        let rows = row_regions(&world.regions, &["Sint Maarten".into(), "Saint Martin".into()]);
+        let ids: Vec<&str> = rows.iter().map(|r| world.regions[r.unwrap()].id.as_str()).collect();
+        assert_eq!(ids, ["SXM", "MAF"]);
+    }
+
+    #[test]
+    fn every_region_has_a_code_of_its_own() {
+        let a = atlas();
+        let mut seen = HashSet::new();
+        for r in a.countries.iter().chain(&a.states) {
+            assert!(seen.insert((r.parent.as_str(), r.id.as_str())), "{} {} twice", r.parent, r.id);
+        }
+        // Pieces of one region are one region; a city keeps a code of its own.
+        let cebu = a.states.iter().filter(|r| r.parent == "PHL" && r.name == "Cebu").count();
+        assert_eq!(cebu, 1);
+    }
+
+    #[test]
+    fn adding_all_regions_twice_adds_nothing() {
+        // On every map and in every language, the rows Add All Regions
+        // writes name their own regions: a second click finds none missing.
+        let a = atlas();
+        let mut maps: Vec<String> = vec!["world".into()];
+        maps.extend(CONTINENTS.iter().map(|c| c.0.to_string()));
+        maps.extend(a.countries.iter().filter(|c| a.states.iter().any(|s| s.parent == c.id)).map(|c| c.id.clone()));
+        for map in &maps {
+            for lang in ["en", "ar", "bn", "de", "es", "fr", "hi", "it", "ja", "nl", "pl", "pt-BR", "ru", "tr", "zh-CN"] {
+                let labels: Vec<String> = regions(map, lang, &[]).regions.into_iter().map(|r| r.label).collect();
+                let found = regions(map, lang, &labels);
+                let missing: Vec<&str> = found.regions.iter().filter(|r| !r.named).map(|r| r.id.as_str()).collect();
+                assert!(
+                    missing.is_empty() && found.repeated.is_empty() && found.unmatched.is_empty(),
+                    "{map} {lang}: missing {missing:?}, repeated {:?}, unmatched {:?}",
+                    found.repeated,
+                    found.unmatched
+                );
+            }
+        }
     }
 
     #[test]

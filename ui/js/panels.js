@@ -786,7 +786,7 @@ export function ChartPanel({ els }) {
           // The sample is replaced; rows someone wrote are kept, and so are
           // the regions they name (by a name, a code or another language).
           const fresh = isSample(ch, 'map');
-          const add = regions.filter(([, , named]) => fresh || !named).map(([, name]) => name);
+          const add = regions.filter((r) => fresh || !r.named).map((r) => r.label);
           const labels = [...(fresh ? [] : ch.labels), ...add];
           const first = ch.series[0] || { name: t('Series {n}', { n: 1 }), color: '' };
           const values = [...(fresh ? [] : first.values.slice(0, ch.labels.length)), ...add.map(() => 0)];
@@ -794,7 +794,7 @@ export function ChartPanel({ els }) {
         }}
       />
     </div>`}
-    ${isMap && html`<datalist id="cz-map-regions">${regions.map(([id, name]) => html`<option value=${name}>${id}</option>`)}</datalist>`}
+    ${isMap && html`<datalist id="cz-map-regions">${regions.map((r) => html`<option value=${r.name}>${r.id}</option>`)}</datalist>`}
     ${linked &&
     html`<div class="datagrid" ref=${ref}>
       <table>
