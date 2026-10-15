@@ -457,17 +457,13 @@ impl Element {
     }
 
     /// Build steps a chart takes after its build-in when it builds by
-    /// series: one per series, or one per slice of a pie or donut.
+    /// series (see `chart::series_steps`).
     pub fn series_steps(&self) -> u32 {
         if self.build.effect.is_empty() || self.build.delivery != "series" {
             return 0;
         }
         match &self.content {
-            Content::Chart(c) if matches!(c.chart.as_str(), "pie" | "donut") => c
-                .series
-                .first()
-                .map_or(0, |s| s.values.iter().filter(|v| v.is_finite() && **v > 0.0).count() as u32),
-            Content::Chart(c) => c.series.len() as u32,
+            Content::Chart(c) => crate::chart::series_steps(c),
             _ => 0,
         }
     }
@@ -929,7 +925,7 @@ impl Default for TableContent {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ChartContent {
-    /// "bar", "column", "line", "area", "pie" or "donut".
+    /// One of `chart::CHART_TYPES`, e.g. "column", "stacked-bar", "pie".
     pub chart: String,
     pub labels: Vec<String>,
     pub series: Vec<Series>,
@@ -939,7 +935,10 @@ pub struct ChartContent {
     pub font_size: f64,
     /// Empty = theme text color.
     pub color: String,
+    /// Older files: stacked column, bar or area (now chart types of their own).
     pub stacked: bool,
+    /// Heatmaps: the color of the highest value. Empty = theme color 1.
+    pub scale_color: String,
 }
 
 impl Default for ChartContent {
@@ -965,6 +964,7 @@ impl Default for ChartContent {
             font_size: 20.0,
             color: String::new(),
             stacked: false,
+            scale_color: String::new(),
         }
     }
 }

@@ -173,3 +173,15 @@ file-plus-2
 list-plus
 pause
 rotate-ccw
+chart-column-stacked
+chart-bar-stacked
+chart-area
+waves
+layout-dashboard
+landmark
+chart-scatter
+grid-3x3
+chart-candlestick
+split
+chart-network
+earth

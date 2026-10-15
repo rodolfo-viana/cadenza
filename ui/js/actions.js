@@ -23,6 +23,7 @@ import {
   deckTitle,
 } from './store.js';
 import { t, N_ } from './i18n.js';
+import { chartSteps } from './charts.js';
 import { fileExt, fileName, textToHtml, bounds, unionBounds } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -465,9 +466,7 @@ export function goToNextSlideWithSelection(delta) {
 /** Steps a chart takes after its build-in when it builds by series (same rule as `Element::series_steps`). */
 export function seriesSteps(el) {
   if (!el.build.effect || el.build.delivery !== 'series' || el.content.kind !== 'chart') return 0;
-  const c = el.content;
-  if (c.chart === 'pie' || c.chart === 'donut') return (c.series[0]?.values || []).filter((v) => Number.isFinite(v) && v > 0).length;
-  return c.series.length;
+  return chartSteps(el.content);
 }
 
 export const hasPath = (el) => (el.build.path?.length || 0) >= 2;

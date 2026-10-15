@@ -9,6 +9,7 @@ import * as A from './actions.js';
 import { ShapeGlyph } from './panels.js';
 import { cls, fileName } from './util.js';
 import { t } from './i18n.js';
+import { CHART_ICONS, chartSample } from './charts.js';
 
 /** A menu item for a command, with its (English) label translated. */
 // Menu entry for a command (item() translates the command's label).
@@ -90,8 +91,7 @@ function textMenu() {
 }
 
 function chartMenu() {
-  const icons = { column: 'chart-column', bar: 'chart-bar', line: 'chart-line', area: 'chart-line', pie: 'chart-pie', donut: 'chart-pie' };
-  return state.info.charts.map((c) => ({ label: t(c.name), icon: icons[c.id], run: () => A.insert('chart', c.id) }));
+  return state.info.charts.map((c) => ({ label: t(c.name), icon: CHART_ICONS[c.id], run: () => A.insert('chart', c.id, { content: chartSample(c.id) }) }));
 }
 
 function zoomMenu() {

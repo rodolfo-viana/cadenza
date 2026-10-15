@@ -11,29 +11,85 @@ use crate::util::{css_value, esc, num};
 
 pub const CHART_TYPES: &[(&str, &str)] = &[
     ("column", "Column"),
+    ("stacked-column", "Stacked column"),
     ("bar", "Bar"),
+    ("stacked-bar", "Stacked bar"),
     ("line", "Line"),
     ("area", "Area"),
+    ("stacked-area", "Stacked area"),
+    ("streamgraph", "Streamgraph"),
     ("pie", "Pie"),
     ("donut", "Donut"),
+    ("treemap", "Treemap"),
+    ("parliament", "Parliament"),
+    ("scatter", "Scatterplot"),
+    ("heatmap", "Heatmap"),
+    ("candlestick", "Candlestick"),
 ];
+
+/// Column, bar and area charts: the base kind and whether it is stacked
+/// (older files stack with a flag instead of a chart type).
+fn axis_kind(chart: &ChartContent) -> (&str, bool) {
+    match chart.chart.as_str() {
+        "stacked-column" => ("column", true),
+        "stacked-bar" => ("bar", true),
+        "stacked-area" => ("area", true),
+        k @ ("column" | "bar" | "area") => (k, chart.stacked),
+        k => (k, false),
+    }
+}
+
+fn positive_count(chart: &ChartContent) -> u32 {
+    chart
+        .series
+        .first()
+        .map_or(0, |s| s.values.iter().filter(|v| v.is_finite() && **v > 0.0).count() as u32)
+}
+
+/// Steps a chart takes when it builds by series: one per series, or per
+/// slice (pie, donut), party (parliament), rectangle (treemap with one
+/// series), point group (scatterplot) or column (heatmap).
+pub fn series_steps(chart: &ChartContent) -> u32 {
+    let n = chart.series.len() as u32;
+    match chart.chart.as_str() {
+        "pie" | "donut" | "parliament" => positive_count(chart),
+        "treemap" if n == 1 => positive_count(chart),
+        "scatter" => n.saturating_sub(1).max(n.min(1)),
+        "candlestick" => 0,
+        _ => n,
+    }
+}
 
 fn series_color(chart: &ChartContent, i: usize) -> String {
     match chart.series.get(i).map(|s| css_value(&s.color)).unwrap_or("") {
-        "" => format!("var(--cz-chart-{}, #6366f1)", i % 6 + 1),
+        "" => slice_color(i),
         c => c.to_string(),
     }
 }
 
+/// Palette color `i`: the theme's six chart colors, then lighter and
+/// darker versions of them, so that up to 18 parts look different.
 fn slice_color(i: usize) -> String {
-    format!("var(--cz-chart-{}, #6366f1)", i % 6 + 1)
+    let base = format!("var(--cz-chart-{}, #6366f1)", i % 6 + 1);
+    match (i / 6) % 3 {
+        0 => base,
+        1 => format!("color-mix(in srgb, {base} 55%, #fff)"),
+        _ => format!("color-mix(in srgb, {base} 60%, #000)"),
+    }
 }
 
-/// Picks "nice" axis bounds and step for a value range.
+/// Picks "nice" axis bounds and step for a value range, from zero.
 pub fn nice_scale(min: f64, max: f64, ticks: usize) -> (f64, f64, f64) {
-    let (mut lo, mut hi) = (min.min(0.0), max.max(0.0));
+    nice_range(min.min(0.0), max.max(0.0), ticks)
+}
+
+/// Picks "nice" axis bounds and step around a value range.
+pub fn nice_range(min: f64, max: f64, ticks: usize) -> (f64, f64, f64) {
+    let (mut lo, mut hi) = (min, max);
     if (hi - lo).abs() < f64::EPSILON {
-        hi = lo + 1.0;
+        let pad = if lo == 0.0 { 1.0 } else { lo.abs() * 0.1 };
+        lo -= if lo == 0.0 { 0.0 } else { pad };
+        hi += pad;
     }
     let raw = (hi - lo) / ticks.max(1) as f64;
     let mag = 10f64.powf(raw.log10().floor());
@@ -98,24 +154,61 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
         h = num(h),
         f = num(f)
     );
-    let pie = matches!(chart.chart.as_str(), "pie" | "donut");
-    let legend_items: Vec<(String, String)> = if pie {
-        chart.labels.iter().enumerate().map(|(i, l)| (l.clone(), slice_color(i))).collect()
-    } else {
-        chart.series.iter().enumerate().map(|(i, s)| (s.name.clone(), series_color(chart, i))).collect()
+    let kind = chart.chart.as_str();
+    let by_label = matches!(kind, "pie" | "donut" | "parliament") || (kind == "treemap" && chart.series.len() <= 1);
+    let legend_items: Vec<(String, String)> = match kind {
+        "heatmap" | "candlestick" => Vec::new(),
+        "parliament" if chart.show_values => {
+            let seats = parliament_seats(chart);
+            chart
+                .labels
+                .iter()
+                .enumerate()
+                .map(|(i, l)| (format!("{l} ({})", seats.get(i).unwrap_or(&0)), slice_color(i)))
+                .collect()
+        }
+        _ if by_label => chart.labels.iter().enumerate().map(|(i, l)| (l.clone(), slice_color(i))).collect(),
+        // A scatterplot's first series holds the X values.
+        "scatter" if chart.series.len() > 1 => chart
+            .series
+            .iter()
+            .enumerate()
+            .skip(1)
+            .map(|(i, s)| (s.name.clone(), series_color(chart, i)))
+            .collect(),
+        _ => chart.series.iter().enumerate().map(|(i, s)| (s.name.clone(), series_color(chart, i))).collect(),
     };
-    let legend_h = if chart.show_legend && !legend_items.is_empty() { f * 2.0 } else { 0.0 };
-    let plot_h = h - legend_h;
-    if pie {
-        pie_chart(&mut svg, chart, w, plot_h, f, steps);
+    let scale_legend = kind == "heatmap" && value_range(chart).is_some();
+    let legend_h = if chart.show_legend && (!legend_items.is_empty() || scale_legend) {
+        f * 2.0
     } else {
-        axis_chart(&mut svg, chart, w, plot_h, f, steps);
+        0.0
+    };
+    let plot_h = h - legend_h;
+    match kind {
+        "pie" | "donut" => pie_chart(&mut svg, chart, w, plot_h, f, steps),
+        "parliament" => parliament_chart(&mut svg, chart, w, plot_h, f, steps),
+        "treemap" => treemap_chart(&mut svg, chart, w, plot_h, f, steps),
+        "scatter" => scatter_chart(&mut svg, chart, w, plot_h, f, steps),
+        "heatmap" => heatmap_chart(&mut svg, chart, w, plot_h, f, steps),
+        "streamgraph" => stream_chart(&mut svg, chart, w, plot_h, f, steps),
+        "candlestick" => candle_chart(&mut svg, chart, w, plot_h, f),
+        _ => axis_chart(&mut svg, chart, w, plot_h, f, steps),
     }
     if legend_h > 0.0 {
-        legend(&mut svg, &legend_items, w, h - legend_h * 0.5, f);
+        if scale_legend {
+            heat_legend(&mut svg, chart, w, h - legend_h * 0.5, f);
+        } else {
+            legend(&mut svg, &legend_items, w, h - legend_h * 0.5, f);
+        }
     }
     svg.push_str("</svg>");
     svg
+}
+
+/// Rows of data: category labels, or the longest series.
+fn rows(chart: &ChartContent) -> usize {
+    chart.labels.len().max(chart.series.iter().map(|s| s.values.len()).max().unwrap_or(0))
 }
 
 fn legend(svg: &mut String, items: &[(String, String)], w: f64, cy: f64, f: f64) {
@@ -143,13 +236,13 @@ fn legend(svg: &mut String, items: &[(String, String)], w: f64, cy: f64, f: f64)
 }
 
 fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
-    let horizontal = chart.chart == "bar";
-    let n = chart.labels.len().max(chart.series.iter().map(|s| s.values.len()).max().unwrap_or(0));
+    let (kind, stacked) = axis_kind(chart);
+    let horizontal = kind == "bar";
+    let n = rows(chart);
     if n == 0 || chart.series.is_empty() {
         return;
     }
     let value = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite()).unwrap_or(0.0);
-    let stacked = chart.stacked && matches!(chart.chart.as_str(), "column" | "bar" | "area");
     let (mut vmin, mut vmax) = (0.0f64, 0.0f64);
     for i in 0..n {
         if stacked {
@@ -271,9 +364,9 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
     }
 
     let ns = chart.series.len();
-    match chart.chart.as_str() {
+    match kind {
         "line" | "area" => {
-            let area = chart.chart == "area";
+            let area = kind == "area";
             let mut base = vec![0.0f64; n];
             for s in 0..ns {
                 open_step(svg, steps, s as u32);
@@ -491,6 +584,758 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
     }
 }
 
+// ---------------------------------------------------------------------------
+// Shared pieces for the chart types below
+// ---------------------------------------------------------------------------
+
+/// Plot area of a chart with axes.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Rect {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+/// Finite values of every series, as (min, max).
+fn value_range(chart: &ChartContent) -> Option<(f64, f64)> {
+    let n = rows(chart);
+    chart
+        .series
+        .iter()
+        .flat_map(|s| s.values.iter().take(n.max(1)))
+        .filter(|v| v.is_finite())
+        .fold(None, |r, &v| Some(r.map_or((v, v), |(lo, hi): (f64, f64)| (lo.min(v), hi.max(v)))))
+}
+
+/// Every how many category labels to print so that they do not overlap.
+fn label_stride(chart: &ChartContent, n: usize, band: f64, f: f64) -> usize {
+    let longest = chart.labels.iter().map(|l| l.chars().count()).max().unwrap_or(1).max(1) as f64;
+    let need = longest * f * 0.6 + f * 0.6;
+    ((need / band.max(1.0)).ceil() as usize).clamp(1, n.max(1))
+}
+
+/// Value grid and labels along the vertical axis of `plot`.
+fn y_axis(svg: &mut String, chart: &ChartContent, plot: Rect, (lo, hi, step): (f64, f64, f64), f: f64) {
+    let ticks = ((hi - lo) / step).round() as i64;
+    for k in 0..=ticks {
+        let v = lo + k as f64 * step;
+        let y = plot.y + plot.h - (v - lo) / (hi - lo) * plot.h;
+        if chart.show_grid {
+            let _ = write!(
+                svg,
+                r#"<line x1="{}" y1="{y}" x2="{}" y2="{y}" class="cz-grid" stroke="currentColor" stroke-opacity="0.18"/>"#,
+                num(plot.x),
+                num(plot.x + plot.w),
+                y = num(y)
+            );
+        }
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central" opacity="0.75">{}</text>"#,
+            num(plot.x - f * 0.5),
+            num(y),
+            fmt_value(v)
+        );
+    }
+}
+
+/// Room for the labels of a value axis.
+fn y_label_room(range: (f64, f64, f64), f: f64) -> f64 {
+    let (lo, hi, step) = range;
+    let longest = (0..=((hi - lo) / step).round() as i64)
+        .map(|k| fmt_value(lo + k as f64 * step).len())
+        .max()
+        .unwrap_or(1) as f64;
+    longest * f * 0.6 + f * 0.8
+}
+
+/// Category labels under `plot`, one per band (thinned out when crowded).
+fn x_categories(svg: &mut String, chart: &ChartContent, plot: Rect, n: usize, x_of: impl Fn(usize) -> f64, band: f64, f: f64) {
+    let stride = label_stride(chart, n, band, f);
+    for i in (0..n).step_by(stride) {
+        let label = chart.labels.get(i).map(String::as_str).unwrap_or("");
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" text-anchor="middle">{}</text>"#,
+            num(x_of(i)),
+            num(plot.y + plot.h + f * 1.3),
+            esc(label)
+        );
+    }
+}
+
+/// Bézier segments of a smooth curve through points with increasing x that
+/// never overshoots them (monotone cubic interpolation, like d3's
+/// curveMonotoneX): (first control, second control, end) per segment.
+type Point = (f64, f64);
+fn monotone_segments(p: &[Point]) -> Vec<(Point, Point, Point)> {
+    let n = p.len();
+    if n < 2 {
+        return Vec::new();
+    }
+    let h: Vec<f64> = (0..n - 1).map(|i| p[i + 1].0 - p[i].0).collect();
+    let s: Vec<f64> = (0..n - 1).map(|i| if h[i] != 0.0 { (p[i + 1].1 - p[i].1) / h[i] } else { 0.0 }).collect();
+    let sign = |x: f64| if x < 0.0 { -1.0 } else { 1.0 };
+    let mut t = vec![0.0; n];
+    for i in 1..n - 1 {
+        let q = (s[i - 1] * h[i] + s[i] * h[i - 1]) / (h[i - 1] + h[i]);
+        let v = (sign(s[i - 1]) + sign(s[i])) * s[i - 1].abs().min(s[i].abs()).min(0.5 * q.abs());
+        t[i] = if v.is_finite() { v } else { 0.0 };
+    }
+    if n == 2 {
+        t[0] = s[0];
+        t[1] = s[0];
+    } else {
+        t[0] = (3.0 * s[0] - t[1]) / 2.0;
+        t[n - 1] = (3.0 * s[n - 2] - t[n - 2]) / 2.0;
+    }
+    (0..n - 1)
+        .map(|i| {
+            let dx = h[i] / 3.0;
+            ((p[i].0 + dx, p[i].1 + dx * t[i]), (p[i + 1].0 - dx, p[i + 1].1 - dx * t[i + 1]), p[i + 1])
+        })
+        .collect()
+}
+
+fn curve_to(out: &mut String, (c1, c2, end): (Point, Point, Point)) {
+    let _ = write!(out, "C{} {} {} {} {} {}", num(c1.0), num(c1.1), num(c2.0), num(c2.1), num(end.0), num(end.1));
+}
+
+// ---------------------------------------------------------------------------
+// Streamgraph: stacked series flowing around a center line
+// ---------------------------------------------------------------------------
+
+fn stream_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
+    let n = rows(chart);
+    let m = chart.series.len();
+    if n == 0 || m == 0 {
+        return;
+    }
+    let v = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite()).unwrap_or(0.0).max(0.0);
+    let totals: Vec<f64> = (0..n).map(|i| (0..m).map(|s| v(s, i)).sum()).collect();
+    let top = totals.iter().cloned().fold(0.0, f64::max);
+    if top <= 0.0 {
+        return;
+    }
+    // Room for half of the first and last labels, centered on the edges.
+    let side = (chart.labels.iter().map(|l| l.chars().count()).max().unwrap_or(0) as f64 * f * 0.3).max(f * 0.8);
+    let plot = Rect {
+        x: side,
+        y: f * 0.5,
+        w: (w - side * 2.0).max(10.0),
+        h: (h - f * 2.3).max(10.0),
+    };
+    // One category still spans the width.
+    let (cols, xs): (Vec<usize>, Vec<f64>) = if n == 1 {
+        (vec![0, 0], vec![plot.x, plot.x + plot.w])
+    } else {
+        ((0..n).collect(), (0..n).map(|i| plot.x + i as f64 * plot.w / (n - 1) as f64).collect())
+    };
+    let scale = plot.h / top;
+    let mid = plot.y + plot.h / 2.0;
+    if chart.show_grid {
+        for x in &xs {
+            let _ = write!(
+                svg,
+                r#"<line x1="{x}" y1="{}" x2="{x}" y2="{}" class="cz-grid" stroke="currentColor" stroke-opacity="0.18"/>"#,
+                num(plot.y),
+                num(plot.y + plot.h),
+                x = num(*x)
+            );
+        }
+    }
+    let mut cum = vec![0.0f64; n];
+    for s in 0..m {
+        open_step(svg, steps, s as u32);
+        let y = |val: f64| mid - val * scale;
+        let lower: Vec<Point> = cols.iter().zip(&xs).map(|(&i, &x)| (x, y(cum[i] - totals[i] / 2.0))).collect();
+        for (i, c) in cum.iter_mut().enumerate() {
+            *c += v(s, i);
+        }
+        let upper: Vec<Point> = cols.iter().zip(&xs).map(|(&i, &x)| (x, y(cum[i] - totals[i] / 2.0))).collect();
+        let mut d = format!("M{} {}", num(upper[0].0), num(upper[0].1));
+        for seg in monotone_segments(&upper) {
+            curve_to(&mut d, seg);
+        }
+        let last = lower[lower.len() - 1];
+        let _ = write!(d, "L{} {}", num(last.0), num(last.1));
+        // The lower edge backwards: same curve, controls swapped.
+        let segs = monotone_segments(&lower);
+        for (k, (c1, c2, _)) in segs.iter().enumerate().rev() {
+            curve_to(&mut d, (*c2, *c1, lower[k]));
+        }
+        let _ = write!(
+            svg,
+            r#"<path d="{d}Z" style="fill:{}" fill-opacity="0.88" stroke="rgba(0,0,0,0.12)" stroke-width="1"/>"#,
+            esc(&series_color(chart, s))
+        );
+        close_step(svg, steps);
+    }
+    let band = if n > 1 { plot.w / (n - 1) as f64 } else { plot.w };
+    x_categories(svg, chart, plot, n, |i| if n == 1 { plot.x + plot.w / 2.0 } else { xs[i] }, band, f);
+}
+
+// ---------------------------------------------------------------------------
+// Scatterplot: the first series holds X, each other series is a group (Y)
+// ---------------------------------------------------------------------------
+
+fn scatter_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
+    let ns = chart.series.len();
+    let n = rows(chart);
+    if ns == 0 || n == 0 {
+        return;
+    }
+    let get = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite());
+    // With a single series, X is the row number.
+    let x_of = |i: usize| if ns > 1 { get(0, i) } else { Some(i as f64 + 1.0) };
+    let groups: Vec<usize> = if ns > 1 { (1..ns).collect() } else { vec![0] };
+    let points: Vec<(usize, usize, f64, f64)> = groups
+        .iter()
+        .flat_map(|&g| (0..n).filter_map(move |i| Some((g, i, x_of(i)?, get(g, i)?))))
+        .collect();
+    if points.is_empty() {
+        return;
+    }
+    let (x0, x1) = points.iter().fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p.2), b.max(p.2)));
+    let (y0, y1) = points.iter().fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p.3), b.max(p.3)));
+    let xr = nice_range(x0, x1, 5);
+    let yr = nice_range(y0, y1, 5);
+    let left = y_label_room(yr, f);
+    let plot = Rect {
+        x: left,
+        y: f * 0.9,
+        w: (w - left - f * 1.4).max(10.0),
+        h: (h - f * 2.7).max(10.0),
+    };
+    y_axis(svg, chart, plot, yr, f);
+    let px = |x: f64| plot.x + (x - xr.0) / (xr.1 - xr.0) * plot.w;
+    let py = |y: f64| plot.y + plot.h - (y - yr.0) / (yr.1 - yr.0) * plot.h;
+    let ticks = ((xr.1 - xr.0) / xr.2).round() as i64;
+    for k in 0..=ticks {
+        let x = px(xr.0 + k as f64 * xr.2);
+        if chart.show_grid {
+            let _ = write!(
+                svg,
+                r#"<line x1="{x}" y1="{}" x2="{x}" y2="{}" class="cz-grid" stroke="currentColor" stroke-opacity="0.18"/>"#,
+                num(plot.y),
+                num(plot.y + plot.h),
+                x = num(x)
+            );
+        }
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" text-anchor="middle" opacity="0.75">{}</text>"#,
+            num(x),
+            num(plot.y + plot.h + f * 1.3),
+            fmt_value(xr.0 + k as f64 * xr.2)
+        );
+    }
+    let _ = write!(
+        svg,
+        r#"<path d="M{} {}V{}H{}" fill="none" stroke="currentColor" stroke-opacity="0.5"/>"#,
+        num(plot.x),
+        num(plot.y),
+        num(plot.y + plot.h),
+        num(plot.x + plot.w)
+    );
+    let r = (f * 0.32).max(3.0);
+    for (k, &g) in groups.iter().enumerate() {
+        open_step(svg, steps, k as u32);
+        let color = series_color(chart, g);
+        for &(_, i, x, y) in points.iter().filter(|p| p.0 == g) {
+            let _ = write!(
+                svg,
+                r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}" fill-opacity="0.85"/>"#,
+                num(px(x)),
+                num(py(y)),
+                num(r),
+                esc(&color)
+            );
+            if chart.show_values
+                && let Some(label) = chart.labels.get(i).filter(|l| !l.is_empty())
+            {
+                let _ = write!(
+                    svg,
+                    r#"<text x="{}" y="{}" dominant-baseline="central" font-size="{}">{}</text>"#,
+                    num(px(x) + r + f * 0.2),
+                    num(py(y)),
+                    num(f * 0.7),
+                    esc(label)
+                );
+            }
+        }
+        close_step(svg, steps);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Heatmap: rows are the categories, columns the series
+// ---------------------------------------------------------------------------
+
+fn scale_color(chart: &ChartContent) -> String {
+    match css_value(&chart.scale_color) {
+        "" => "var(--cz-chart-1, #6366f1)".into(),
+        c => c.to_string(),
+    }
+}
+
+/// How strongly a value is colored: 0.1 (lowest) to 1 (highest).
+fn heat(v: f64, (lo, hi): (f64, f64)) -> f64 {
+    let t = if hi > lo { (v - lo) / (hi - lo) } else { 1.0 };
+    0.1 + 0.9 * t.clamp(0.0, 1.0)
+}
+
+fn heatmap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
+    let n = rows(chart);
+    let m = chart.series.len();
+    let Some(range) = value_range(chart) else { return };
+    if n == 0 || m == 0 {
+        return;
+    }
+    let longest = chart.labels.iter().map(|l| l.chars().count()).max().unwrap_or(0) as f64;
+    let left = if longest > 0.0 {
+        (longest * f * 0.58 + f * 0.6).min(w * 0.35)
+    } else {
+        f * 0.3
+    };
+    let plot = Rect {
+        x: left,
+        y: f * 1.6,
+        w: (w - left - f * 0.3).max(10.0),
+        h: (h - f * 1.9).max(10.0),
+    };
+    let (cw, ch) = (plot.w / m as f64, plot.h / n as f64);
+    let gap = (cw.min(ch) * 0.06).min(3.0);
+    let color = scale_color(chart);
+    for i in 0..n {
+        let label = chart.labels.get(i).map(String::as_str).unwrap_or("");
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central">{}</text>"#,
+            num(plot.x - f * 0.4),
+            num(plot.y + (i as f64 + 0.5) * ch),
+            esc(label)
+        );
+    }
+    for (c, s) in chart.series.iter().enumerate() {
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" text-anchor="middle">{}</text>"#,
+            num(plot.x + (c as f64 + 0.5) * cw),
+            num(plot.y - f * 0.5),
+            esc(&s.name)
+        );
+    }
+    for (c, s) in chart.series.iter().enumerate() {
+        open_step(svg, steps, c as u32);
+        for i in 0..n {
+            let Some(v) = s.values.get(i).copied().filter(|v| v.is_finite()) else {
+                continue;
+            };
+            let o = heat(v, range);
+            let (x, y) = (plot.x + c as f64 * cw + gap / 2.0, plot.y + i as f64 * ch + gap / 2.0);
+            let _ = write!(
+                svg,
+                r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" style="fill:{}" fill-opacity="{}"/>"#,
+                num(x),
+                num(y),
+                num((cw - gap).max(0.5)),
+                num((ch - gap).max(0.5)),
+                num((cw.min(ch) * 0.08).min(4.0)),
+                esc(&color),
+                num(o)
+            );
+            if chart.show_values {
+                let _ = write!(
+                    svg,
+                    r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-size="{}"{}>{}</text>"#,
+                    num(x + (cw - gap) / 2.0),
+                    num(y + (ch - gap) / 2.0),
+                    num(f * 0.8),
+                    if o > 0.55 { r#" style="fill:#fff""# } else { "" },
+                    fmt_value(v)
+                );
+            }
+        }
+        close_step(svg, steps);
+    }
+}
+
+/// The heatmap's color scale: lowest value, steps of color, highest value.
+fn heat_legend(svg: &mut String, chart: &ChartContent, w: f64, cy: f64, f: f64) {
+    let Some((lo, hi)) = value_range(chart) else { return };
+    let (a, b) = (fmt_value(lo), fmt_value(hi));
+    let cell = f * 0.9;
+    let total = (a.len() + b.len()) as f64 * f * 0.6 + f * 1.2 + cell * 10.0;
+    let mut x = ((w - total) / 2.0).max(0.0);
+    let _ = write!(
+        svg,
+        r#"<text x="{}" y="{}" dominant-baseline="central" opacity="0.75">{}</text>"#,
+        num(x),
+        num(cy),
+        a
+    );
+    x += a.len() as f64 * f * 0.6 + f * 0.6;
+    let color = scale_color(chart);
+    for k in 0..10 {
+        let _ = write!(
+            svg,
+            r#"<rect x="{}" y="{}" width="{}" height="{}" style="fill:{}" fill-opacity="{}"/>"#,
+            num(x + k as f64 * cell),
+            num(cy - f * 0.4),
+            num(cell + 0.5),
+            num(f * 0.8),
+            esc(&color),
+            num(0.1 + 0.9 * k as f64 / 9.0)
+        );
+    }
+    let _ = write!(
+        svg,
+        r#"<text x="{}" y="{}" dominant-baseline="central" opacity="0.75">{}</text>"#,
+        num(x + cell * 10.0 + f * 0.6),
+        num(cy),
+        b
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Treemap: one rectangle per row; with several series, one group per series
+// ---------------------------------------------------------------------------
+
+/// Squarified treemap layout (Bruls, Huizing and van Wijk): one rectangle
+/// per value, in the order given; zero and negative values get none.
+fn squarify(values: &[f64], area: Rect) -> Vec<Option<Rect>> {
+    let mut out = vec![None; values.len()];
+    let mut order: Vec<usize> = (0..values.len()).filter(|&i| values[i].is_finite() && values[i] > 0.0).collect();
+    let total: f64 = order.iter().map(|&i| values[i]).sum();
+    if total <= 0.0 || area.w <= 0.0 || area.h <= 0.0 {
+        return out;
+    }
+    order.sort_by(|a, b| values[*b].total_cmp(&values[*a]));
+    let scale = area.w * area.h / total;
+    let size = |k: usize| values[order[k]] * scale;
+    let mut rest = area;
+    let mut i = 0;
+    while i < order.len() {
+        let side = rest.w.min(rest.h).max(1e-9);
+        // The worst aspect ratio of a row made of order[i..j].
+        let worst = |j: usize| {
+            let (sum, lo, hi) = (i..j).fold((0.0, f64::MAX, 0.0f64), |(s, lo, hi), k| (s + size(k), lo.min(size(k)), hi.max(size(k))));
+            (side * side * hi / (sum * sum)).max(sum * sum / (side * side * lo))
+        };
+        let mut j = i + 1;
+        while j < order.len() && worst(j + 1) <= worst(j) {
+            j += 1;
+        }
+        let sum: f64 = (i..j).map(size).sum();
+        if rest.w >= rest.h {
+            let rw = (sum / rest.h.max(1e-9)).min(rest.w);
+            let mut y = rest.y;
+            for k in i..j {
+                let rh = size(k) / rw.max(1e-9);
+                out[order[k]] = Some(Rect { x: rest.x, y, w: rw, h: rh });
+                y += rh;
+            }
+            rest.x += rw;
+            rest.w = (rest.w - rw).max(0.0);
+        } else {
+            let rh = (sum / rest.w.max(1e-9)).min(rest.h);
+            let mut x = rest.x;
+            for k in i..j {
+                let rw = size(k) / rh.max(1e-9);
+                out[order[k]] = Some(Rect { x, y: rest.y, w: rw, h: rh });
+                x += rw;
+            }
+            rest.y += rh;
+            rest.h = (rest.h - rh).max(0.0);
+        }
+        i = j;
+    }
+    out
+}
+
+/// A label cut to fit `width` (about 0.55em per character).
+fn fit_label(label: &str, width: f64, size: f64) -> Option<String> {
+    let max = (width / (size * 0.55)).floor() as usize;
+    let count = label.chars().count();
+    if count == 0 || max < 2 {
+        return None;
+    }
+    Some(if count <= max {
+        label.to_string()
+    } else {
+        format!("{}…", label.chars().take(max - 1).collect::<String>())
+    })
+}
+
+fn treemap_cell(svg: &mut String, r: Rect, color: &str, label: &str, value: Option<f64>, f: f64) {
+    let g = (r.w.min(r.h) * 0.04).clamp(0.5, 2.0);
+    let (x, y, w, h) = (r.x + g / 2.0, r.y + g / 2.0, (r.w - g).max(0.0), (r.h - g).max(0.0));
+    let _ = write!(
+        svg,
+        r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" style="fill:{}"/>"#,
+        num(x),
+        num(y),
+        num(w),
+        num(h),
+        num((w.min(h) * 0.06).min(4.0)),
+        esc(color)
+    );
+    let size = f * 0.85;
+    if h < size * 1.5 {
+        return;
+    }
+    let Some(text) = fit_label(label, w - f * 0.6, size) else { return };
+    let _ = write!(
+        svg,
+        r#"<text x="{}" y="{}" font-size="{}" font-weight="600" style="fill:#fff">{}</text>"#,
+        num(x + f * 0.3),
+        num(y + size * 1.15),
+        num(size),
+        esc(&text)
+    );
+    if let Some(v) = value.filter(|_| h >= size * 2.7) {
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" font-size="{}" style="fill:#fff" opacity="0.85">{}</text>"#,
+            num(x + f * 0.3),
+            num(y + size * 2.3),
+            num(size * 0.9),
+            fmt_value(v)
+        );
+    }
+}
+
+fn treemap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
+    let area = Rect { x: 0.0, y: 0.0, w, h };
+    let label = |i: usize| chart.labels.get(i).map(String::as_str).unwrap_or("");
+    let shown = |v: f64| chart.show_values.then_some(v);
+    if chart.series.len() <= 1 {
+        let Some(s) = chart.series.first() else { return };
+        let mut step = 0;
+        for (i, r) in squarify(&s.values, area).into_iter().enumerate() {
+            let Some(r) = r else { continue };
+            open_step(svg, steps, step);
+            step += 1;
+            treemap_cell(svg, r, &slice_color(i), label(i), shown(s.values[i]), f);
+            close_step(svg, steps);
+        }
+        return;
+    }
+    // Groups: one per series, sized by their totals.
+    let totals: Vec<f64> = chart
+        .series
+        .iter()
+        .map(|s| s.values.iter().filter(|v| v.is_finite() && **v > 0.0).sum())
+        .collect();
+    for (g, r) in squarify(&totals, area).into_iter().enumerate() {
+        open_step(svg, steps, g as u32);
+        if let Some(r) = r {
+            let color = series_color(chart, g);
+            let head = if r.h > f * 3.5 && r.w > f * 3.0 { f * 1.4 } else { 0.0 };
+            if head > 0.0
+                && let Some(text) = fit_label(&chart.series[g].name, r.w - f * 0.4, f * 0.8)
+            {
+                let _ = write!(
+                    svg,
+                    r#"<text x="{}" y="{}" font-size="{}" font-weight="700" style="fill:{}">{}</text>"#,
+                    num(r.x + f * 0.2),
+                    num(r.y + f * 1.0),
+                    num(f * 0.8),
+                    esc(&color),
+                    esc(&text)
+                );
+            }
+            let inner = Rect {
+                x: r.x,
+                y: r.y + head,
+                w: r.w,
+                h: r.h - head,
+            };
+            let values = &chart.series[g].values;
+            for (i, c) in squarify(values, inner).into_iter().enumerate() {
+                if let Some(c) = c {
+                    treemap_cell(svg, c, &color, label(i), shown(values[i]), f);
+                }
+            }
+        }
+        close_step(svg, steps);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Parliament: seats as dots in a half circle, party by party
+// ---------------------------------------------------------------------------
+
+/// Seats per party (row) of the first series; at most 2,000 in all.
+fn parliament_seats(chart: &ChartContent) -> Vec<u32> {
+    let raw: Vec<f64> = chart.series.first().map_or_else(Vec::new, |s| {
+        s.values.iter().map(|v| if v.is_finite() && *v > 0.0 { v.round() } else { 0.0 }).collect()
+    });
+    let total: f64 = raw.iter().sum();
+    let k = if total > 2000.0 { 2000.0 / total } else { 1.0 };
+    raw.iter().map(|v| (v * k).round() as u32).collect()
+}
+
+/// Seat positions (angle, radius as a share of the outer radius) for
+/// `total` seats, ordered from left to right, and the dot spacing.
+fn parliament_layout(total: u32) -> (Vec<(f64, f64)>, f64) {
+    const INNER: f64 = 0.38;
+    let row_caps = |rows: u32| -> (f64, Vec<u32>) {
+        let d = (1.0 - INNER) / rows as f64;
+        let caps = (0..rows)
+            .map(|i| (std::f64::consts::PI * (INNER + d * (i as f64 + 0.5)) / d).floor() as u32 + 1)
+            .collect();
+        (d, caps)
+    };
+    let mut rows = 1;
+    while rows < 80 && row_caps(rows).1.iter().sum::<u32>() < total {
+        rows += 1;
+    }
+    let (d, caps) = row_caps(rows);
+    let cap_total: u32 = caps.iter().sum::<u32>().max(1);
+    // Seats per row in proportion to each row's room, largest remainders first.
+    let mut per: Vec<u32> = caps.iter().map(|c| (total as u64 * *c as u64 / cap_total as u64) as u32).collect();
+    let mut left = total.saturating_sub(per.iter().sum());
+    let mut by_rest: Vec<usize> = (0..caps.len()).collect();
+    by_rest.sort_by_key(|&i| std::cmp::Reverse((total as u64 * caps[i] as u64 % cap_total as u64, i)));
+    for &i in by_rest.iter().cycle().take(caps.len() * 4) {
+        if left == 0 {
+            break;
+        }
+        if per[i] < caps[i] {
+            per[i] += 1;
+            left -= 1;
+        }
+    }
+    let mut seats: Vec<(f64, f64)> = Vec::with_capacity(total as usize);
+    for (i, &k) in per.iter().enumerate() {
+        let r = INNER + d * (i as f64 + 0.5);
+        for j in 0..k {
+            let a = if k > 1 {
+                std::f64::consts::PI * (1.0 - j as f64 / (k - 1) as f64)
+            } else {
+                std::f64::consts::FRAC_PI_2
+            };
+            seats.push((a, r));
+        }
+    }
+    seats.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.total_cmp(&b.1)));
+    (seats, d)
+}
+
+fn parliament_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
+    let seats = parliament_seats(chart);
+    let total: u32 = seats.iter().sum();
+    if total == 0 {
+        return;
+    }
+    let (layout, d) = parliament_layout(total);
+    let margin = f * 0.5;
+    let radius = ((w / 2.0) - margin).min(h - margin * 2.0).max(4.0);
+    let (cx, cy) = (w / 2.0, (h + radius) / 2.0);
+    let dot = radius * d * 0.4;
+    let mut next = layout.iter();
+    let mut step = 0;
+    for (i, &n) in seats.iter().enumerate() {
+        if n == 0 {
+            continue;
+        }
+        open_step(svg, steps, step);
+        step += 1;
+        let color = slice_color(i);
+        for &(a, r) in next.by_ref().take(n as usize) {
+            let _ = write!(
+                svg,
+                r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#,
+                num(cx + radius * r * a.cos()),
+                num(cy - radius * r * a.sin()),
+                num(dot),
+                esc(&color)
+            );
+        }
+        close_step(svg, steps);
+    }
+    if chart.show_values {
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" text-anchor="middle" font-size="{}" font-weight="700">{}</text>"#,
+            num(cx),
+            num(cy - dot),
+            num(f * 1.6),
+            total
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Candlestick: open, high, low and close (the first four series) per row
+// ---------------------------------------------------------------------------
+
+const RISING: &str = "var(--cz-chart-up, #16a34a)";
+const FALLING: &str = "var(--cz-chart-down, #dc2626)";
+
+fn candle_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
+    let n = rows(chart);
+    let get = |s: usize, i: usize| chart.series.get(s).and_then(|x| x.values.get(i)).copied().filter(|v| v.is_finite());
+    let candles: Vec<Option<[f64; 4]>> = (0..n).map(|i| Some([get(0, i)?, get(1, i)?, get(2, i)?, get(3, i)?])).collect();
+    let all = candles.iter().flatten().flat_map(|c| c.iter().copied());
+    let Some((lo, hi)) = all.fold(None, |r, v| Some(r.map_or((v, v), |(a, b): (f64, f64)| (a.min(v), b.max(v))))) else {
+        return;
+    };
+    let range = nice_range(lo, hi, 5);
+    let left = y_label_room(range, f);
+    let plot = Rect {
+        x: left,
+        y: f * 0.9,
+        w: (w - left - f * 0.6).max(10.0),
+        h: (h - f * 2.7).max(10.0),
+    };
+    y_axis(svg, chart, plot, range, f);
+    let band = plot.w / n as f64;
+    let center = |i: usize| plot.x + (i as f64 + 0.5) * band;
+    x_categories(svg, chart, plot, n, center, band, f);
+    let y = |v: f64| plot.y + plot.h - (v - range.0) / (range.1 - range.0) * plot.h;
+    for (i, c) in candles.iter().enumerate() {
+        let Some([open, high, low, close]) = *c else { continue };
+        let color = if close >= open { RISING } else { FALLING };
+        let (top, bottom) = (high.max(open).max(close), low.min(open).min(close));
+        let x = center(i);
+        let _ = write!(
+            svg,
+            r#"<line x1="{x}" y1="{}" x2="{x}" y2="{}" style="stroke:{}" stroke-width="{}"/>"#,
+            num(y(top)),
+            num(y(bottom)),
+            color,
+            num((f * 0.08).max(1.5)),
+            x = num(x)
+        );
+        let bw = band * 0.55;
+        let (b0, b1) = (y(open.max(close)), y(open.min(close)));
+        let _ = write!(
+            svg,
+            r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" style="fill:{}"/>"#,
+            num(x - bw / 2.0),
+            num(b0),
+            num(bw),
+            num((b1 - b0).max(1.5)),
+            num((bw * 0.08).min(3.0)),
+            color
+        );
+        if chart.show_values {
+            let _ = write!(
+                svg,
+                r#"<text x="{}" y="{}" text-anchor="middle" font-size="{}">{}</text>"#,
+                num(x),
+                num(y(top) - f * 0.4),
+                num(f * 0.7),
+                fmt_value(close)
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -522,14 +1367,127 @@ mod tests {
         }
     }
 
+    fn series(values: &[f64]) -> crate::model::Series {
+        crate::model::Series {
+            values: values.to_vec(),
+            ..Default::default()
+        }
+    }
+
     #[test]
-    fn empty_chart_does_not_panic() {
-        let c = ChartContent {
-            labels: vec![],
-            series: vec![],
+    fn treemap_rectangles_tile_the_area() {
+        let area = Rect {
+            x: 10.0,
+            y: 20.0,
+            w: 800.0,
+            h: 450.0,
+        };
+        let values = [6.0, 0.0, 3.0, 2.0, 2.0, 1.0, -4.0, 1.0];
+        let rects = squarify(&values, area);
+        assert!(rects[1].is_none() && rects[6].is_none(), "zero and negative values take no room");
+        let sum: f64 = rects.iter().flatten().map(|r| r.w * r.h).sum();
+        assert!((sum - area.w * area.h).abs() < 1e-6, "{sum}");
+        let total: f64 = values.iter().filter(|v| **v > 0.0).sum();
+        for (v, r) in values.iter().zip(&rects) {
+            if let Some(r) = r {
+                assert!((r.w * r.h / (area.w * area.h) - v / total).abs() < 1e-9, "areas follow the values");
+                assert!(r.x >= area.x - 1e-9 && r.y >= area.y - 1e-9);
+                assert!(r.x + r.w <= area.x + area.w + 1e-6 && r.y + r.h <= area.y + area.h + 1e-6);
+            }
+        }
+    }
+
+    #[test]
+    fn parliament_draws_one_dot_per_seat() {
+        for seats in [vec![1.0], vec![120.0, 95.0, 60.0, 40.0, 18.0], vec![3.4, 0.0, 2.6], vec![300.0, 213.0]] {
+            let total: f64 = seats.iter().map(|v: &f64| v.round()).sum();
+            let c = ChartContent {
+                chart: "parliament".into(),
+                labels: (0..seats.len()).map(|i| format!("P{i}")).collect(),
+                series: vec![series(&seats)],
+                ..Default::default()
+            };
+            let svg = chart_svg(&c, 800.0, 450.0, None);
+            assert_eq!(svg.matches("<circle").count() as f64, total, "{seats:?}");
+            let (layout, _) = parliament_layout(total as u32);
+            assert!(layout.windows(2).all(|p| p[0].0 >= p[1].0), "seats run from left to right");
+        }
+    }
+
+    #[test]
+    fn smooth_curves_stay_within_their_points() {
+        let pts = [(0.0, 0.0), (1.0, 10.0), (2.0, 10.0), (3.0, 2.0), (4.0, 2.5)];
+        for (k, (c1, c2, end)) in monotone_segments(&pts).iter().enumerate() {
+            let (lo, hi) = (pts[k].1.min(pts[k + 1].1), pts[k].1.max(pts[k + 1].1));
+            for y in [c1.1, c2.1] {
+                assert!(y >= lo - 1e-9 && y <= hi + 1e-9, "segment {k} overshoots: {y}");
+            }
+            assert_eq!(*end, pts[k + 1]);
+        }
+    }
+
+    #[test]
+    fn steps_follow_what_each_chart_builds_by() {
+        let c = |chart: &str, s: Vec<crate::model::Series>| ChartContent {
+            chart: chart.into(),
+            series: s,
             ..Default::default()
         };
-        assert!(chart_svg(&c, 100.0, 100.0, None).contains("</svg>"));
+        let one = || vec![series(&[3.0, 0.0, 2.0, 1.0])];
+        let three = || vec![series(&[1.0]), series(&[2.0]), series(&[3.0])];
+        assert_eq!(series_steps(&c("parliament", one())), 3, "parties with seats");
+        assert_eq!(series_steps(&c("treemap", one())), 3, "rectangles");
+        assert_eq!(series_steps(&c("treemap", three())), 3, "groups");
+        assert_eq!(series_steps(&c("scatter", three())), 2, "the first series is X");
+        assert_eq!(series_steps(&c("scatter", one())), 1);
+        assert_eq!(series_steps(&c("heatmap", three())), 3, "columns");
+        assert_eq!(series_steps(&c("stacked-bar", three())), 3);
+        assert_eq!(series_steps(&c("candlestick", three())), 0);
+    }
+
+    #[test]
+    fn stacked_types_and_the_older_flag_draw_alike() {
+        let new = chart_svg(
+            &ChartContent {
+                chart: "stacked-column".into(),
+                ..Default::default()
+            },
+            800.0,
+            450.0,
+            None,
+        );
+        let old = chart_svg(
+            &ChartContent {
+                chart: "column".into(),
+                stacked: true,
+                ..Default::default()
+            },
+            800.0,
+            450.0,
+            None,
+        );
+        assert_eq!(new, old);
+        assert_ne!(new, chart_svg(&ChartContent::default(), 800.0, 450.0, None));
+    }
+
+    #[test]
+    fn empty_chart_does_not_panic() {
+        for (kind, _) in CHART_TYPES {
+            for (labels, series_) in [
+                (vec![], vec![]),
+                (vec!["A".to_string()], vec![series(&[5.0])]),
+                (vec!["A".to_string()], vec![series(&[f64::NAN])]),
+            ] {
+                let c = ChartContent {
+                    chart: kind.to_string(),
+                    labels,
+                    series: series_,
+                    ..Default::default()
+                };
+                let svg = chart_svg(&c, 100.0, 100.0, None);
+                assert!(svg.ends_with("</svg>") && !svg.contains("NaN") && !svg.contains("inf"), "{kind}: {svg}");
+            }
+        }
     }
 
     #[test]

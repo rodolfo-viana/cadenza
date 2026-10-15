@@ -11,6 +11,7 @@ import { Button } from './ui.js';
 import { cardFromDef, openThemeBuilder, applyCustomTheme, importTheme, themeMenu } from './themebuilder.js';
 import { cls } from './util.js';
 import { t, tn, N_ } from './i18n.js';
+import { buildUnit } from './charts.js';
 
 export function Inspector() {
   const st = useStore();
@@ -269,6 +270,15 @@ const effectLabel = (v) => {
   return label ? t(label) : v;
 };
 
+// How a chart building step by step is described in the Build Order list.
+const BY_UNIT = {
+  slice: () => t('by slice'),
+  party: () => t('by party'),
+  item: () => t('by item'),
+  column: () => t('by column'),
+  series: () => t('by series'),
+};
+
 function AnimatePanel({ els }) {
   const slide = currentSlide();
   if (!slide) return null;
@@ -285,8 +295,16 @@ function AnimatePanel({ els }) {
     A.setBuildOrder(slide, order);
   };
   const isBuildIn = (v) => BUILD_IN[0].options.some((o) => o.value === v && v);
-  const pie = one?.content.kind === 'chart' && (one.content.chart === 'pie' || one.content.chart === 'donut');
+  const unit = one?.content.kind === 'chart' ? buildUnit(one.content) : '';
   const series = one ? A.seriesSteps(one) : 0;
+  const steps = { first: one?.build.order, last: (one?.build.order || 0) + series };
+  const byUnit = {
+    slice: [t('By slice'), t('The chart appears at step {first}, then one slice per step until step {last}.', steps)],
+    party: [t('By party'), t('The chart appears at step {first}, then one party per step until step {last}.', steps)],
+    item: [t('By item'), t('The chart appears at step {first}, then one item per step until step {last}.', steps)],
+    column: [t('By column'), t('The chart appears at step {first}, then one column per step until step {last}.', steps)],
+    series: [t('By series'), t('The chart appears at step {first}, then one series per step until step {last}.', steps)],
+  }[unit];
   // Building a chart by series takes more steps: renumber if they now
   // overlap other builds.
   const setDelivery = async (delivery) => {
@@ -312,23 +330,18 @@ function AnimatePanel({ els }) {
         />
       <//>
       ${one?.build.effect && html`<${Row} label=${t('Step')}><${NumberField} value=${one.build.order} min=${1} max=${99} onChange=${(v) => setBuild({ order: v })} /><//>`}
-      ${one?.content.kind === 'chart' && isBuildIn(one.build.effect) &&
+      ${byUnit && isBuildIn(one.build.effect) &&
       html`<${Row} label=${t('Delivery')}>
           <${Segmented}
             value=${one.build.delivery || ''}
             options=${[
               { value: '', label: t('All at once') },
-              { value: 'series', label: pie ? t('By slice') : t('By series') },
+              { value: 'series', label: byUnit[0] },
             ]}
             onChange=${setDelivery}
           />
         <//>
-        ${series > 0 &&
-        html`<${Hint}>
-          ${pie
-            ? t('The chart appears at step {first}, then one slice per step until step {last}.', { first: one.build.order, last: one.build.order + series })
-            : t('The chart appears at step {first}, then one series per step until step {last}.', { first: one.build.order, last: one.build.order + series })}
-        </${Hint}>`}`}
+        ${series > 0 && html`<${Hint}>${byUnit[1]}</${Hint}>`}`}
       <${Row} label=${t('Build out')}>
         <${Select}
           value=${one ? one.build.outEffect : ''}
@@ -394,7 +407,7 @@ function AnimatePanel({ els }) {
           const what =
             ev.kind === 'path'
               ? t('Motion path')
-              : `${effectLabel(e.build.effect)}${extra ? ` · ${e.content.chart === 'pie' || e.content.chart === 'donut' ? t('by slice') : t('by series')}` : ''}${e.build.outEffect ? ` · ${t('out: {effect}', { effect: effectLabel(e.build.outEffect) })}` : ''}`;
+              : `${effectLabel(e.build.effect)}${extra ? ` · ${BY_UNIT[buildUnit(e.content)]()}` : ''}${e.build.outEffect ? ` · ${t('out: {effect}', { effect: effectLabel(e.build.outEffect) })}` : ''}`;
           return html`<div key=${e.id + ev.kind} class=${cls('build-item', state.selection.includes(e.id) && 'active')} onClick=${() => set({ selection: [e.id] })}>
             <span class="build-step">${ev.step ? (extra ? `${ev.step}–${ev.step + extra}` : ev.step) : '–'}</span>
             <span class="build-name">${elementName(e)}<small>${what}</small></span>

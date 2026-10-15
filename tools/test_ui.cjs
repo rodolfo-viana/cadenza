@@ -69,6 +69,7 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
   return {
     S: module('store.js').namespace, A: module('actions.js').namespace,
     T: module('textedit.js').namespace, Notes: module('notes.js').namespace,
+    Charts: module('charts.js').namespace,
   };
 }
 
@@ -561,4 +562,34 @@ test('build steps count chart series, pie slices and motion paths', async () => 
   mover.build.outOrder = 0;
   mover.build.pathOrder = 3;
   assert.equal(A.nextBuildStep(slide), 6, 'after the chart’s last series (2 + 3)');
+});
+
+test('each chart type builds by its own unit and keeps edited data', async () => {
+  const { A, Charts } = await ui(async () => ({}));
+  const el = (chart, series, extra = {}) => ({
+    build: { effect: 'fade-in', order: 1, delivery: 'series' },
+    content: { kind: 'chart', chart, labels: [], series: series.map((values) => ({ name: '', values })), ...extra },
+  });
+  const one = [[3, 0, 2, 1]];
+  const three = [[1], [2], [3]];
+  assert.equal(A.seriesSteps(el('parliament', one)), 3, 'parties with seats');
+  assert.equal(A.seriesSteps(el('treemap', one)), 3, 'rectangles');
+  assert.equal(A.seriesSteps(el('treemap', three)), 3, 'groups');
+  assert.equal(A.seriesSteps(el('scatter', three)), 2, 'the first series is X');
+  assert.equal(A.seriesSteps(el('heatmap', three)), 3, 'columns');
+  assert.equal(A.seriesSteps(el('candlestick', three)), 0, 'candles build all at once');
+  assert.equal(A.seriesSteps(el('column', three, { stacked: true })), 3, 'older stacked columns');
+  assert.equal(Charts.chartKind({ chart: 'bar', stacked: true }), 'stacked-bar');
+
+  // Untouched sample data follows the type; edited data stays.
+  const sample = { chart: 'parliament', ...Charts.chartSample('parliament') };
+  const toTree = Charts.switchChart(sample, 'treemap');
+  assert.deepEqual(toTree.labels, Charts.chartSample('treemap').labels);
+  assert.equal(toTree.stacked, false);
+  const edited = { ...sample, series: [{ ...sample.series[0], values: [1, 2, 3, 4, 5] }] };
+  const kept = Charts.switchChart(edited, 'treemap');
+  assert.equal(kept.labels, undefined, 'edited data is kept');
+  const candles = Charts.switchChart(edited, 'candlestick');
+  assert.equal(candles.series.length, 4, 'candlesticks get the series they need');
+  assert.deepEqual(candles.series[0].values, [1, 2, 3, 4, 5]);
 });

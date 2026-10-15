@@ -175,5 +175,17 @@ export const ICONS = {
 "file-plus-2": "<path d=\"M11.35 22H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v5.35\" /> <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /> <path d=\"M14 19h6\" /> <path d=\"M17 16v6\" />",
 "list-plus": "<path d=\"M16 5H3\" /> <path d=\"M11 12H3\" /> <path d=\"M16 19H3\" /> <path d=\"M18 9v6\" /> <path d=\"M21 12h-6\" />",
 "pause": "<rect x=\"14\" y=\"3\" width=\"5\" height=\"18\" rx=\"1\" /> <rect x=\"5\" y=\"3\" width=\"5\" height=\"18\" rx=\"1\" />",
-"rotate-ccw": "<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" /> <path d=\"M3 3v5h5\" />"
+"rotate-ccw": "<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" /> <path d=\"M3 3v5h5\" />",
+"chart-column-stacked": "<path d=\"M11 13H7\" /> <path d=\"M19 9h-4\" /> <path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /> <rect x=\"15\" y=\"5\" width=\"4\" height=\"12\" rx=\"1\" /> <rect x=\"7\" y=\"8\" width=\"4\" height=\"9\" rx=\"1\" />",
+"chart-bar-stacked": "<path d=\"M11 13v4\" /> <path d=\"M15 5v4\" /> <path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /> <rect x=\"7\" y=\"13\" width=\"9\" height=\"4\" rx=\"1\" /> <rect x=\"7\" y=\"5\" width=\"12\" height=\"4\" rx=\"1\" />",
+"chart-area": "<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /> <path d=\"M7 11.207a.5.5 0 0 1 .146-.353l2-2a.5.5 0 0 1 .708 0l3.292 3.292a.5.5 0 0 0 .708 0l4.292-4.292a.5.5 0 0 1 .854.353V16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1z\" />",
+"waves": "<path d=\"M2 12q2.5 2 5 0t5 0 5 0 5 0\" /> <path d=\"M2 19q2.5 2 5 0t5 0 5 0 5 0\" /> <path d=\"M2 5q2.5 2 5 0t5 0 5 0 5 0\" />",
+"layout-dashboard": "<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\" /> <rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\" /> <rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\" /> <rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\" />",
+"landmark": "<path d=\"M10 18v-7\" /> <path d=\"M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z\" /> <path d=\"M14 18v-7\" /> <path d=\"M18 18v-7\" /> <path d=\"M3 22h18\" /> <path d=\"M6 18v-7\" />",
+"chart-scatter": "<circle cx=\"7.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" /> <circle cx=\"18.5\" cy=\"5.5\" r=\".5\" fill=\"currentColor\" /> <circle cx=\"11.5\" cy=\"11.5\" r=\".5\" fill=\"currentColor\" /> <circle cx=\"7.5\" cy=\"16.5\" r=\".5\" fill=\"currentColor\" /> <circle cx=\"17.5\" cy=\"14.5\" r=\".5\" fill=\"currentColor\" /> <path d=\"M3 3v16a2 2 0 0 0 2 2h16\" />",
+"grid-3x3": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /> <path d=\"M3 9h18\" /> <path d=\"M3 15h18\" /> <path d=\"M9 3v18\" /> <path d=\"M15 3v18\" />",
+"chart-candlestick": "<path d=\"M9 5v4\" /> <rect width=\"4\" height=\"6\" x=\"7\" y=\"9\" rx=\"1\" /> <path d=\"M9 15v2\" /> <path d=\"M17 3v2\" /> <rect width=\"4\" height=\"8\" x=\"15\" y=\"5\" rx=\"1\" /> <path d=\"M17 13v3\" /> <path d=\"M3 3v16a2 2 0 0 0 2 2h16\" />",
+"split": "<path d=\"M16 3h5v5\" /> <path d=\"M8 3H3v5\" /> <path d=\"M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3\" /> <path d=\"m15 9 6-6\" />",
+"chart-network": "<path d=\"m13.11 7.664 1.78 2.672\" /> <path d=\"m14.162 12.788-3.324 1.424\" /> <path d=\"m20 4-6.06 1.515\" /> <path d=\"M3 3v16a2 2 0 0 0 2 2h16\" /> <circle cx=\"12\" cy=\"6\" r=\"2\" /> <circle cx=\"16\" cy=\"12\" r=\"2\" /> <circle cx=\"9\" cy=\"15\" r=\"2\" />",
+"earth": "<path d=\"M21.54 15H17a2 2 0 0 0-2 2v4.54\" /> <path d=\"M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17\" /> <path d=\"M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05\" /> <circle cx=\"12\" cy=\"12\" r=\"10\" />"
 };

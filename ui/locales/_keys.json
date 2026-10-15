@@ -683,7 +683,37 @@
   ]
  },
  {
-  "key": "By series",
+  "key": "by column",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "By column",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "by item",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "By item",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "by party",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "By party",
   "files": [
    "inspector.js"
   ]
@@ -695,13 +725,19 @@
   ]
  },
  {
-  "key": "By slice",
+  "key": "By series",
   "files": [
    "inspector.js"
   ]
  },
  {
   "key": "by slice",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "By slice",
   "files": [
    "inspector.js"
   ]
@@ -742,6 +778,12 @@
   "files": [
    "dialogs.js",
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Candlestick",
+  "files": [
+   "chart.rs"
   ]
  },
  {
@@ -964,6 +1006,12 @@
   "files": [
    "commands.js",
    "app_menu.rs"
+  ]
+ },
+ {
+  "key": "Closing",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -1516,6 +1564,18 @@
  },
  {
   "key": "e.g. 1|2-3|5,7",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Each cell is colored by its value.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Each row needs four values, in this order: opening, high, low and closing price.",
   "files": [
    "panels.js"
   ]
@@ -2216,6 +2276,12 @@
   ]
  },
  {
+  "key": "Heatmap",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
   "key": "Help",
   "files": [
    "commands.js",
@@ -2262,6 +2328,12 @@
   "key": "Hide the teleprompter (T)",
   "files": [
    "teleprompter.js"
+  ]
+ },
+ {
+  "key": "High",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -2505,6 +2577,7 @@
  {
   "key": "Item {n}",
   "files": [
+   "charts.js",
    "panels.js"
   ]
  },
@@ -2752,6 +2825,12 @@
   "key": "Loop presentation",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Low",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -3170,6 +3249,18 @@
   ]
  },
  {
+  "key": "One column: a rectangle per row. Several columns: each column is a group of rectangles.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "One row per party, with its number of seats.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Online Video (YouTube, Vimeo)…",
   "files": [
    "commands.js"
@@ -3248,6 +3339,12 @@
   "key": "Open {site}",
   "files": [
    "media.js"
+  ]
+ },
+ {
+  "key": "Opening",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -3371,6 +3468,18 @@
   "key": "Parallelogram",
   "files": [
    "shapes.rs"
+  ]
+ },
+ {
+  "key": "Parliament",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Party {n}",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -3970,6 +4079,12 @@
   ]
  },
  {
+  "key": "Scatterplot",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
   "key": "Screen blacked out — press B to resume",
   "files": [
    "presenter.html"
@@ -4021,6 +4136,12 @@
   "key": "Search {site} just like you normally do — then click {button} in the Cadenza bar at the bottom of the page.",
   "files": [
    "media.js"
+  ]
+ },
+ {
+  "key": "Seats",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -4081,6 +4202,7 @@
  {
   "key": "Series {n}",
   "files": [
+   "charts.js",
    "panels.js"
   ]
  },
@@ -4458,9 +4580,21 @@
   ]
  },
  {
-  "key": "Stacked",
+  "key": "Stacked area",
   "files": [
-   "panels.js"
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Stacked bar",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Stacked column",
+  "files": [
+   "chart.rs"
   ]
  },
  {
@@ -4527,6 +4661,12 @@
   "key": "Step highlights",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Streamgraph",
+  "files": [
+   "chart.rs"
   ]
  },
  {
@@ -4698,6 +4838,24 @@
   ]
  },
  {
+  "key": "The chart appears at step {first}, then one column per step until step {last}.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "The chart appears at step {first}, then one item per step until step {last}.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "The chart appears at step {first}, then one party per step until step {last}.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
   "key": "The chart appears at step {first}, then one series per step until step {last}.",
   "files": [
    "inspector.js"
@@ -4725,6 +4883,12 @@
   "key": "The file is too large (40 MB max)",
   "files": [
    "media.rs"
+  ]
+ },
+ {
+  "key": "The first column holds the X values. Each other column is a group of points.",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -5024,6 +5188,12 @@
   "key": "Trapezoid",
   "files": [
    "shapes.rs"
+  ]
+ },
+ {
+  "key": "Treemap",
+  "files": [
+   "chart.rs"
   ]
  },
  {

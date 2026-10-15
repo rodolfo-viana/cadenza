@@ -12,6 +12,7 @@ import { Button } from './ui.js';
 import { renderDiagram, svgAspect, DIAGRAM_TEMPLATES } from './diagrams.js';
 import { opener } from './api.js';
 import { t, N_ } from './i18n.js';
+import { CHART_ICONS, chartKind, oneSeries, switchChart } from './charts.js';
 
 const ids = (els) => els.map((e) => e.id).join(',');
 
@@ -646,7 +647,10 @@ export function ChartPanel({ els }) {
   const ref = useRef();
   useFocusPrimary(ref);
   const set_ = (patch, key, live) => patchAll([el], { content: patch }, live ? key : null);
-  const pie = ch.chart === 'pie' || ch.chart === 'donut';
+  const kind = chartKind(ch);
+  const one = oneSeries(kind);
+  // Candlesticks take exactly four series (opening, high, low, closing).
+  const fixed = one || kind === 'candlestick';
   const n = ch.labels.length;
   const setCell = (s, i, v) => {
     const series = ch.series.map((x, k) => (k === s ? { ...x, values: Array.from({ length: n }, (_, j) => (j === i ? v : x.values[j] ?? 0)) } : x));
@@ -658,16 +662,31 @@ export function ChartPanel({ els }) {
   const delRow = (i) => set_({ labels: ch.labels.filter((_, j) => j !== i), series: ch.series.map((s) => ({ ...s, values: s.values.filter((_, j) => j !== i) })) }, 'rows');
   const addSeries = () => set_({ series: [...ch.series, { name: t('Series {n}', { n: ch.series.length + 1 }), values: ch.labels.map(() => 0), color: '' }] }, 'series');
   const delSeries = (k) => set_({ series: ch.series.filter((_, j) => j !== k) }, 'series');
-  const shownSeries = pie ? ch.series.slice(0, 1) : ch.series;
+  const shownSeries = one ? ch.series.slice(0, 1) : ch.series;
+  // Series that get a color of their own: not slices, rectangles of a
+  // one-series treemap, heatmap cells, candles or a scatterplot's X.
+  const colored =
+    one || kind === 'heatmap' || kind === 'candlestick' || (kind === 'treemap' && ch.series.length <= 1)
+      ? []
+      : ch.series.map((s, k) => ({ s, k })).filter(({ k }) => !(kind === 'scatter' && k === 0 && ch.series.length > 1));
+  const hint = {
+    scatter: t('The first column holds the X values. Each other column is a group of points.'),
+    heatmap: t('Each cell is colored by its value.'),
+    parliament: t('One row per party, with its number of seats.'),
+    treemap: t('One column: a rectangle per row. Several columns: each column is a group of rectangles.'),
+    candlestick: t('Each row needs four values, in this order: opening, high, low and closing price.'),
+  }[kind];
+  const grid = ['column', 'stacked-column', 'bar', 'stacked-bar', 'line', 'area', 'stacked-area', 'streamgraph', 'scatter', 'candlestick'].includes(kind);
   return html`<${Section} title=${t('Chart')} id="chart">
     <div class="chart-types">
       ${state.info.charts.map(
-        (c) => html`<button type="button" class=${cls('chart-type', ch.chart === c.id && 'active')} title=${t(c.name)} onClick=${() => set_({ chart: c.id }, 'type')}>
-          <${Icon} name=${{ column: 'chart-column', bar: 'chart-bar', line: 'chart-line', area: 'chart-line', pie: 'chart-pie', donut: 'chart-pie' }[c.id]} size=${18} />
+        (c) => html`<button type="button" class=${cls('chart-type', kind === c.id && 'active')} title=${t(c.name)} onClick=${() => kind !== c.id && set_(switchChart(ch, c.id), 'type')}>
+          <${Icon} name=${CHART_ICONS[c.id]} size=${18} />
           <span>${t(c.name)}</span>
         </button>`,
       )}
     </div>
+    ${hint && html`<${Hint}>${hint}</${Hint}>`}
     <div class="datagrid" ref=${ref}>
       <table>
         <thead>
@@ -676,10 +695,10 @@ export function ChartPanel({ els }) {
             ${shownSeries.map(
               (s, k) => html`<th>
                 <input class="cell head" value=${s.name} onChange=${(e) => set_({ series: ch.series.map((x, j) => (j === k ? { ...x, name: e.target.value } : x)) }, 'sname')} />
-                ${!pie && ch.series.length > 1 && html`<button class="cell-x" title=${t('Remove series')} onClick=${() => delSeries(k)}>×</button>`}
+                ${!fixed && ch.series.length > 1 && html`<button class="cell-x" title=${t('Remove series')} onClick=${() => delSeries(k)}>×</button>`}
               </th>`,
             )}
-            ${!pie && html`<th><button class="cell-add" title=${t('Add series')} onClick=${addSeries}>+</button></th>`}
+            ${!fixed && html`<th><button class="cell-add" title=${t('Add series')} onClick=${addSeries}>+</button></th>`}
           </tr>
         </thead>
         <tbody>
@@ -698,10 +717,10 @@ export function ChartPanel({ els }) {
       </table>
       <button class="cell-add wide" onClick=${addRow}>${t('+ Add row')}</button>
     </div>
-    ${!pie &&
+    ${colored.length > 0 &&
     html`<div class="series-colors">
-      ${ch.series.map(
-        (s, k) => html`<${Row} label=${s.name}>
+      ${colored.map(
+        ({ s, k }) => html`<${Row} label=${s.name}>
           <${ColorField}
             value=${s.color}
             noneLabel=${t('Theme color {n}', { n: (k % 6) + 1 })}
@@ -710,10 +729,13 @@ export function ChartPanel({ els }) {
         <//>`,
       )}
     </div>`}
-    <${Row}><${Toggle} value=${ch.showLegend} label=${t('Legend')} onChange=${(v) => set_({ showLegend: v }, 'legend')} /><//>
-    <${Row}><${Toggle} value=${ch.showValues} label=${t('Value labels')} onChange=${(v) => set_({ showValues: v }, 'values')} /><//>
-    ${!pie && html`<${Row}><${Toggle} value=${ch.showGrid} label=${t('Grid lines')} onChange=${(v) => set_({ showGrid: v }, 'grid')} /><//>`}
-    ${['column', 'bar', 'area'].includes(ch.chart) && html`<${Row}><${Toggle} value=${ch.stacked} label=${t('Stacked')} onChange=${(v) => set_({ stacked: v }, 'stacked')} /><//>`}
+    ${kind === 'heatmap' &&
+    html`<${Row} label=${t('Color')}>
+      <${ColorField} value=${ch.scaleColor} noneLabel=${t('Theme color {n}', { n: 1 })} onChange=${(v, live) => set_({ scaleColor: v }, 'scale', live)} />
+    <//>`}
+    ${kind !== 'candlestick' && html`<${Row}><${Toggle} value=${ch.showLegend} label=${t('Legend')} onChange=${(v) => set_({ showLegend: v }, 'legend')} /><//>`}
+    ${kind !== 'streamgraph' && html`<${Row}><${Toggle} value=${ch.showValues} label=${t('Value labels')} onChange=${(v) => set_({ showValues: v }, 'values')} /><//>`}
+    ${grid && html`<${Row}><${Toggle} value=${ch.showGrid} label=${t('Grid lines')} onChange=${(v) => set_({ showGrid: v }, 'grid')} /><//>`}
     <${Row} label=${t('Text size')}><${NumberField} value=${ch.fontSize} min=${6} max=${96} unit="px" onChange=${(v, live) => set_({ fontSize: v }, 'fs', live)} /><//>
     <${Row} label=${t('Text color')}><${ColorField} value=${ch.color} noneLabel=${t('Theme text color')} onChange=${(v, live) => set_({ color: v }, 'color', live)} /><//>
   <//>`;

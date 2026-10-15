@@ -17,7 +17,7 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
 **Editing**
 - Slides built from 12 layouts (title, section, two columns, quote, big number, code…), with text,
   shapes, images, video, tables, charts, code, equations and diagrams.
-- Charts (column, bar, line, area, pie, donut) edited in a data grid and rendered as crisp SVG.
+- Charts edited in a data grid and rendered as crisp SVG: column, bar and area (stacked or not), line, streamgraph, pie, donut, treemap, parliament, scatterplot, heatmap and candlestick.
 - Code blocks with syntax highlighting, line numbers and step-by-step line highlights.
 - LaTeX math with KaTeX, as equation objects or inline in any text: `$e^{i\pi}+1=0$`.
 - [Mermaid](https://mermaid.js.org) diagrams: flowcharts, sequences, timelines, mind maps and more.
