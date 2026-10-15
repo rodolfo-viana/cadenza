@@ -19,7 +19,12 @@ export const CHART_ICONS = {
   scatter: 'chart-scatter',
   heatmap: 'grid-3x3',
   candlestick: 'chart-candlestick',
+  sankey: 'split',
+  network: 'chart-network',
 };
+
+/** Types drawn from links between named nodes instead of the table. */
+export const linkChart = (kind) => kind === 'sankey' || kind === 'network';
 
 /** The chart's type; older files stack columns, bars and areas with a flag. */
 export const chartKind = (c) => (c.stacked && ['column', 'bar', 'area'].includes(c.chart) ? `stacked-${c.chart}` : c.chart);
@@ -31,6 +36,7 @@ export const oneSeries = (kind) => ['pie', 'donut', 'parliament'].includes(kind)
 export const candleSeries = () => [t('Opening'), t('High'), t('Low'), t('Closing')];
 
 const series = (name, values) => ({ name, values, color: '' });
+const link = (from, to, value) => ({ from, to, value });
 const named = (n, f) => Array.from({ length: n }, (_, i) => f(i));
 
 /** The data a new chart of `kind` starts with. */
@@ -81,11 +87,31 @@ export function chartSample(kind) {
         ],
       };
     }
+    case 'sankey': {
+      const [s1, s2, s3] = [1, 2, 3].map((n) => t('Source {n}', { n }));
+      const [m1, m2] = [1, 2].map((n) => t('Stage {n}', { n }));
+      const [t1, t2, t3] = [1, 2, 3].map((n) => t('Target {n}', { n }));
+      return {
+        links: [
+          link(s1, m1, 30), link(s2, m1, 20), link(s2, m2, 15), link(s3, m2, 25),
+          link(m1, t1, 35), link(m1, t2, 15), link(m2, t2, 30), link(m2, t3, 10),
+        ],
+      };
+    }
+    case 'network':
+      return {
+        links: [
+          ['A', 'B', 3], ['A', 'C', 2], ['A', 'D', 1], ['B', 'C', 2], ['B', 'E', 1], ['C', 'F', 2],
+          ['D', 'E', 1], ['E', 'F', 3], ['F', 'G', 2], ['G', 'H', 1], ['E', 'H', 2], ['D', 'G', 1],
+        ].map(([a, b, v]) => link(a, b, v)),
+      };
     default:
       // Also what Rust gives a new chart (model.rs, ChartContent::default).
       return { labels: ['Q1', 'Q2', 'Q3', 'Q4'], series: [series('2025', [12, 19, 15, 24]), series('2026', [16, 22, 21, 31])] };
   }
 }
+
+const sameLinks = (a = [], b = []) => a.length === b.length && a.every((l, i) => l.from === b[i].from && l.to === b[i].to && l.value === b[i].value);
 
 const sameData = (a, b) =>
   a.labels.length === b.labels.length &&
@@ -99,6 +125,12 @@ const sameData = (a, b) =>
  */
 export function switchChart(c, kind) {
   const patch = { chart: kind, stacked: false };
+  if (linkChart(kind)) {
+    // The table stays as it is; links nobody wrote yet become the sample.
+    const samples = [chartSample('sankey').links, chartSample('network').links];
+    if (!c.links?.length || samples.some((s) => sameLinks(c.links, s))) patch.links = chartSample(kind).links;
+    return patch;
+  }
   if (sameData(c, chartSample(chartKind(c))) || sameData(c, chartSample('column'))) {
     Object.assign(patch, chartSample(kind));
   } else if (kind === 'candlestick' && c.series.length < 4) {
@@ -116,7 +148,44 @@ export function buildUnit(c) {
   if (kind === 'treemap' && c.series.length <= 1) return 'item';
   if (kind === 'heatmap') return 'column';
   if (kind === 'candlestick') return '';
+  if (kind === 'sankey') return 'column';
+  if (kind === 'network') return 'item';
   return 'series';
+}
+
+/**
+ * Nodes and links of a Sankey diagram or network, as chart.rs (graph)
+ * reads them: names in order of appearance, links between two nodes.
+ */
+export function graph(c, flows) {
+  const names = [];
+  const links = [];
+  const node = (name) => (names.includes(name) ? names.indexOf(name) : names.push(name) - 1);
+  for (const l of c.links || []) {
+    const [a, b] = [String(l.from ?? '').trim(), String(l.to ?? '').trim()];
+    const ok = Number.isFinite(l.value) && l.value > 0;
+    if ((!ok && flows) || !a || !b || a === b) continue;
+    links.push([node(a), node(b), ok ? l.value : 1]);
+  }
+  return { names, links };
+}
+
+/** Columns of a Sankey diagram's nodes (mirrors chart.rs, sankey_columns). */
+export function sankeyColumns(g) {
+  const n = g.names.length;
+  const col = new Array(n).fill(0);
+  for (let round = 0; round < n; round++) {
+    let changed = false;
+    for (const [s, t] of g.links) {
+      if (col[t] < col[s] + 1 && col[s] + 1 < n) {
+        col[t] = col[s] + 1;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  const last = Math.max(0, ...col);
+  return col.map((c, i) => (g.links.some((l) => l[0] === i) ? c : last));
 }
 
 /** Build steps when building by series (mirrors chart.rs, series_steps). */
@@ -126,10 +195,13 @@ export function chartSteps(c) {
   switch (buildUnit(c)) {
     case 'slice':
     case 'party':
-    case 'item':
       return positive();
+    case 'item':
+      return chartKind(c) === 'network' ? Math.min(300, graph(c, false).names.length) : positive();
     case '':
       return 0;
+    case 'column':
+      return chartKind(c) === 'sankey' ? Math.max(0, ...sankeyColumns(graph(c, true))) : n;
     default:
       return chartKind(c) === 'scatter' ? Math.max(n - 1, Math.min(n, 1)) : n;
   }

@@ -12,7 +12,7 @@ import { Button } from './ui.js';
 import { renderDiagram, svgAspect, DIAGRAM_TEMPLATES } from './diagrams.js';
 import { opener } from './api.js';
 import { t, N_ } from './i18n.js';
-import { CHART_ICONS, chartKind, oneSeries, switchChart } from './charts.js';
+import { CHART_ICONS, chartKind, linkChart, oneSeries, switchChart } from './charts.js';
 
 const ids = (els) => els.map((e) => e.id).join(',');
 
@@ -663,10 +663,15 @@ export function ChartPanel({ els }) {
   const addSeries = () => set_({ series: [...ch.series, { name: t('Series {n}', { n: ch.series.length + 1 }), values: ch.labels.map(() => 0), color: '' }] }, 'series');
   const delSeries = (k) => set_({ series: ch.series.filter((_, j) => j !== k) }, 'series');
   const shownSeries = one ? ch.series.slice(0, 1) : ch.series;
+  const linked = linkChart(kind);
+  const links = ch.links || [];
+  const setLink = (i, patch) => set_({ links: links.map((l, j) => (j === i ? { ...l, ...patch } : l)) }, 'links', true);
+  const addLink = () => set_({ links: [...links, { from: '', to: '', value: 1 }] }, 'links');
+  const delLink = (i) => set_({ links: links.filter((_, j) => j !== i) }, 'links');
   // Series that get a color of their own: not slices, rectangles of a
   // one-series treemap, heatmap cells, candles or a scatterplot's X.
   const colored =
-    one || kind === 'heatmap' || kind === 'candlestick' || (kind === 'treemap' && ch.series.length <= 1)
+    linked || one || kind === 'heatmap' || kind === 'candlestick' || (kind === 'treemap' && ch.series.length <= 1)
       ? []
       : ch.series.map((s, k) => ({ s, k })).filter(({ k }) => !(kind === 'scatter' && k === 0 && ch.series.length > 1));
   const hint = {
@@ -675,6 +680,8 @@ export function ChartPanel({ els }) {
     parliament: t('One row per party, with its number of seats.'),
     treemap: t('One column: a rectangle per row. Several columns: each column is a group of rectangles.'),
     candlestick: t('Each row needs four values, in this order: opening, high, low and closing price.'),
+    sankey: t('One row per flow: where it comes from, where it goes and how much.'),
+    network: t('One row per connection between two nodes. The value sets the line width.'),
   }[kind];
   const grid = ['column', 'stacked-column', 'bar', 'stacked-bar', 'line', 'area', 'stacked-area', 'streamgraph', 'scatter', 'candlestick'].includes(kind);
   return html`<${Section} title=${t('Chart')} id="chart">
@@ -687,7 +694,27 @@ export function ChartPanel({ els }) {
       )}
     </div>
     ${hint && html`<${Hint}>${hint}</${Hint}>`}
-    <div class="datagrid" ref=${ref}>
+    ${linked &&
+    html`<div class="datagrid" ref=${ref}>
+      <table>
+        <thead>
+          <tr><th>${t('From')}</th><th>${t('To')}</th><th>${t('Value')}</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${links.map(
+            (l, i) => html`<tr>
+              <td><input class="cell label" value=${l.from} onChange=${(e) => setLink(i, { from: e.target.value })} /></td>
+              <td><input class="cell label" value=${l.to} onChange=${(e) => setLink(i, { to: e.target.value })} /></td>
+              <td><input class="cell num" type="number" value=${l.value} onChange=${(e) => setLink(i, { value: Number(e.target.value) || 0 })} /></td>
+              <td><button class="cell-x" title=${t('Remove row')} onClick=${() => delLink(i)}>×</button></td>
+            </tr>`,
+          )}
+        </tbody>
+      </table>
+      <button class="cell-add wide" onClick=${addLink}>${t('+ Add row')}</button>
+    </div>`}
+    ${!linked &&
+    html`<div class="datagrid" ref=${ref}>
       <table>
         <thead>
           <tr>
@@ -716,7 +743,7 @@ export function ChartPanel({ els }) {
         </tbody>
       </table>
       <button class="cell-add wide" onClick=${addRow}>${t('+ Add row')}</button>
-    </div>
+    </div>`}
     ${colored.length > 0 &&
     html`<div class="series-colors">
       ${colored.map(
@@ -733,7 +760,7 @@ export function ChartPanel({ els }) {
     html`<${Row} label=${t('Color')}>
       <${ColorField} value=${ch.scaleColor} noneLabel=${t('Theme color {n}', { n: 1 })} onChange=${(v, live) => set_({ scaleColor: v }, 'scale', live)} />
     <//>`}
-    ${kind !== 'candlestick' && html`<${Row}><${Toggle} value=${ch.showLegend} label=${t('Legend')} onChange=${(v) => set_({ showLegend: v }, 'legend')} /><//>`}
+    ${kind !== 'candlestick' && !linked && html`<${Row}><${Toggle} value=${ch.showLegend} label=${t('Legend')} onChange=${(v) => set_({ showLegend: v }, 'legend')} /><//>`}
     ${kind !== 'streamgraph' && html`<${Row}><${Toggle} value=${ch.showValues} label=${t('Value labels')} onChange=${(v) => set_({ showValues: v }, 'values')} /><//>`}
     ${grid && html`<${Row}><${Toggle} value=${ch.showGrid} label=${t('Grid lines')} onChange=${(v) => set_({ showGrid: v }, 'grid')} /><//>`}
     <${Row} label=${t('Text size')}><${NumberField} value=${ch.fontSize} min=${6} max=${96} unit="px" onChange=${(v, live) => set_({ fontSize: v }, 'fs', live)} /><//>

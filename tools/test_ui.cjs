@@ -592,4 +592,20 @@ test('each chart type builds by its own unit and keeps edited data', async () =>
   const candles = Charts.switchChart(edited, 'candlestick');
   assert.equal(candles.series.length, 4, 'candlesticks get the series they need');
   assert.deepEqual(candles.series[0].values, [1, 2, 3, 4, 5]);
+
+  // Sankey diagrams and networks count steps as chart.rs does (its tests use the same flows).
+  const links = (rows) => rows.map(([from, to, value]) => ({ from, to, value }));
+  const flows = links([
+    ['S1', 'M1', 30], ['S2', 'M1', 20], ['S2', 'M2', 15], ['S3', 'M2', 25], ['M1', 'T1', 35], ['M1', 'T2', 15],
+    ['M2', 'T2', 30], ['S3', 'T3', 10], ['', 'X', 5], ['Y', 'Y', 5], ['Z', 'W', 0],
+  ]);
+  assert.deepEqual([...Charts.sankeyColumns(Charts.graph({ links: flows }, true))], [0, 1, 0, 1, 0, 2, 2, 2]);
+  assert.equal(A.seriesSteps(el('sankey', [], { links: flows })), 2, 'one step per column after the first');
+  const net = links([['A', 'B', 3], ['A', 'C', 0], ['B', 'C', 2], ['C', 'D', 1], ['E', 'F', 1]]);
+  assert.equal(A.seriesSteps(el('network', [], { links: net })), 6, 'node by node');
+  const cycle = Charts.sankeyColumns(Charts.graph({ links: links([['A', 'B', 1], ['B', 'C', 1], ['C', 'A', 1]]) }, true));
+  assert.ok(cycle.every((c) => c < 3), 'a cycle stops growing');
+  // Switching to a link chart fills in sample links only when there are none.
+  assert.equal(Charts.switchChart({ ...sample, links: [] }, 'sankey').links.length, 8);
+  assert.equal(Charts.switchChart({ ...sample, links: net }, 'sankey').links, undefined, 'written links are kept');
 });

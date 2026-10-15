@@ -2063,7 +2063,8 @@
  {
   "key": "From",
   "files": [
-   "inspector.js"
+   "inspector.js",
+   "panels.js"
   ]
  },
  {
@@ -3038,6 +3039,12 @@
   ]
  },
  {
+  "key": "Network graph",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
   "key": "Neutral",
   "files": [
    "panels.js"
@@ -3250,6 +3257,18 @@
  },
  {
   "key": "One column: a rectangle per row. Several columns: each column is a group of rectangles.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "One row per connection between two nodes. The value sets the line width.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "One row per flow: where it comes from, where it goes and how much.",
   "files": [
    "panels.js"
   ]
@@ -4009,6 +4028,12 @@
   ]
  },
  {
+  "key": "Sankey diagram",
+  "files": [
+   "chart.rs"
+  ]
+ },
+ {
   "key": "Sans",
   "files": [
    "controls.js"
@@ -4532,6 +4557,12 @@
   ]
  },
  {
+  "key": "Source {n}",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
   "key": "Space after each paragraph",
   "files": [
    "panels.js"
@@ -4601,6 +4632,12 @@
   "key": "Stacks this slide below the previous one (reveal.js vertical slides).",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Stage {n}",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -4768,6 +4805,12 @@
    "inspector.js",
    "panels.js",
    "toolbar.js"
+  ]
+ },
+ {
+  "key": "Target {n}",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -5132,6 +5175,7 @@
   "key": "To",
   "files": [
    "inspector.js",
+   "panels.js",
    "themebuilder.js"
   ]
  },
@@ -5344,6 +5388,12 @@
   "key": "Uses the background of the “{theme}” theme.",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Value",
+  "files": [
+   "panels.js"
   ]
  },
  {

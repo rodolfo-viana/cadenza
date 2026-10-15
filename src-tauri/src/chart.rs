@@ -25,6 +25,8 @@ pub const CHART_TYPES: &[(&str, &str)] = &[
     ("scatter", "Scatterplot"),
     ("heatmap", "Heatmap"),
     ("candlestick", "Candlestick"),
+    ("sankey", "Sankey diagram"),
+    ("network", "Network graph"),
 ];
 
 /// Column, bar and area charts: the base kind and whether it is stacked
@@ -48,7 +50,8 @@ fn positive_count(chart: &ChartContent) -> u32 {
 
 /// Steps a chart takes when it builds by series: one per series, or per
 /// slice (pie, donut), party (parliament), rectangle (treemap with one
-/// series), point group (scatterplot) or column (heatmap).
+/// series), point group (scatterplot), column (heatmap, Sankey diagram
+/// after its first) or node (network).
 pub fn series_steps(chart: &ChartContent) -> u32 {
     let n = chart.series.len() as u32;
     match chart.chart.as_str() {
@@ -56,6 +59,8 @@ pub fn series_steps(chart: &ChartContent) -> u32 {
         "treemap" if n == 1 => positive_count(chart),
         "scatter" => n.saturating_sub(1).max(n.min(1)),
         "candlestick" => 0,
+        "sankey" => sankey_columns(&graph(chart, true)).into_iter().max().unwrap_or(0) as u32,
+        "network" => graph(chart, false).names.len().min(300) as u32,
         _ => n,
     }
 }
@@ -157,7 +162,7 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
     let kind = chart.chart.as_str();
     let by_label = matches!(kind, "pie" | "donut" | "parliament") || (kind == "treemap" && chart.series.len() <= 1);
     let legend_items: Vec<(String, String)> = match kind {
-        "heatmap" | "candlestick" => Vec::new(),
+        "heatmap" | "candlestick" | "sankey" | "network" => Vec::new(),
         "parliament" if chart.show_values => {
             let seats = parliament_seats(chart);
             chart
@@ -193,6 +198,8 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
         "heatmap" => heatmap_chart(&mut svg, chart, w, plot_h, f, steps),
         "streamgraph" => stream_chart(&mut svg, chart, w, plot_h, f, steps),
         "candlestick" => candle_chart(&mut svg, chart, w, plot_h, f),
+        "sankey" => sankey_chart(&mut svg, chart, w, plot_h, f, steps),
+        "network" => network_chart(&mut svg, chart, w, plot_h, f, steps),
         _ => axis_chart(&mut svg, chart, w, plot_h, f, steps),
     }
     if legend_h > 0.0 {
@@ -1336,6 +1343,353 @@ fn candle_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) 
     }
 }
 
+// ---------------------------------------------------------------------------
+// Sankey diagrams and networks: links between named nodes
+// ---------------------------------------------------------------------------
+
+/// Nodes (named in order of first appearance) and the links between two
+/// different nodes. Sankey flows need a positive value; network links
+/// without one weigh 1.
+struct Graph {
+    names: Vec<String>,
+    links: Vec<(usize, usize, f64)>,
+}
+
+fn graph(chart: &ChartContent, flows: bool) -> Graph {
+    let mut names: Vec<String> = Vec::new();
+    let mut links = Vec::new();
+    let node = |name: &str, names: &mut Vec<String>| match names.iter().position(|n| n == name) {
+        Some(i) => i,
+        None => {
+            names.push(name.to_string());
+            names.len() - 1
+        }
+    };
+    for l in &chart.links {
+        let (a, b) = (l.from.trim(), l.to.trim());
+        let v = if l.value.is_finite() && l.value > 0.0 {
+            l.value
+        } else if flows {
+            continue;
+        } else {
+            1.0
+        };
+        if a.is_empty() || b.is_empty() || a == b {
+            continue;
+        }
+        let (s, t) = (node(a, &mut names), node(b, &mut names));
+        links.push((s, t, v));
+    }
+    Graph { names, links }
+}
+
+/// The column of each node of a Sankey diagram: one after the nodes that
+/// flow into it, and nodes nothing flows out of in the last column.
+/// (Mirrored in ui/js/charts.js to count build steps.)
+fn sankey_columns(g: &Graph) -> Vec<usize> {
+    let n = g.names.len();
+    let mut col = vec![0usize; n];
+    // A cycle stops growing at the last possible column.
+    for _ in 0..n {
+        let mut changed = false;
+        for &(s, t, _) in &g.links {
+            if col[t] < col[s] + 1 && col[s] + 1 < n {
+                col[t] = col[s] + 1;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let last = col.iter().copied().max().unwrap_or(0);
+    for (i, c) in col.iter_mut().enumerate() {
+        if !g.links.iter().any(|l| l.0 == i) {
+            *c = last;
+        }
+    }
+    col
+}
+
+fn sankey_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
+    let g = graph(chart, true);
+    let n = g.names.len();
+    if g.links.is_empty() {
+        return;
+    }
+    let col = sankey_columns(&g);
+    let last = col.iter().copied().max().unwrap_or(0).max(1);
+    let inflow: Vec<f64> = (0..n).map(|i| g.links.iter().filter(|l| l.1 == i).map(|l| l.2).sum()).collect();
+    let outflow: Vec<f64> = (0..n).map(|i| g.links.iter().filter(|l| l.0 == i).map(|l| l.2).sum()).collect();
+    let value: Vec<f64> = (0..n).map(|i| inflow[i].max(outflow[i])).collect();
+    let columns: Vec<Vec<usize>> = (0..=last).map(|c| (0..n).filter(|&i| col[i] == c).collect()).collect();
+    let pad = (f * 0.6).min(h * 0.08);
+    let nw = (f * 0.7).min(w * 0.04).max(4.0);
+    let top = f * 0.2;
+    let height = (h - top * 2.0).max(10.0);
+    // One scale for all columns: the fullest column fills the height.
+    let ky = columns
+        .iter()
+        .filter(|c| !c.is_empty())
+        .map(|c| (height - pad * (c.len() - 1) as f64) / c.iter().map(|&i| value[i]).sum::<f64>())
+        .fold(f64::MAX, f64::min)
+        .max(0.0);
+    let x = |c: usize| f * 0.2 + c as f64 * (w - f * 0.4 - nw) / last as f64;
+    let hgt: Vec<f64> = value.iter().map(|v| (v * ky).max(1.0)).collect();
+    let mut y = vec![top; n];
+    for c in &columns {
+        let used: f64 = c.iter().map(|&i| hgt[i]).sum::<f64>() + pad * c.len().saturating_sub(1) as f64;
+        let mut at = top + (height - used) / 2.0;
+        for &i in c {
+            y[i] = at;
+            at += hgt[i] + pad;
+        }
+    }
+    // Move nodes toward the nodes they are linked with, then keep them
+    // apart and inside the chart (as d3-sankey does).
+    let settle = |y: &mut Vec<f64>, c: &[usize]| {
+        let mut order = c.to_vec();
+        order.sort_by(|a, b| y[*a].total_cmp(&y[*b]));
+        let mut at = top;
+        for &i in &order {
+            y[i] = y[i].max(at);
+            at = y[i] + hgt[i] + pad;
+        }
+        let mut at = top + height;
+        for &i in order.iter().rev() {
+            y[i] = y[i].min(at - hgt[i]).max(top);
+            at = y[i] - pad;
+        }
+    };
+    for round in 0..8 {
+        let alpha = 0.99f64.powi(round);
+        for (k, c) in columns.iter().enumerate().skip(1).chain(columns.iter().enumerate().rev().skip(1)) {
+            for &i in c {
+                let (mut sum, mut wt) = (0.0, 0.0);
+                for &(s, t, v) in &g.links {
+                    let other = if t == i && col[s] < k {
+                        s
+                    } else if s == i && col[t] > k {
+                        t
+                    } else {
+                        continue;
+                    };
+                    sum += (y[other] + hgt[other] / 2.0) * v;
+                    wt += v;
+                }
+                if wt > 0.0 {
+                    y[i] += (sum / wt - (y[i] + hgt[i] / 2.0)) * alpha;
+                }
+            }
+            settle(&mut y, c);
+        }
+    }
+    // Where each link leaves its source and enters its target, ordered by
+    // the other end's position so that bands do not cross at the nodes.
+    let mut out_at = vec![0.0f64; g.links.len()];
+    let mut in_at = vec![0.0f64; g.links.len()];
+    for i in 0..n {
+        let mut outs: Vec<usize> = (0..g.links.len()).filter(|&k| g.links[k].0 == i).collect();
+        outs.sort_by(|a, b| y[g.links[*a].1].total_cmp(&y[g.links[*b].1]));
+        let mut at = y[i];
+        for k in outs {
+            out_at[k] = at;
+            at += g.links[k].2 * ky;
+        }
+        let mut ins: Vec<usize> = (0..g.links.len()).filter(|&k| g.links[k].1 == i).collect();
+        ins.sort_by(|a, b| y[g.links[*a].0].total_cmp(&y[g.links[*b].0]));
+        let mut at = y[i];
+        for k in ins {
+            in_at[k] = at;
+            at += g.links[k].2 * ky;
+        }
+    }
+    let node = |svg: &mut String, i: usize| {
+        let _ = write!(
+            svg,
+            r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" style="fill:{}"/>"#,
+            num(x(col[i])),
+            num(y[i]),
+            num(nw),
+            num(hgt[i]),
+            num((nw * 0.2).min(3.0)),
+            esc(&slice_color(i))
+        );
+        // Labels face inward: after the node, before it in the last column.
+        let right = col[i] < last;
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" text-anchor="{}" dominant-baseline="central" font-size="{}">{}"#,
+            num(if right { x(col[i]) + nw + f * 0.35 } else { x(col[i]) - f * 0.35 }),
+            num(y[i] + hgt[i] / 2.0),
+            if right { "start" } else { "end" },
+            num(f * 0.8),
+            esc(&g.names[i])
+        );
+        if chart.show_values {
+            let _ = write!(svg, r#" <tspan opacity="0.7">{}</tspan>"#, fmt_value(value[i]));
+        }
+        svg.push_str("</text>");
+    };
+    for &i in &columns[0] {
+        node(svg, i);
+    }
+    // Build by column: each column arrives with the flows that reach it.
+    for (c, nodes) in columns.iter().enumerate().skip(1) {
+        open_step(svg, steps, c as u32 - 1);
+        for (k, &(s, t, v)) in g.links.iter().enumerate() {
+            if col[t] != c {
+                continue;
+            }
+            let (x0, x1) = (x(col[s]) + nw, x(col[t]));
+            let xm = (x0 + x1) / 2.0;
+            let (a0, a1, b) = (out_at[k], in_at[k], v * ky);
+            let _ = write!(
+                svg,
+                r#"<path d="M{x0} {a0}C{xm} {a0} {xm} {a1} {x1} {a1}L{x1} {b1}C{xm} {b1} {xm} {b0} {x0} {b0}Z" style="fill:{}" fill-opacity="0.35"/>"#,
+                esc(&slice_color(s)),
+                x0 = num(x0),
+                x1 = num(x1),
+                xm = num(xm),
+                a0 = num(a0),
+                a1 = num(a1),
+                b0 = num(a0 + b),
+                b1 = num(a1 + b)
+            );
+        }
+        for &i in nodes {
+            node(svg, i);
+        }
+        close_step(svg, steps);
+    }
+}
+
+/// Node positions of a network: a force-directed layout (Fruchterman and
+/// Reingold) that starts from a circle, so the same data always gives the
+/// same picture. Positions stay within ±`aspect` across and ±1 down.
+fn network_layout(g: &Graph, aspect: f64) -> Vec<Point> {
+    let n = g.names.len();
+    let mut p: Vec<Point> = (0..n)
+        .map(|i| {
+            let a = std::f64::consts::TAU * i as f64 / n as f64;
+            (a.cos() * aspect, a.sin())
+        })
+        .collect();
+    if n < 2 {
+        return vec![(0.0, 0.0); n];
+    }
+    let k = (4.0 * aspect / n as f64).sqrt();
+    let rounds = 300;
+    for round in 0..rounds {
+        let heat = 0.1 * (1.0 - round as f64 / rounds as f64) + 0.002;
+        let mut d = vec![(0.0f64, 0.0f64); n];
+        for i in 0..n {
+            for j in i + 1..n {
+                let (dx, dy) = (p[i].0 - p[j].0, p[i].1 - p[j].1);
+                let dist = (dx * dx + dy * dy).sqrt().max(0.01);
+                let push = k * k / dist;
+                d[i].0 += dx / dist * push;
+                d[i].1 += dy / dist * push;
+                d[j].0 -= dx / dist * push;
+                d[j].1 -= dy / dist * push;
+            }
+        }
+        for &(i, j, _) in &g.links {
+            let (dx, dy) = (p[i].0 - p[j].0, p[i].1 - p[j].1);
+            let dist = (dx * dx + dy * dy).sqrt().max(0.01);
+            let pull = dist * dist / k;
+            d[i].0 -= dx / dist * pull;
+            d[i].1 -= dy / dist * pull;
+            d[j].0 += dx / dist * pull;
+            d[j].1 += dy / dist * pull;
+        }
+        for i in 0..n {
+            // A little gravity keeps separate groups in view.
+            d[i].0 -= p[i].0 * k;
+            d[i].1 -= p[i].1 * k;
+            let len = (d[i].0 * d[i].0 + d[i].1 * d[i].1).sqrt().max(1e-9);
+            let step = len.min(heat);
+            // Nodes stay in a frame shaped like the chart, so lone nodes
+            // cannot drift off and leave the rest small.
+            p[i].0 = (p[i].0 + d[i].0 / len * step).clamp(-aspect, aspect);
+            p[i].1 = (p[i].1 + d[i].1 / len * step).clamp(-1.0, 1.0);
+        }
+    }
+    p
+}
+
+fn network_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
+    let mut g = graph(chart, false);
+    g.names.truncate(300);
+    g.links.retain(|l| l.0 < 300 && l.1 < 300);
+    let n = g.names.len();
+    if n == 0 {
+        return;
+    }
+    let weight: Vec<f64> = (0..n).map(|i| g.links.iter().filter(|l| l.0 == i || l.1 == i).map(|l| l.2).sum()).collect();
+    let heaviest = weight.iter().copied().fold(0.0, f64::max).max(1e-9);
+    let radius: Vec<f64> = weight.iter().map(|wt| f * 0.35 + f * 0.6 * (wt / heaviest).sqrt()).collect();
+    let rmax = radius.iter().copied().fold(0.0, f64::max);
+    let layout = network_layout(&g, (w / h.max(1.0)).clamp(0.5, 3.0));
+    let (x0, x1) = layout.iter().fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p.0), b.max(p.0)));
+    let (y0, y1) = layout.iter().fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p.1), b.max(p.1)));
+    // Room for the largest node and its label all around.
+    let (mx, my) = (rmax + f * 2.5, rmax + f * 0.3);
+    let span = |a: f64, b: f64| if b - a > 1e-9 { b - a } else { 1.0 };
+    let sx = (w - mx * 2.0).max(1.0) / span(x0, x1);
+    let sy = (h - my * 2.0 - f * 1.2).max(1.0) / span(y0, y1);
+    let s = sx.min(sy);
+    let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+    let pos: Vec<Point> = layout
+        .iter()
+        .map(|p| (w / 2.0 + (p.0 - cx) * s, (h - f * 1.2) / 2.0 + (p.1 - cy) * s))
+        .collect();
+    let thickest = g.links.iter().map(|l| l.2).fold(0.0, f64::max).max(1e-9);
+    // Build node by node: each node arrives with its links to earlier ones.
+    for i in 0..n {
+        open_step(svg, steps, i as u32);
+        for &(a, b, v) in g.links.iter().filter(|l| l.0.max(l.1) == i) {
+            let (p, q) = (pos[a], pos[b]);
+            let (dx, dy) = (q.0 - p.0, q.1 - p.1);
+            let len = (dx * dx + dy * dy).sqrt().max(1e-9);
+            // Lines stop at the circles, so later lines never cross nodes.
+            let (ux, uy) = (dx / len, dy / len);
+            let _ = write!(
+                svg,
+                r#"<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="currentColor" stroke-opacity="0.4" stroke-width="{}" stroke-linecap="round"/>"#,
+                num(p.0 + ux * radius[a]),
+                num(p.1 + uy * radius[a]),
+                num(q.0 - ux * radius[b]),
+                num(q.1 - uy * radius[b]),
+                num(1.0 + f * 0.25 * v / thickest)
+            );
+            if chart.show_values {
+                let _ = write!(
+                    svg,
+                    r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-size="{}" opacity="0.8">{}</text>"#,
+                    num((p.0 + q.0) / 2.0),
+                    num((p.1 + q.1) / 2.0),
+                    num(f * 0.65),
+                    fmt_value(v)
+                );
+            }
+        }
+        let _ = write!(
+            svg,
+            r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/><text x="{}" y="{}" text-anchor="middle" font-size="{}">{}</text>"#,
+            num(pos[i].0),
+            num(pos[i].1),
+            num(radius[i]),
+            esc(&slice_color(i)),
+            num(pos[i].0),
+            num(pos[i].1 + radius[i] + f * 0.85),
+            num(f * 0.75),
+            esc(&g.names[i])
+        );
+        close_step(svg, steps);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1468,6 +1822,80 @@ mod tests {
         );
         assert_eq!(new, old);
         assert_ne!(new, chart_svg(&ChartContent::default(), 800.0, 450.0, None));
+    }
+
+    fn flows(links: &[(&str, &str, f64)]) -> Vec<crate::model::Link> {
+        links
+            .iter()
+            .map(|(a, b, v)| crate::model::Link {
+                from: a.to_string(),
+                to: b.to_string(),
+                value: *v,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn sankey_nodes_follow_their_flows() {
+        let c = ChartContent {
+            chart: "sankey".into(),
+            links: flows(&[
+                ("S1", "M1", 30.0),
+                ("S2", "M1", 20.0),
+                ("S2", "M2", 15.0),
+                ("S3", "M2", 25.0),
+                ("M1", "T1", 35.0),
+                ("M1", "T2", 15.0),
+                ("M2", "T2", 30.0),
+                ("S3", "T3", 10.0),
+                ("", "X", 5.0),
+                ("Y", "Y", 5.0),
+                ("Z", "W", 0.0),
+            ]),
+            ..Default::default()
+        };
+        let g = graph(&c, true);
+        assert_eq!(
+            g.names,
+            ["S1", "M1", "S2", "M2", "S3", "T1", "T2", "T3"],
+            "blank, looping and empty flows are left out"
+        );
+        // T3 is fed straight from a source but still ends in the last column.
+        assert_eq!(sankey_columns(&g), [0, 1, 0, 1, 0, 2, 2, 2]);
+        assert_eq!(series_steps(&c), 2);
+        let svg = chart_svg(&c, 800.0, 450.0, Some(SeriesSteps { effect: "fade-in", first: 1 }));
+        assert_eq!(svg.matches("class=\"fragment").count(), 2, "one step per column after the first");
+        assert_eq!(svg.matches("<rect").count(), 8, "one bar per node");
+        assert!(!svg.contains("NaN") && !svg.contains("inf"));
+
+        let cycle = ChartContent {
+            chart: "sankey".into(),
+            links: flows(&[("A", "B", 1.0), ("B", "C", 1.0), ("C", "A", 1.0)]),
+            ..Default::default()
+        };
+        assert!(sankey_columns(&graph(&cycle, true)).iter().all(|c| *c < 3), "a cycle stops growing");
+        assert!(chart_svg(&cycle, 400.0, 300.0, None).ends_with("</svg>"));
+    }
+
+    #[test]
+    fn networks_lay_out_the_same_way_every_time() {
+        let c = ChartContent {
+            chart: "network".into(),
+            links: flows(&[("A", "B", 3.0), ("A", "C", 0.0), ("B", "C", 2.0), ("C", "D", 1.0), ("E", "F", 1.0)]),
+            ..Default::default()
+        };
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert_eq!(svg, chart_svg(&c, 800.0, 450.0, None));
+        assert_eq!(svg.matches("<circle").count(), 6, "links without a value still connect");
+        assert_eq!(svg.matches("<line").count(), 5);
+        assert!(!svg.contains("NaN") && !svg.contains("inf"));
+        assert_eq!(series_steps(&c), 6, "node by node");
+        let layout = network_layout(&graph(&c, false), 16.0 / 9.0);
+        for (i, p) in layout.iter().enumerate() {
+            for q in &layout[i + 1..] {
+                assert!((p.0 - q.0).hypot(p.1 - q.1) > 0.05, "nodes keep apart");
+            }
+        }
     }
 
     #[test]

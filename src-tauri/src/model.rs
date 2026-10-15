@@ -939,6 +939,8 @@ pub struct ChartContent {
     pub stacked: bool,
     /// Heatmaps: the color of the highest value. Empty = theme color 1.
     pub scale_color: String,
+    /// Sankey diagrams and networks: links between named nodes.
+    pub links: Vec<Link>,
 }
 
 impl Default for ChartContent {
@@ -965,6 +967,7 @@ impl Default for ChartContent {
             color: String::new(),
             stacked: false,
             scale_color: String::new(),
+            links: Vec::new(),
         }
     }
 }
@@ -996,6 +999,15 @@ impl Default for DiagramContent {
             svg_dark: String::new(),
         }
     }
+}
+
+/// A link of a Sankey diagram (a flow) or of a network (a connection).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Link {
+    pub from: String,
+    pub to: String,
+    pub value: f64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
