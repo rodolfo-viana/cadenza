@@ -1144,20 +1144,17 @@ fn open_editor_window(app: &AppHandle, file: Option<PathBuf>) -> tauri::Result<(
     {
         p.insert(label.clone(), f);
     }
-    let w = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+    WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("Cadenza")
         .inner_size(1440.0, 900.0)
         .min_inner_size(900.0, 560.0)
         .center()
-        .on_permission_request(camera_only)
         .build()?;
-    // The editor previews live video elements on request.
-    enable_camera(&w);
     Ok(())
 }
 
-/// Cadenza's own pages may use the camera (live video elements), never the
-/// microphone.
+/// The audience window may use the camera (live video elements), never the
+/// microphone. No other window gets the camera.
 fn camera_only<R: tauri::Runtime>(_: tauri::Webview<R>, kind: tauri::webview::PermissionKind) -> tauri::webview::PermissionResponse {
     use tauri::webview::{PermissionKind, PermissionResponse};
     match kind {

@@ -89,6 +89,7 @@
         }
         camera.stream = stream;
         camera.device = device;
+        try { window.dispatchEvent(new CustomEvent('cz-camera-on')); } catch (e) { /* old browsers */ }
         return stream;
       });
     }

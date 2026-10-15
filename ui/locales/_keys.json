@@ -738,12 +738,6 @@
   ]
  },
  {
-  "key": "Camera {n}",
-  "files": [
-   "panels.js"
-  ]
- },
- {
   "key": "Cancel",
   "files": [
    "dialogs.js",
@@ -1949,6 +1943,12 @@
   "key": "font weight::Semibold",
   "files": [
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "For a round picture, choose Circle with a square frame.",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -3176,6 +3176,12 @@
   ]
  },
  {
+  "key": "Only the audience sees the camera, and only while you present its slide: the editor and the presenter display never turn it on.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Opacity",
   "files": [
    "controls.js",
@@ -3569,12 +3575,6 @@
   "key": "Presenting",
   "files": [
    "dialogs.js"
-  ]
- },
- {
-  "key": "Preview",
-  "files": [
-   "panels.js"
   ]
  },
  {
@@ -4524,12 +4524,6 @@
   ]
  },
  {
-  "key": "Stop Preview",
-  "files": [
-   "panels.js"
-  ]
- },
- {
   "key": "Stretch",
   "files": [
    "panels.js"
@@ -4695,18 +4689,6 @@
   "files": [
    "panels.js",
    "teleprompter.js"
-  ]
- },
- {
-  "key": "The camera could not be turned on. Check that it is connected and not used by another app.",
-  "files": [
-   "panels.js"
-  ]
- },
- {
-  "key": "The camera turns on only while you present a slide with live video, or during a preview here. For a round picture, choose Circle with a square frame.",
-  "files": [
-   "panels.js"
   ]
  },
  {
@@ -5362,6 +5344,12 @@
   "key": "You can change the theme at any time from the Document inspector.",
   "files": [
    "welcome.js"
+  ]
+ },
+ {
+  "key": "Your cameras are listed here by name after you present live video once.",
+  "files": [
+   "panels.js"
   ]
  },
  {

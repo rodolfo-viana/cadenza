@@ -23,7 +23,6 @@ import { item } from './commands.js';
 import { beginTextEdit, endTextEdit, editingNode, beginTableEdit, endTableEdit, tableNode, isEditing, isEditingTable } from './textedit.js';
 import { bounds, unionBounds, intersects, rotate, clamp, cls } from './util.js';
 import { t, language } from './i18n.js';
-import { attachPreview } from './camera.js';
 
 const PAD = 48; // space around the slide
 const MIN = 8; // minimum element size
@@ -148,10 +147,6 @@ export function Canvas() {
     v.update(rendered?.html || '', force);
     measure();
   }, [rendered?.html, slide?.id, st.editing, st.editingTable, language()]);
-
-  // A live camera preview lives inside its element's markup: put it back
-  // after every render.
-  useLayoutEffect(() => attachPreview(viewRef.current, slide));
 
   // Leaving the slide ends inline editing and path drawing.
   useEffect(() => {

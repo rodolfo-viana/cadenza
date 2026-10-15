@@ -172,6 +172,15 @@
         e.preventDefault();
         Reveal.prev();
       });
+      // With the camera on, cameras have names: the editor lists them (it
+      // never uses the camera itself).
+      window.addEventListener('cz-camera-on', function () {
+        navigator.mediaDevices.enumerateDevices().then(function (list) {
+          var cams = list.filter(function (d) { return d.kind === 'videoinput' && d.label; })
+            .map(function (d) { return { id: d.deviceId, label: d.label }; });
+          if (cams.length) localStorage.setItem('cz-cameras', JSON.stringify(cams));
+        }).catch(function () {});
+      });
       emitState({ started: true });
     }).catch(function (e) {
       var message = t('Could not start the presentation: {error}', { error: t(String(e)) });
