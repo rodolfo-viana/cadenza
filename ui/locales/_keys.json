@@ -1198,6 +1198,12 @@
   ]
  },
  {
+  "key": "Could not reach the address — check the link and your internet connection",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
   "key": "Could not reach the service — check your internet connection",
   "files": [
    "media.rs"
@@ -2457,6 +2463,12 @@
   ]
  },
  {
+  "key": "Image from {site}",
+  "files": [
+   "media.js"
+  ]
+ },
+ {
   "key": "Images",
   "files": [
    "actions.js"
@@ -2541,7 +2553,8 @@
  {
   "key": "Insert Image",
   "files": [
-   "actions.js"
+   "actions.js",
+   "media.js"
   ]
  },
  {
@@ -4219,7 +4232,7 @@
   ]
  },
  {
-  "key": "Search GIFs…",
+  "key": "Search GIFs or paste a link to one…",
   "files": [
    "media.js"
   ]
@@ -4231,7 +4244,7 @@
   ]
  },
  {
-  "key": "Search photos…",
+  "key": "Search photos or paste a link to an image…",
   "files": [
    "media.js"
   ]
@@ -5033,6 +5046,12 @@
   ]
  },
  {
+  "key": "The link did not open — check that it is complete and public",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
   "key": "The Markdown file has no content",
   "files": [
    "lib.rs"
@@ -5218,6 +5237,12 @@
   ]
  },
  {
+  "key": "This link does not show an image. Right-click the image and copy its address, then paste that.",
+  "files": [
+   "media.rs"
+  ]
+ },
+ {
   "key": "This theme was made with a newer version of Cadenza",
   "files": [
    "custom_theme.rs"
@@ -5363,7 +5388,7 @@
   ]
  },
  {
-  "key": "Type to search.",
+  "key": "Type to search, or paste a link.",
   "files": [
    "media.js"
   ]

@@ -48,7 +48,7 @@ pub struct MediaPage {
 }
 
 fn agent() -> ureq::Agent {
-    ureq::Agent::new_with_config(
+    crate::util::http_agent(
         ureq::Agent::config_builder()
             .timeout_global(Some(Duration::from_secs(25)))
             .http_status_as_error(false)
@@ -268,13 +268,20 @@ fn id(v: &Value) -> String {
 /// Plain text of an HTML snippet (Wikimedia's metadata is HTML).
 fn plain(html: &str) -> String {
     let mut out = String::with_capacity(html.len());
-    let mut in_tag = false;
+    let mut tag: Option<String> = None;
     for c in html.chars() {
-        match c {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => out.push(c),
-            _ => {}
+        match (c, tag.as_mut()) {
+            ('<', None) => tag = Some(String::new()),
+            ('>', Some(t)) => {
+                // Lines and blocks end in a space ("Ann<br>Bo" is "Ann Bo").
+                let name = t.trim_start_matches('/').split(|c: char| !c.is_ascii_alphanumeric()).next().unwrap_or("");
+                if matches!(name.to_ascii_lowercase().as_str(), "br" | "p" | "div" | "li" | "tr" | "td" | "th") {
+                    out.push(' ');
+                }
+                tag = None;
+            }
+            (_, Some(t)) => t.push(c),
+            (_, None) => out.push(c),
         }
     }
     html_unescape(&out).split_whitespace().collect::<Vec<_>>().join(" ")
@@ -358,7 +365,7 @@ fn wikimedia_page(v: &Value) -> MediaPage {
             let info = &r["imageinfo"][0];
             let mime = s(info, &["mime"]);
             // Only formats every web engine shows (no TIFF, no XCF…).
-            if !matches!(mime.as_str(), "image/jpeg" | "image/png" | "image/gif" | "image/webp") {
+            if !web_image(&mime) {
                 return None;
             }
             let (original, thumb) = (s(info, &["url"]), s(info, &["thumburl"]));
@@ -369,30 +376,44 @@ fn wikimedia_page(v: &Value) -> MediaPage {
             } else {
                 original
             };
-            let meta = &info["extmetadata"];
-            let file = s(r, &["title"]);
-            let name = file.trim_start_matches("File:");
-            let name = name.rsplit_once('.').map_or(name, |(stem, _)| stem);
-            let title = plain(&s(meta, &["ObjectName", "value"]));
             Some(MediaItem {
-                id: id(&r["pageid"]),
-                provider: "wikimedia".into(),
-                kind: if mime == "image/gif" { "gif".into() } else { "image".into() },
-                title: if title.is_empty() { name.to_string() } else { title },
                 thumb,
                 url,
-                width,
-                height: n(info, &["height"]),
-                author: plain(&s(meta, &["Artist", "value"])),
-                author_url: String::new(),
-                page_url: s(info, &["descriptionurl"]),
-                license: plain(&s(meta, &["LicenseShortName", "value"])),
+                ..wikimedia_file(r)
             })
         })
         .collect();
     MediaPage {
         items,
         next: v["continue"]["gsroffset"].as_u64().map(|o| o.to_string()),
+    }
+}
+
+fn web_image(mime: &str) -> bool {
+    matches!(mime, "image/jpeg" | "image/png" | "image/gif" | "image/webp")
+}
+
+/// A Wikimedia file's name, author and license (`r` is a page of an
+/// imageinfo query).
+fn wikimedia_file(r: &Value) -> MediaItem {
+    let info = &r["imageinfo"][0];
+    let meta = &info["extmetadata"];
+    let file = s(r, &["title"]);
+    let name = file.split_once(':').map_or(file.as_str(), |(_, n)| n);
+    let name = name.rsplit_once('.').map_or(name, |(stem, _)| stem);
+    let title = plain(&s(meta, &["ObjectName", "value"]));
+    MediaItem {
+        id: id(&r["pageid"]),
+        provider: "wikimedia".into(),
+        kind: if s(info, &["mime"]) == "image/gif" { "gif".into() } else { "image".into() },
+        title: if title.is_empty() { name.to_string() } else { title },
+        width: n(info, &["width"]),
+        height: n(info, &["height"]),
+        // Credits continue after the name ("…, CC BY-SA 4.0").
+        author: plain(&s(meta, &["Artist", "value"])).trim_end_matches('.').to_string(),
+        page_url: s(info, &["descriptionurl"]),
+        license: plain(&s(meta, &["LicenseShortName", "value"])),
+        ..Default::default()
     }
 }
 
@@ -427,6 +448,256 @@ pub fn oembed(link: &str) -> anyhow::Result<MediaItem> {
         page_url: link.to_string(),
         ..Default::default()
     })
+}
+
+/// What an image link shows, before inserting it: a Wikimedia file (with its
+/// author and license), an image, or a web page's main image.
+pub fn link(link: &str) -> anyhow::Result<MediaItem> {
+    let link = link.trim();
+    let lower = link.to_ascii_lowercase();
+    if !lower.starts_with("https://") && !lower.starts_with("http://") {
+        bail!("Invalid address");
+    }
+    if let Some((api, title)) = wikimedia_title(link) {
+        let direct = !lower.contains("/wiki/") && !lower.contains("title=");
+        if let Some(item) = wikimedia_link(&api, &title, direct.then_some(link)) {
+            return Ok(item);
+        }
+    }
+    image_at(link, true)
+}
+
+/// The API and file title of a link to a file on Wikimedia Commons or
+/// Wikipedia: an upload (`upload.wikimedia.org/wikipedia/commons/…`), a file
+/// page (`…/wiki/File:…`) or a picture opened from an article (`#/media/…`).
+fn wikimedia_title(link: &str) -> Option<(String, String)> {
+    let rest = link.split_once("://")?.1;
+    let (host, path) = rest.split_once('/').unwrap_or((rest, ""));
+    let host = host.to_ascii_lowercase().replace(".m.", ".");
+    let (path, fragment) = path.split_once('#').unwrap_or((path, ""));
+    let (path, query) = path.split_once('?').unwrap_or((path, ""));
+    let decode = |s: &str| crate::util::decode_percent(s).map(|s| s.replace('_', " "));
+    if host == "upload.wikimedia.org" || host == "thumb.wikimedia.org" {
+        // wikipedia/<wiki>/[thumb/]a/ab/<name>[/<size>px-<name>.png]
+        let parts: Vec<&str> = path.split('/').collect();
+        let (family, wiki) = (*parts.first()?, *parts.get(1)?);
+        let skip = if parts.get(2) == Some(&"thumb") { 3 } else { 2 };
+        let name = parts.get(skip + 2)?;
+        if family != "wikipedia" || name.is_empty() {
+            return None;
+        }
+        let api = if wiki == "commons" {
+            "commons.wikimedia.org".to_string()
+        } else {
+            format!("{wiki}.wikipedia.org")
+        };
+        return Some((format!("https://{api}/w/api.php"), format!("File:{}", decode(name)?)));
+    }
+    if host != "commons.wikimedia.org" && !host.ends_with(".wikipedia.org") {
+        return None;
+    }
+    let title = if let Some(media) = fragment.strip_prefix("/media/") {
+        media
+    } else if let Some(t) = path.strip_prefix("wiki/") {
+        t
+    } else {
+        query.split('&').find_map(|kv| kv.strip_prefix("title="))?
+    };
+    // A file, in any language ("File:", "Ficheiro:", "Datei:"…).
+    let title = decode(title)?;
+    title.contains(':').then(|| (format!("https://{host}/w/api.php"), title))
+}
+
+/// A Wikimedia file as a media item: the link itself when it is the image,
+/// else the file (or a picture of it for SVG, TIFF, PDF…), 1920px at most.
+fn wikimedia_link(api: &str, title: &str, direct: Option<&str>) -> Option<MediaItem> {
+    let url = format!(
+        "{api}?action=query&format=json&formatversion=2&titles={}&prop=imageinfo&iiprop=url%7Csize%7Cmime%7Cextmetadata&iiurlwidth=1920&iiextmetadatafilter=Artist%7CLicenseShortName%7CObjectName",
+        enc(title)
+    );
+    let v = get_json(&url, &[]).ok()?;
+    let r = &v["query"]["pages"][0];
+    let info = &r["imageinfo"][0];
+    let (original, thumb) = (s(info, &["url"]), s(info, &["thumburl"]));
+    if original.is_empty() {
+        return None;
+    }
+    let mime = s(info, &["mime"]);
+    let keep = web_image(&mime) && (n(info, &["width"]) <= 1920 || mime == "image/gif");
+    let url = match direct {
+        Some(link) => link.to_string(),
+        None if keep || thumb.is_empty() => original,
+        None => thumb.clone(),
+    };
+    let mut item = wikimedia_file(r);
+    if direct.is_some_and(|l| !l.to_ascii_lowercase().ends_with(".gif")) || !keep {
+        item.kind = "image".into();
+    }
+    // A thumbnail link (…/1280px-Name.png) is that wide.
+    let file = direct.unwrap_or(&url).split(['?', '#']).next().unwrap_or("").rsplit('/').next().unwrap_or("");
+    let px = file.split_once("px-").and_then(|(w, _)| w.rsplit('-').next()?.parse::<u32>().ok());
+    if let Some(w) = px.filter(|w| *w > 0 && item.width > 0) {
+        item.height = (f64::from(item.height) * f64::from(w) / f64::from(item.width)).round() as u32;
+        item.width = w;
+    }
+    Some(MediaItem {
+        thumb: if thumb.is_empty() { url.clone() } else { thumb },
+        url,
+        ..item
+    })
+}
+
+/// The image at `link`; for a web page, the image it shows in link
+/// previews (Open Graph), when `page` allows.
+fn image_at(link: &str, page: bool) -> anyhow::Result<MediaItem> {
+    use std::io::Read;
+    let mut resp = agent()
+        .get(link)
+        .header("User-Agent", UA)
+        .header("Accept", "image/webp,image/png,image/jpeg,image/*;q=0.9,text/html;q=0.8,*/*;q=0.5")
+        .call()
+        .context("Could not reach the address — check the link and your internet connection")?;
+    match resp.status().as_u16() {
+        200..=299 => {}
+        429 => bail!("Too many requests — please wait a moment and try again."),
+        _ => bail!("The link did not open — check that it is complete and public"),
+    }
+    let ctype = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    // Enough to read an image's size, or a page's head.
+    let mut head = Vec::new();
+    resp.body_mut()
+        .as_reader()
+        .take(1 << 20)
+        .read_to_end(&mut head)
+        .context("Download failed — check your internet connection")?;
+    if let Some((width, height)) = image_size(&head) {
+        let file = link.split(['?', '#']).next().unwrap_or(link).rsplit('/').next().unwrap_or("");
+        let file = crate::util::decode_percent(file).unwrap_or_else(|| file.to_string());
+        let gif = head.starts_with(b"GIF8");
+        return Ok(MediaItem {
+            id: link.to_string(),
+            provider: "link".into(),
+            kind: if gif { "gif".into() } else { "image".into() },
+            title: file.rsplit_once('.').map_or(file.as_str(), |(stem, _)| stem).replace('_', " "),
+            thumb: link.to_string(),
+            url: link.to_string(),
+            width,
+            height,
+            page_url: link.to_string(),
+            ..Default::default()
+        });
+    }
+    if page && (ctype.contains("html") || ctype.is_empty()) {
+        let html = String::from_utf8_lossy(&head);
+        if let Some((src, title)) = page_image(&html) {
+            let mut item = image_at(&join_url(link, &src), false)?;
+            item.page_url = link.to_string();
+            if !title.is_empty() {
+                item.title = title;
+            }
+            return Ok(item);
+        }
+    }
+    bail!("This link does not show an image. Right-click the image and copy its address, then paste that.")
+}
+
+/// Size of an image in a format every web engine shows (0 × 0 for an SVG
+/// without one), from its first bytes.
+fn image_size(head: &[u8]) -> Option<(u32, u32)> {
+    use imagesize::ImageType::*;
+    if let Ok(Png | Jpeg | Gif | Webp | Bmp | Ico) = imagesize::image_type(head) {
+        return imagesize::blob_size(head).ok().map(|s| (s.width as u32, s.height as u32));
+    }
+    let text = String::from_utf8_lossy(&head[..head.len().min(4096)]);
+    let start = text.find("<svg")?;
+    let tag = &text[start + 4..start + text[start..].find('>')?];
+    let attrs = tag_attrs(tag);
+    let get = |k: &str| attrs.iter().find(|(n, _)| n == k).map(|(_, v)| v.trim());
+    let px = |v: Option<&str>| v.and_then(|v| v.trim_end_matches("px").parse::<f64>().ok()).filter(|v| *v > 0.0);
+    let view: Vec<f64> = get("viewbox").unwrap_or("").split([' ', ',']).filter_map(|v| v.parse().ok()).collect();
+    let (w, h) = match (px(get("width")), px(get("height"))) {
+        (Some(w), Some(h)) => (w, h),
+        _ if view.len() == 4 => (view[2], view[3]),
+        _ => (0.0, 0.0),
+    };
+    Some((w.round() as u32, h.round() as u32))
+}
+
+/// The image a web page names for link previews (Open Graph or Twitter
+/// cards) and the page's title there.
+fn page_image(html: &str) -> Option<(String, String)> {
+    let (mut image, mut title) = (None, String::new());
+    let lower = html.to_ascii_lowercase();
+    let mut at = 0;
+    while let Some(i) = lower[at..].find("<meta") {
+        let start = at + i;
+        let end = lower[start..].find('>').map_or(lower.len(), |e| start + e);
+        let attrs = tag_attrs(&html[start + 5..end]);
+        let get = |k: &str| attrs.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
+        let key = get("property").or(get("name")).unwrap_or("").to_ascii_lowercase();
+        let value = html_unescape(get("content").unwrap_or("").trim());
+        match key.as_str() {
+            "og:image" | "og:image:url" | "og:image:secure_url" | "twitter:image" | "twitter:image:src" if image.is_none() && !value.is_empty() => {
+                image = Some(value)
+            }
+            "og:title" | "twitter:title" if title.is_empty() => title = value,
+            _ => {}
+        }
+        if end >= lower.len() {
+            break;
+        }
+        at = end + 1;
+    }
+    image.map(|i| (i, title))
+}
+
+/// Attributes of a tag (`name="value"`, `name='value'` or `name=value`),
+/// names in lowercase.
+fn tag_attrs(tag: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut rest = tag;
+    while let Some(eq) = rest.find('=') {
+        let name = rest[..eq].split_whitespace().last().unwrap_or("").to_ascii_lowercase();
+        let after = rest[eq + 1..].trim_start();
+        let (value, next) = match after.chars().next() {
+            Some(q @ ('"' | '\'')) => {
+                let body = &after[1..];
+                let close = body.find(q).unwrap_or(body.len());
+                (&body[..close], &body[(close + 1).min(body.len())..])
+            }
+            _ => {
+                let close = after.find(char::is_whitespace).unwrap_or(after.len());
+                (&after[..close], &after[close..])
+            }
+        };
+        out.push((name, value.to_string()));
+        rest = next;
+    }
+    out
+}
+
+/// `href` read from the page at `base`.
+fn join_url(base: &str, href: &str) -> String {
+    let href = href.trim();
+    if href.starts_with("http://") || href.starts_with("https://") {
+        return href.to_string();
+    }
+    let (scheme, rest) = base.split_once("://").unwrap_or(("https", base));
+    if let Some(r) = href.strip_prefix("//") {
+        return format!("{scheme}://{r}");
+    }
+    let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
+    if href.starts_with('/') {
+        return format!("{scheme}://{host}{href}");
+    }
+    let path = rest.split(['?', '#']).next().unwrap_or(rest);
+    let dir = path.rsplit_once('/').map_or(host, |(d, _)| d);
+    format!("{scheme}://{dir}/{href}")
 }
 
 /// Downloads a media file (images/GIFs to embed in the presentation).
@@ -546,5 +817,73 @@ mod tests {
         assert_eq!(small.url, "https://upload.wikimedia.org/o.jpg");
         assert_eq!((big.author.as_str(), big.license.as_str()), ("Ann & Bo", "CC BY-SA 4.0"));
         assert_eq!(page.next.as_deref(), Some("30"));
+    }
+
+    #[test]
+    fn finds_wikimedia_files_in_links() {
+        let commons = "https://commons.wikimedia.org/w/api.php".to_string();
+        let file = |t: &str| Some((commons.clone(), t.to_string()));
+        assert_eq!(
+            wikimedia_title("https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0a/Logo_Unesp.svg/1280px-Logo_Unesp.svg.png"),
+            file("File:Logo Unesp.svg")
+        );
+        assert_eq!(
+            wikimedia_title("https://upload.wikimedia.org/wikipedia/commons/a/ab/S%C3%A3o_Paulo.jpg"),
+            file("File:São Paulo.jpg")
+        );
+        assert_eq!(
+            wikimedia_title("https://commons.wikimedia.org/wiki/File:Logo_Unesp.svg?uselang=pt"),
+            file("File:Logo Unesp.svg")
+        );
+        assert_eq!(wikimedia_title("https://commons.m.wikimedia.org/wiki/File:A.jpg"), file("File:A.jpg"));
+        assert_eq!(
+            wikimedia_title("https://pt.wikipedia.org/wiki/Unesp#/media/Ficheiro:Logo_Unesp.svg"),
+            Some(("https://pt.wikipedia.org/w/api.php".into(), "Ficheiro:Logo Unesp.svg".into()))
+        );
+        assert_eq!(
+            wikimedia_title("https://upload.wikimedia.org/wikipedia/en/thumb/1/1a/X.png/200px-X.png"),
+            Some(("https://en.wikipedia.org/w/api.php".into(), "File:X.png".into()))
+        );
+        // Articles have no file: their page shows its own picture.
+        assert_eq!(wikimedia_title("https://en.wikipedia.org/wiki/Brazil"), None);
+        assert_eq!(wikimedia_title("https://example.com/wiki/File:A.jpg"), None);
+    }
+
+    #[test]
+    fn plain_text_keeps_lines_apart() {
+        assert_eq!(
+            plain("Giro720<br>Original design by <a href=\"x\">Israel Pedrosa</a>."),
+            "Giro720 Original design by Israel Pedrosa."
+        );
+        assert_eq!(plain("<p>Ann &amp; Bo</p><p>Cy</p>"), "Ann & Bo Cy");
+    }
+
+    #[test]
+    fn reads_the_image_of_a_web_page() {
+        let page = r#"<head><meta charset="utf-8"><meta content="A &amp; B" property="og:title">
+            <meta name='twitter:image' content='/t.jpg'><META PROPERTY="og:image" CONTENT="https://x.org/i.jpg?a=1&amp;b=2"></head>"#;
+        assert_eq!(page_image(page), Some(("/t.jpg".into(), "A & B".into())));
+        assert_eq!(
+            page_image("<meta property=og:image content=//cdn.x.org/a.png>"),
+            Some(("//cdn.x.org/a.png".into(), String::new()))
+        );
+        assert_eq!(page_image("<title>None</title>"), None);
+        assert_eq!(join_url("https://x.org/a/b.html?q", "/t.jpg"), "https://x.org/t.jpg");
+        assert_eq!(join_url("https://x.org/a/b.html?q", "c/t.jpg"), "https://x.org/a/c/t.jpg");
+        assert_eq!(join_url("http://x.org", "//cdn.x.org/a.png"), "http://cdn.x.org/a.png");
+        assert_eq!(join_url("https://x.org/a/", "https://y.org/i.png"), "https://y.org/i.png");
+    }
+
+    #[test]
+    fn reads_image_sizes_from_their_first_bytes() {
+        let mut png = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, b'I', b'H', b'D', b'R'];
+        png.extend_from_slice(&[0, 0, 2, 0, 0, 0, 1, 0, 8, 6, 0, 0, 0]);
+        assert_eq!(image_size(&png), Some((512, 256)));
+        assert_eq!(
+            image_size(br#"<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150">"#),
+            Some((300, 150))
+        );
+        assert_eq!(image_size(br#"<svg width="64px" height='32' viewBox="0 0 1 1">"#), Some((64, 32)));
+        assert_eq!(image_size(b"<!doctype html><html><body>no</body></html>"), None);
     }
 }

@@ -980,7 +980,10 @@ input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 .powered { font-size: 12px; color: var(--muted); }
 .center { text-align: center; }
 .video-preview { display: flex; gap: 16px; padding: 14px; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--panel-2); margin-bottom: 14px; }
-.video-preview img { width: 280px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
+.video-preview img { width: 280px; flex-shrink: 0; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; }
+/* Images show whole, over a checkerboard where they are transparent. */
+.video-preview.image img { object-fit: contain; background: repeating-conic-gradient(#d4d4d8 0 25%, #f4f4f5 0 50%) 0 0 / 16px 16px; }
+.video-preview > div { min-width: 0; overflow-wrap: anywhere; }
 .video-preview b { font-size: 15px; }
 .key-prompt { display: flex; gap: 14px; padding: 16px; border-radius: 12px; border: 1px dashed var(--border-strong); background: var(--panel-2); margin-bottom: 10px; }
 .key-prompt.compact { padding: 10px; margin: 8px 0 0; border-style: solid; }

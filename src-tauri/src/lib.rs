@@ -690,6 +690,11 @@ async fn media_oembed(url: String) -> CmdResult<media::MediaItem> {
         .map_err(err)
 }
 
+#[tauri::command]
+async fn media_link(url: String) -> CmdResult<media::MediaItem> {
+    tauri::async_runtime::spawn_blocking(move || media::link(&url)).await.map_err(err)?.map_err(err)
+}
+
 /// Opens a provider's website (YouTube, Vimeo, GIPHY) with an
 /// "Insert" bar. The site runs in a separate helper process (this same
 /// executable with `--media-browser`), so a crash in the web engine can never
@@ -1452,6 +1457,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             secret_delete,
             media_search,
             media_oembed,
+            media_link,
             media_browse,
             media_import,
             import_markdown,

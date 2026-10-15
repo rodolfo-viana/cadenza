@@ -1,5 +1,6 @@
-// Media Library: photos (Openverse, Wikimedia Commons, Pexels, Pixabay), GIFs
-// (GIPHY, Openverse) and videos (YouTube search, YouTube/Vimeo links).
+// Media Library: photos (Openverse, Wikimedia Commons, Pexels, Pixabay, or a
+// link to an image), GIFs (GIPHY, Openverse) and videos (YouTube search,
+// YouTube/Vimeo links).
 
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
@@ -195,16 +196,22 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
 
   async function search(cursor = null) {
     const q = query.trim();
-    if (tab === 'videos' && isLink(q)) {
+    if (isLink(q)) {
+      // A video link, or a link to an image (or a page that shows one).
+      const my = ++seq.current;
       setLoading(true);
       setError(null);
+      setItems([]);
+      setNext(null);
       try {
-        setPreview(await invoke('media_oembed', { url: q }));
+        const item = await invoke(tab === 'videos' ? 'media_oembed' : 'media_link', { url: q });
+        if (my === seq.current) setPreview(item);
       } catch (e) {
+        if (my !== seq.current) return;
         setPreview(null);
         setError(String(e));
       } finally {
-        setLoading(false);
+        if (my === seq.current) setLoading(false);
       }
       return;
     }
@@ -257,7 +264,9 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
     }
     setInserting(item.id);
     try {
-      const asset = await invoke('media_import', { url: item.url });
+      let asset = await invoke('media_import', { url: item.url });
+      // SVG files: the size their link said.
+      if (!asset.width && item.width) asset = { ...asset, width: item.width, height: item.height };
       const alt = attribution(item);
       if (replaceId) {
         await apply({
@@ -291,7 +300,7 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
         <${Icon} name="search" size=${16} />
         <input
           ref=${searchRef}
-          placeholder=${tab === 'videos' ? t('Search YouTube or paste a YouTube/Vimeo link…') : tab === 'gifs' ? t('Search GIFs…') : t('Search photos…')}
+          placeholder=${tab === 'videos' ? t('Search YouTube or paste a YouTube/Vimeo link…') : tab === 'gifs' ? t('Search GIFs or paste a link to one…') : t('Search photos or paste a link to an image…')}
           value=${query}
           onInput=${(e) => setQuery(e.target.value)}
         />
@@ -313,25 +322,31 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
       </div>
     </div>
     <div class="media-body">
-      ${needsKey && !(tab === 'videos' && isLink(query)) && !SITE[provider] && html`<${KeyPrompt} name=${provider} onSaved=${loadKeys} />`}
-      ${needsKey && !(tab === 'videos' && isLink(query)) && SITE[provider] &&
+      ${needsKey && !isLink(query) && !SITE[provider] && html`<${KeyPrompt} name=${provider} onSaved=${loadKeys} />`}
+      ${needsKey && !isLink(query) && SITE[provider] &&
       html`<${BrowseCard} provider=${provider} onKey=${provider !== 'vimeo' && !showKey ? () => setShowKey(true) : null} />
         ${showKey && html`<${KeyPrompt} name=${provider} onSaved=${loadKeys} />`}
         ${tab === 'videos' && html`<p class="muted small center">${t('Tip: you can also paste any YouTube or Vimeo link in the box above.')}</p>`}`}
       ${error && html`<div class="media-error"><${Icon} name="circle-alert" size=${16} />${t(error)}</div>`}
       ${preview &&
-      html`<div class="video-preview">
-        <img src=${preview.thumb} alt="" />
+      html`<div class=${cls('video-preview', preview.kind !== 'video' && 'image')}>
+        <img src=${preview.thumb} alt="" onError=${(e) => (e.currentTarget.style.visibility = 'hidden')} />
         <div>
           <b>${preview.title}</b>
-          <p class="muted small">${preview.author} · ${preview.provider === 'vimeo' ? 'Vimeo' : 'YouTube'}</p>
-          <${Button} variant="primary" icon="plus" label=${t('Insert Video')} onClick=${() => insertItem(preview)} />
+          <p class="muted small">${previewSource(preview)}</p>
+          <${Button}
+            variant="primary"
+            icon="plus"
+            label=${preview.kind === 'video' ? t('Insert Video') : t('Insert Image')}
+            disabled=${!!inserting}
+            onClick=${() => insertItem(preview)}
+          />
         </div>
       </div>`}
-      ${!needsKey && !preview && !items.length && !loading && !error &&
+      ${(!needsKey || isLink(query)) && !preview && !items.length && !loading && !error &&
       html`<div class="media-empty">
         <${Icon} name=${current.icon} size=${36} />
-        <p>${tab === 'videos' ? t('Search YouTube, or paste a YouTube or Vimeo link.') : t('Type to search.')}</p>
+        <p>${tab === 'videos' ? t('Search YouTube, or paste a YouTube or Vimeo link.') : t('Type to search, or paste a link.')}</p>
       </div>`}
       <div class=${cls('media-grid', tab === 'videos' && 'videos')}>
         ${items.map(
@@ -366,11 +381,28 @@ function thumbFailed(img, it) {
   else img.closest('.media-item')?.remove();
 }
 
+const site = (url) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+};
+
+/** Where a previewed link comes from, under its title. */
+function previewSource(it) {
+  if (it.provider === 'youtube' || it.provider === 'vimeo') return `${it.author} · ${it.provider === 'vimeo' ? 'Vimeo' : 'YouTube'}`;
+  const size = it.width && it.height ? `${it.width} × ${it.height}` : '';
+  const from = it.provider === 'wikimedia' ? [it.author, it.license, 'Wikimedia Commons'] : [site(it.pageUrl)];
+  return [...from, size].filter(Boolean).join(' · ');
+}
+
 /** Credit line for the image's description (and optional caption). */
 function attribution(it) {
   if (it.provider === 'pexels') return t('Photo by {author} on Pexels', { author: it.author });
   if (it.provider === 'pixabay') return t('Image by {author} from Pixabay', { author: it.author });
   if (it.provider === 'giphy') return it.title || t('GIF via GIPHY');
+  if (it.provider === 'link') return t('Image from {site}', { site: site(it.pageUrl) });
   if (it.provider === 'openverse' || it.provider === 'wikimedia') {
     const { title, author } = it;
     const work = title

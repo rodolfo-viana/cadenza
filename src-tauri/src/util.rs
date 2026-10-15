@@ -84,6 +84,32 @@ pub fn decode_percent(s: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
+/// An HTTP client that tries a host's IPv4 addresses before its IPv6 ones.
+/// Some hosts publish an IPv6 address that never answers, and ureq tries
+/// addresses one after another, giving the first most of the time allowed:
+/// a download would hang for many seconds before trying IPv4 (curl and web
+/// engines race the two instead). Networks without IPv4 resolve no IPv4
+/// addresses, so they lose nothing.
+pub fn http_agent(config: ureq::config::Config) -> ureq::Agent {
+    ureq::Agent::with_parts(config, ureq::unversioned::transport::DefaultConnector::new(), Ipv4First::default())
+}
+
+#[derive(Debug, Default)]
+struct Ipv4First(ureq::unversioned::resolver::DefaultResolver);
+
+impl ureq::unversioned::resolver::Resolver for Ipv4First {
+    fn resolve(
+        &self,
+        uri: &ureq::http::Uri,
+        config: &ureq::config::Config,
+        timeout: ureq::unversioned::transport::NextTimeout,
+    ) -> Result<ureq::unversioned::resolver::ResolvedSocketAddrs, ureq::Error> {
+        let mut addrs = self.0.resolve(uri, config, timeout)?;
+        addrs.sort_by_key(|a| a.is_ipv6());
+        Ok(addrs)
+    }
+}
+
 /// Formats a number compactly for CSS/SVG output (no trailing zeros).
 pub fn num(v: f64) -> String {
     if !v.is_finite() {

@@ -144,7 +144,7 @@ pub fn select_faces(faces: Vec<Face>) -> Vec<Face> {
 }
 
 fn agent() -> ureq::Agent {
-    ureq::Agent::new_with_config(ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).build())
+    crate::util::http_agent(ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).build())
 }
 
 /// Downloads a Google font. `store` saves a WOFF2 file as an asset and
