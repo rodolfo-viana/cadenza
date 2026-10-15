@@ -608,4 +608,14 @@ test('each chart type builds by its own unit and keeps edited data', async () =>
   // Switching to a link chart fills in sample links only when there are none.
   assert.equal(Charts.switchChart({ ...sample, links: [] }, 'sankey').links.length, 8);
   assert.equal(Charts.switchChart({ ...sample, links: net }, 'sankey').links, undefined, 'written links are kept');
+
+  // Maps color regions all at once; they start on the world.
+  assert.equal(A.seriesSteps(el('map', one)), 0);
+  const basic = { chart: 'column', ...Charts.chartSample('column') };
+  const toMap = Charts.switchChart(basic, 'map');
+  assert.equal(toMap.map, 'world');
+  assert.ok(Charts.isSample({ ...basic, ...toMap }, 'map'), 'the sample becomes the map sample');
+  const mine = Charts.switchChart(edited, 'map');
+  assert.equal(mine.map, 'world', 'edited data is kept, on the world map');
+  assert.equal(mine.labels, undefined);
 });

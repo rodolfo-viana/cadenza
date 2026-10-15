@@ -941,6 +941,9 @@ pub struct ChartContent {
     pub scale_color: String,
     /// Sankey diagrams and networks: links between named nodes.
     pub links: Vec<Link>,
+    /// Map charts: "world", a continent ("europe") or a country's code
+    /// ("BRA") for its states or provinces (see maps.rs).
+    pub map: String,
 }
 
 impl Default for ChartContent {
@@ -968,6 +971,7 @@ impl Default for ChartContent {
             stacked: false,
             scale_color: String::new(),
             links: Vec::new(),
+            map: String::new(),
         }
     }
 }

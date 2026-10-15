@@ -10,9 +10,9 @@ import { canvasApi } from './canvas.js';
 import { cls } from './util.js';
 import { Button } from './ui.js';
 import { renderDiagram, svgAspect, DIAGRAM_TEMPLATES } from './diagrams.js';
-import { opener } from './api.js';
-import { t, N_ } from './i18n.js';
-import { CHART_ICONS, chartKind, linkChart, oneSeries, switchChart } from './charts.js';
+import { opener, invoke } from './api.js';
+import { t, N_, language } from './i18n.js';
+import { CHART_ICONS, MAP_AREAS, chartKind, isSample, linkChart, oneSeries, switchChart } from './charts.js';
 
 const ids = (els) => els.map((e) => e.id).join(',');
 
@@ -641,6 +641,43 @@ export function TablePanel({ els }) {
 // Charts
 // ---------------------------------------------------------------------------
 
+// Country maps by UI language (maps.rs), fetched once.
+const mapCountries = {};
+
+function useMapCountries(on) {
+  const lang = language();
+  const [list, setList] = useState(mapCountries[lang] || []);
+  useEffect(() => {
+    if (!on) return;
+    if (mapCountries[lang]) return setList(mapCountries[lang]);
+    invoke('map_countries', { language: lang })
+      .then((l) => {
+        mapCountries[lang] = l;
+        setList(l);
+      })
+      .catch(() => {});
+  }, [on, lang]);
+  return list;
+}
+
+/** A map's regions (for suggestions) and the rows that match none. */
+function useMapRegions(on, map, labels) {
+  const lang = language();
+  const [info, setInfo] = useState({ regions: [], unmatched: [] });
+  const key = labels.join('\n');
+  useEffect(() => {
+    if (!on) return;
+    let live = true;
+    invoke('map_regions', { map: map || 'world', language: lang, labels })
+      .then(([regions, unmatched]) => live && setInfo({ regions, unmatched }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [on, map, lang, key]);
+  return info;
+}
+
 export function ChartPanel({ els }) {
   const el = els[0];
   const ch = el.content;
@@ -651,6 +688,9 @@ export function ChartPanel({ els }) {
   const one = oneSeries(kind);
   // Candlesticks take exactly four series (opening, high, low, closing).
   const fixed = one || kind === 'candlestick';
+  const isMap = kind === 'map';
+  const countries = useMapCountries(isMap);
+  const { regions, unmatched } = useMapRegions(isMap, ch.map, ch.labels);
   const n = ch.labels.length;
   const setCell = (s, i, v) => {
     const series = ch.series.map((x, k) => (k === s ? { ...x, values: Array.from({ length: n }, (_, j) => (j === i ? v : x.values[j] ?? 0)) } : x));
@@ -682,6 +722,7 @@ export function ChartPanel({ els }) {
     candlestick: t('Each row needs four values, in this order: opening, high, low and closing price.'),
     sankey: t('One row per flow: where it comes from, where it goes and how much.'),
     network: t('One row per connection between two nodes. The value sets the line width.'),
+    map: t('One row per region: its name or code, and its value. Regions without a row stay gray.'),
   }[kind];
   const grid = ['column', 'stacked-column', 'bar', 'stacked-bar', 'line', 'area', 'stacked-area', 'streamgraph', 'scatter', 'candlestick'].includes(kind);
   return html`<${Section} title=${t('Chart')} id="chart">
@@ -693,7 +734,40 @@ export function ChartPanel({ els }) {
         </button>`,
       )}
     </div>
+    ${isMap &&
+    html`<${Row} label=${t('Map')}>
+      <${Select}
+        value=${ch.map || 'world'}
+        options=${[
+          { value: 'world', label: t('World') },
+          { group: t('Continents'), options: MAP_AREAS.slice(1).map(([value, name]) => ({ value, label: t(name) })) },
+          { group: t('Countries'), options: countries.map(([value, label]) => ({ value, label })) },
+        ]}
+        onChange=${(v) => set_({ map: v }, 'map')}
+      />
+    <//>`}
     ${hint && html`<${Hint}>${hint}</${Hint}>`}
+    ${isMap && unmatched.length > 0 && html`<${Hint}>${t('Not on this map: {names}', { names: unmatched.join(', ') })}</${Hint}>`}
+    ${isMap &&
+    html`<div class="row-inline">
+      <${Button}
+        size="sm"
+        icon="list-plus"
+        label=${t('Add All Regions')}
+        title=${t('Adds a row for each region of the map that has none yet.')}
+        onClick=${() => {
+          // The sample is replaced; rows someone wrote are kept.
+          const fresh = isSample(ch, 'map');
+          const have = new Set(fresh ? [] : ch.labels);
+          const add = regions.map(([, name]) => name).filter((name) => !have.has(name));
+          const labels = [...(fresh ? [] : ch.labels), ...add];
+          const first = ch.series[0] || { name: t('Series {n}', { n: 1 }), color: '' };
+          const values = [...(fresh ? [] : first.values.slice(0, ch.labels.length)), ...add.map(() => 0)];
+          set_({ labels, series: [{ ...first, values }, ...(fresh ? [] : ch.series.slice(1))] }, 'regions');
+        }}
+      />
+    </div>`}
+    ${isMap && html`<datalist id="cz-map-regions">${regions.map(([id, name]) => html`<option value=${name}>${id}</option>`)}</datalist>`}
     ${linked &&
     html`<div class="datagrid" ref=${ref}>
       <table>
@@ -731,7 +805,7 @@ export function ChartPanel({ els }) {
         <tbody>
           ${ch.labels.map(
             (l, i) => html`<tr>
-              <td><input class="cell label" value=${l} onChange=${(e) => setLabel(i, e.target.value)} /></td>
+              <td><input class="cell label" list=${isMap ? 'cz-map-regions' : undefined} value=${l} onChange=${(e) => setLabel(i, e.target.value)} /></td>
               ${shownSeries.map(
                 (s, k) => html`<td>
                   <input class="cell num" type="number" value=${s.values[i] ?? 0} onChange=${(e) => setCell(k, i, Number(e.target.value) || 0)} />
@@ -756,7 +830,7 @@ export function ChartPanel({ els }) {
         <//>`,
       )}
     </div>`}
-    ${kind === 'heatmap' &&
+    ${(kind === 'heatmap' || isMap) &&
     html`<${Row} label=${t('Color')}>
       <${ColorField} value=${ch.scaleColor} noneLabel=${t('Theme color {n}', { n: 1 })} onChange=${(v, live) => set_({ scaleColor: v }, 'scale', live)} />
     <//>`}

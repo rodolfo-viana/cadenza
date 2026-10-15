@@ -62,6 +62,12 @@
   ]
  },
  {
+  "key": "Add All Regions",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Add column",
   "files": [
    "panels.js"
@@ -133,6 +139,18 @@
   "key": "Address",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Adds a row for each region of the map that has none yet.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Africa",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -405,6 +423,12 @@
   "key": "As typed",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Asia",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -1106,6 +1130,12 @@
   ]
  },
  {
+  "key": "Continents",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Contrast",
   "files": [
    "panels.js"
@@ -1177,6 +1207,12 @@
   "key": "Could not start the presentation: {error}",
   "files": [
    "present.js"
+  ]
+ },
+ {
+  "key": "Countries",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -1744,6 +1780,12 @@
   "key": "Equation (LaTeX)",
   "files": [
    "commands.js"
+  ]
+ },
+ {
+  "key": "Europe",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -2880,6 +2922,19 @@
   ]
  },
  {
+  "key": "Map",
+  "files": [
+   "panels.js",
+   "chart.rs"
+  ]
+ },
+ {
+  "key": "Maps from {naturalEarth} (public domain).",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
   "key": "Markdown",
   "files": [
    "actions.js"
@@ -3178,6 +3233,18 @@
   ]
  },
  {
+  "key": "North America",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
+  "key": "Not on this map: {names}",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Not saved",
   "files": [
    "toolbar.js"
@@ -3223,6 +3290,12 @@
   "key": "Numbered list",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Oceania",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -3275,6 +3348,12 @@
  },
  {
   "key": "One row per party, with its number of seats.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "One row per region: its name or code, and its value. Regions without a row stay gray.",
   "files": [
    "panels.js"
   ]
@@ -4563,6 +4642,12 @@
   ]
  },
  {
+  "key": "South America",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
   "key": "Space after each paragraph",
   "files": [
    "panels.js"
@@ -5552,6 +5637,13 @@
   "key": "With two screens, the audience sees the presentation on the other screen while the presenter display stays on yours.",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "World",
+  "files": [
+   "charts.js",
+   "panels.js"
   ]
  },
  {

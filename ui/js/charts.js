@@ -1,7 +1,7 @@
 // Chart types in the editor: icons, the data each type starts with and how
 // its data grid works. Charts are drawn in Rust (chart.rs).
 
-import { t } from './i18n.js';
+import { t, N_ } from './i18n.js';
 
 export const CHART_ICONS = {
   column: 'chart-column',
@@ -21,7 +21,19 @@ export const CHART_ICONS = {
   candlestick: 'chart-candlestick',
   sankey: 'split',
   network: 'chart-network',
+  map: 'earth',
 };
+
+/** Maps besides countries: the world and the continents (maps.rs). */
+export const MAP_AREAS = [
+  ['world', N_('World')],
+  ['africa', N_('Africa')],
+  ['asia', N_('Asia')],
+  ['europe', N_('Europe')],
+  ['north-america', N_('North America')],
+  ['oceania', N_('Oceania')],
+  ['south-america', N_('South America')],
+];
 
 /** Types drawn from links between named nodes instead of the table. */
 export const linkChart = (kind) => kind === 'sankey' || kind === 'network';
@@ -30,7 +42,7 @@ export const linkChart = (kind) => kind === 'sankey' || kind === 'network';
 export const chartKind = (c) => (c.stacked && ['column', 'bar', 'area'].includes(c.chart) ? `stacked-${c.chart}` : c.chart);
 
 /** Types that show only the first series: one value per row. */
-export const oneSeries = (kind) => ['pie', 'donut', 'parliament'].includes(kind);
+export const oneSeries = (kind) => ['pie', 'donut', 'parliament', 'map'].includes(kind);
 
 /** Candlesticks take exactly four series: opening, high, low and closing. */
 export const candleSeries = () => [t('Opening'), t('High'), t('Low'), t('Closing')];
@@ -98,6 +110,16 @@ export function chartSample(kind) {
         ],
       };
     }
+    case 'map': {
+      // Population in millions, about 2024.
+      const people = [
+        ['China', 1410], ['India', 1440], ['United States', 340], ['Indonesia', 280], ['Pakistan', 245], ['Nigeria', 230],
+        ['Brazil', 212], ['Bangladesh', 174], ['Russia', 144], ['Ethiopia', 129], ['Mexico', 130], ['Japan', 124],
+        ['Philippines', 116], ['Egypt', 116], ['Turkey', 86], ['Germany', 84], ['United Kingdom', 69], ['France', 68],
+        ['South Africa', 63], ['Kenya', 56], ['Colombia', 53], ['Spain', 48], ['Argentina', 46], ['Canada', 41], ['Australia', 27],
+      ];
+      return { map: 'world', labels: people.map((p) => p[0]), series: [series(t('Series {n}', { n: 1 }), people.map((p) => p[1]))] };
+    }
     case 'network':
       return {
         links: [
@@ -110,6 +132,9 @@ export function chartSample(kind) {
       return { labels: ['Q1', 'Q2', 'Q3', 'Q4'], series: [series('2025', [12, 19, 15, 24]), series('2026', [16, 22, 21, 31])] };
   }
 }
+
+/** Whether a chart still has the sample data of `kind`. */
+export const isSample = (c, kind) => sameData(c, chartSample(kind));
 
 const sameLinks = (a = [], b = []) => a.length === b.length && a.every((l, i) => l.from === b[i].from && l.to === b[i].to && l.value === b[i].value);
 
@@ -131,8 +156,10 @@ export function switchChart(c, kind) {
     if (!c.links?.length || samples.some((s) => sameLinks(c.links, s))) patch.links = chartSample(kind).links;
     return patch;
   }
-  if (sameData(c, chartSample(chartKind(c))) || sameData(c, chartSample('column'))) {
+  if (sameData(c, chartSample(chartKind(c))) || sameData(c, chartSample('column')) || sameData(c, chartSample('map'))) {
     Object.assign(patch, chartSample(kind));
+  } else if (kind === 'map' && !c.map) {
+    patch.map = 'world';
   } else if (kind === 'candlestick' && c.series.length < 4) {
     const names = candleSeries();
     patch.series = [...c.series, ...names.slice(c.series.length).map((n) => series(n, c.labels.map(() => 0)))];
@@ -147,7 +174,7 @@ export function buildUnit(c) {
   if (kind === 'parliament') return 'party';
   if (kind === 'treemap' && c.series.length <= 1) return 'item';
   if (kind === 'heatmap') return 'column';
-  if (kind === 'candlestick') return '';
+  if (kind === 'candlestick' || kind === 'map') return '';
   if (kind === 'sankey') return 'column';
   if (kind === 'network') return 'item';
   return 'series';

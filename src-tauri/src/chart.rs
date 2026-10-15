@@ -27,6 +27,7 @@ pub const CHART_TYPES: &[(&str, &str)] = &[
     ("candlestick", "Candlestick"),
     ("sankey", "Sankey diagram"),
     ("network", "Network graph"),
+    ("map", "Map"),
 ];
 
 /// Column, bar and area charts: the base kind and whether it is stacked
@@ -58,7 +59,7 @@ pub fn series_steps(chart: &ChartContent) -> u32 {
         "pie" | "donut" | "parliament" => positive_count(chart),
         "treemap" if n == 1 => positive_count(chart),
         "scatter" => n.saturating_sub(1).max(n.min(1)),
-        "candlestick" => 0,
+        "candlestick" | "map" => 0,
         "sankey" => sankey_columns(&graph(chart, true)).into_iter().max().unwrap_or(0) as u32,
         "network" => graph(chart, false).names.len().min(300) as u32,
         _ => n,
@@ -116,7 +117,7 @@ pub fn nice_range(min: f64, max: f64, ticks: usize) -> (f64, f64, f64) {
     (lo, hi, step)
 }
 
-fn fmt_value(v: f64) -> String {
+pub(crate) fn fmt_value(v: f64) -> String {
     if v.abs() >= 1_000_000.0 {
         format!("{}M", num(v / 1_000_000.0))
     } else if v.abs() >= 10_000.0 {
@@ -162,7 +163,7 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
     let kind = chart.chart.as_str();
     let by_label = matches!(kind, "pie" | "donut" | "parliament") || (kind == "treemap" && chart.series.len() <= 1);
     let legend_items: Vec<(String, String)> = match kind {
-        "heatmap" | "candlestick" | "sankey" | "network" => Vec::new(),
+        "heatmap" | "candlestick" | "sankey" | "network" | "map" => Vec::new(),
         "parliament" if chart.show_values => {
             let seats = parliament_seats(chart);
             chart
@@ -183,13 +184,14 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
             .collect(),
         _ => chart.series.iter().enumerate().map(|(i, s)| (s.name.clone(), series_color(chart, i))).collect(),
     };
-    let scale_legend = kind == "heatmap" && value_range(chart).is_some();
+    let scale_legend = (kind == "heatmap" && value_range(chart).is_some()) || kind == "map";
     let legend_h = if chart.show_legend && (!legend_items.is_empty() || scale_legend) {
         f * 2.0
     } else {
         0.0
     };
     let plot_h = h - legend_h;
+    let mut scale = if kind == "heatmap" { value_range(chart) } else { None };
     match kind {
         "pie" | "donut" => pie_chart(&mut svg, chart, w, plot_h, f, steps),
         "parliament" => parliament_chart(&mut svg, chart, w, plot_h, f, steps),
@@ -200,11 +202,18 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
         "candlestick" => candle_chart(&mut svg, chart, w, plot_h, f),
         "sankey" => sankey_chart(&mut svg, chart, w, plot_h, f, steps),
         "network" => network_chart(&mut svg, chart, w, plot_h, f, steps),
+        "map" => {
+            let values = chart.series.first().map_or(&[][..], |s| &s.values[..]);
+            let color = scale_color(chart);
+            scale = crate::maps::map_chart(&mut svg, &chart.map, &chart.labels, values, &color, chart.show_values, (w, plot_h, f));
+        }
         _ => axis_chart(&mut svg, chart, w, plot_h, f, steps),
     }
     if legend_h > 0.0 {
         if scale_legend {
-            heat_legend(&mut svg, chart, w, h - legend_h * 0.5, f);
+            if let Some(range) = scale {
+                heat_legend(&mut svg, range, &scale_color(chart), w, h - legend_h * 0.5, f);
+            }
         } else {
             legend(&mut svg, &legend_items, w, h - legend_h * 0.5, f);
         }
@@ -887,9 +896,10 @@ fn scale_color(chart: &ChartContent) -> String {
     }
 }
 
-/// How strongly a value is colored: 0.1 (lowest) to 1 (highest).
-fn heat(v: f64, (lo, hi): (f64, f64)) -> f64 {
-    let t = if hi > lo { (v - lo) / (hi - lo) } else { 1.0 };
+/// How strongly a value is colored: 0.1 (lowest) to 1 (highest); halfway
+/// when all values are alike.
+pub(crate) fn heat(v: f64, (lo, hi): (f64, f64)) -> f64 {
+    let t = if hi > lo { (v - lo) / (hi - lo) } else { 0.5 };
     0.1 + 0.9 * t.clamp(0.0, 1.0)
 }
 
@@ -969,9 +979,9 @@ fn heatmap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
     }
 }
 
-/// The heatmap's color scale: lowest value, steps of color, highest value.
-fn heat_legend(svg: &mut String, chart: &ChartContent, w: f64, cy: f64, f: f64) {
-    let Some((lo, hi)) = value_range(chart) else { return };
+/// The color scale of heatmaps and maps: lowest value, steps of color,
+/// highest value.
+fn heat_legend(svg: &mut String, (lo, hi): (f64, f64), color: &str, w: f64, cy: f64, f: f64) {
     let (a, b) = (fmt_value(lo), fmt_value(hi));
     let cell = f * 0.9;
     let total = (a.len() + b.len()) as f64 * f * 0.6 + f * 1.2 + cell * 10.0;
@@ -984,7 +994,6 @@ fn heat_legend(svg: &mut String, chart: &ChartContent, w: f64, cy: f64, f: f64) 
         a
     );
     x += a.len() as f64 * f * 0.6 + f * 0.6;
-    let color = scale_color(chart);
     for k in 0..10 {
         let _ = write!(
             svg,
@@ -993,7 +1002,7 @@ fn heat_legend(svg: &mut String, chart: &ChartContent, w: f64, cy: f64, f: f64) 
             num(cy - f * 0.4),
             num(cell + 0.5),
             num(f * 0.8),
-            esc(&color),
+            esc(color),
             num(0.1 + 0.9 * k as f64 / 9.0)
         );
     }

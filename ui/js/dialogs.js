@@ -190,6 +190,7 @@ function About() {
           preact: link('https://preactjs.com', 'Preact'),
           lucide: link('https://lucide.dev', 'Lucide'),
         })}
+        ${' '}${withLinks(t('Maps from {naturalEarth} (public domain).'), { naturalEarth: link('https://www.naturalearthdata.com', 'Natural Earth') })}
       </p>
       <${Button} label=${t('Close')} onClick=${closeModal} />
     </div>

@@ -16,6 +16,7 @@ pub mod embed;
 pub mod export;
 pub mod fonts;
 pub mod layouts;
+pub mod maps;
 pub mod markdown;
 pub mod mathtext;
 pub mod media;
@@ -144,6 +145,18 @@ fn app_info(state: State<AppState>) -> CmdResult<AppInfo> {
         recoverable: state.recoverable.lock().map_err(err)?.clone(),
         asset_base: document::asset_protocol_base(),
     })
+}
+
+/// Countries with a map of their states or provinces, as (id, name).
+#[tauri::command]
+async fn map_countries(language: String) -> Vec<(String, String)> {
+    maps::countries(&language)
+}
+
+/// The regions of a map as (id, name), and the labels that match none.
+#[tauri::command]
+async fn map_regions(map: String, language: String, labels: Vec<String>) -> (Vec<(String, String)>, Vec<String>) {
+    maps::regions(&map, &language, &labels)
 }
 
 #[tauri::command]
@@ -1401,6 +1414,8 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
         })
         .invoke_handler(tauri::generate_handler![
             app_info,
+            map_countries,
+            map_regions,
             settings_update,
             recent_list,
             recent_remove,

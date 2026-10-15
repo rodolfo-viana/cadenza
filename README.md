@@ -17,7 +17,7 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
 **Editing**
 - Slides built from 12 layouts (title, section, two columns, quote, big number, code…), with text,
   shapes, images, video, tables, charts, code, equations and diagrams.
-- Charts edited in a data grid and rendered as crisp SVG: column, bar and area (stacked or not), line, streamgraph, pie, donut, treemap, parliament, scatterplot, heatmap, candlestick, Sankey diagram and network graph.
+- Charts edited in a data grid and rendered as crisp SVG: column, bar and area (stacked or not), line, streamgraph, pie, donut, treemap, parliament, scatterplot, heatmap, candlestick, Sankey diagram, network graph and maps (the world, a continent, or a country's states or provinces).
 - Code blocks with syntax highlighting, line numbers and step-by-step line highlights.
 - LaTeX math with KaTeX, as equation objects or inline in any text: `$e^{i\pi}+1=0$`.
 - [Mermaid](https://mermaid.js.org) diagrams: flowcharts, sequences, timelines, mind maps and more.
@@ -135,4 +135,5 @@ project is organized and how to send changes.
 
 Cadenza is released under the [MIT License](LICENSE). It includes reveal.js, KaTeX, Mermaid,
 highlight.js, Preact, htm and Lucide icons, each under its own license; see the `LICENSE` files in
-[`ui/vendor`](ui/vendor) and [`ui/vendor/licenses`](ui/vendor/licenses).
+[`ui/vendor`](ui/vendor) and [`ui/vendor/licenses`](ui/vendor/licenses). Map charts use boundaries
+from [Natural Earth](https://www.naturalearthdata.com) (public domain).
