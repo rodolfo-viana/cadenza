@@ -1,5 +1,10 @@
 # Cadenza
 
+![platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square&color=%237c6cff) 
+![release](https://img.shields.io/github/v/release/rodolfo-viana/cadenza?style=flat-square&label=latest%20release&color=%237c6cff) ![downloads](https://img.shields.io/github/downloads/rodolfo-viana/cadenza/total?style=flat-square&color=%237c6cff)
+[![release build](https://img.shields.io/github/actions/workflow/status/rodolfo-viana/cadenza/release.yml?label=release%20build&style=flat-square&color=%237c6cff)](https://github.com/rodolfo-viana/cadenza/actions/workflows/release.yml) [![codeql](https://img.shields.io/github/actions/workflow/status/rodolfo-viana/cadenza/codeql.yml?branch=main&label=codeql&style=flat-square&color=%237c6cff)](https://github.com/rodolfo-viana/cadenza/actions/workflows/codeql.yml) ![license](https://img.shields.io/github/license/rodolfo-viana/cadenza?style=flat-square&color=%237c6cff)
+
+
 **Presentations, powered by reveal.js.** Cadenza is a desktop presentation app in the spirit of
 Keynote and PowerPoint, built on the [reveal.js](https://revealjs.com) engine, written in Rust
 with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
@@ -25,9 +30,7 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
   it as reveal.js CSS.
 - Google Fonts: every family is searchable offline, and the fonts you pick are embedded in the
   presentation, so it looks the same on any computer.
-- Builds (step-by-step animations, including wipes), charts that build one series at a time,
-  motion paths drawn right on the slide, slide transitions and Magic Move (reveal.js
-  auto-animate).
+- Builds (step-by-step animations), slide transitions and Magic Move (reveal.js auto-animate).
 - Per-presentation custom CSS for anything else.
 
 **Media**
@@ -35,7 +38,6 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
   Pexels, Pixabay and GIPHY with a free API key.
 - YouTube and Vimeo videos: browse the sites as usual and click **Insert**, or paste a link. No key
   needed.
-- Live camera: show yourself on any slide while you present, in a rectangle or a circle.
 
 **Presenting and sharing**
 - Fullscreen show with a presenter display: speaker notes, timer, clock and the next slide.
