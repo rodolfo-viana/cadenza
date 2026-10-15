@@ -456,6 +456,22 @@ impl Element {
         self.content.kind()
     }
 
+    /// Build steps a chart takes after its build-in when it builds by
+    /// series: one per series, or one per slice of a pie or donut.
+    pub fn series_steps(&self) -> u32 {
+        if self.build.effect.is_empty() || self.build.delivery != "series" {
+            return 0;
+        }
+        match &self.content {
+            Content::Chart(c) if matches!(c.chart.as_str(), "pie" | "donut") => c
+                .series
+                .first()
+                .map_or(0, |s| s.values.iter().filter(|v| v.is_finite() && **v > 0.0).count() as u32),
+            Content::Chart(c) => c.series.len() as u32,
+            _ => 0,
+        }
+    }
+
     /// Gives the element (and its Magic Move link) a fresh identity.
     pub fn reidentify(&mut self) {
         self.id = new_id("e");
@@ -507,6 +523,25 @@ pub struct Build {
     /// Fragment style for the build-out ("" = none), e.g. "fade-out".
     pub out_effect: String,
     pub out_order: u32,
+    /// Charts: "series" builds the chart first, then one series (pie and
+    /// donut: one slice) per step after `order`. "" = all at once.
+    pub delivery: String,
+    /// Motion path: points the element moves through, as offsets of its
+    /// center from where it stands (the first point is `[0, 0]`). Fewer than
+    /// two points = no motion path.
+    pub path: Vec<[f64; 2]>,
+    /// Curves through the points instead of straight segments.
+    pub path_smooth: bool,
+    /// Step at which the element moves along its path.
+    pub path_order: u32,
+    /// Seconds (0 = default).
+    pub path_duration: f64,
+}
+
+impl Build {
+    pub fn has_path(&self) -> bool {
+        self.path.len() >= 2
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -541,6 +576,7 @@ pub enum Content {
     Table(TableContent),
     Chart(ChartContent),
     Diagram(DiagramContent),
+    Camera(CameraContent),
 }
 
 impl Default for Content {
@@ -562,6 +598,7 @@ impl Content {
             Content::Table(_) => "table",
             Content::Chart(_) => "chart",
             Content::Diagram(_) => "diagram",
+            Content::Camera(_) => "camera",
         }
     }
 
@@ -728,6 +765,31 @@ impl Default for ImageContent {
             saturate: 100.0,
             natural_width: 0,
             natural_height: 0,
+        }
+    }
+}
+
+/// The presenter's camera, live during the presentation.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CameraContent {
+    /// Camera to show (a browser device id); "" = the system's default.
+    pub device_id: String,
+    /// Its name, for the inspector.
+    pub device_label: String,
+    /// Show the picture mirrored, like a selfie view.
+    pub mirror: bool,
+    /// "rect" or "circle".
+    pub mask: String,
+}
+
+impl Default for CameraContent {
+    fn default() -> Self {
+        CameraContent {
+            device_id: String::new(),
+            device_label: String::new(),
+            mirror: true,
+            mask: "rect".into(),
         }
     }
 }

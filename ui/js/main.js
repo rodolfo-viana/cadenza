@@ -6,7 +6,7 @@ import { invoke, currentWindow, currentWebview } from './api.js';
 import { state, set, boot, toast, confirmDiscard, openPath, stepSlide } from './store.js';
 import { COMMANDS, commandForKey } from './commands.js';
 import * as A from './actions.js';
-import { canvasApi } from './canvas.js';
+import { canvasApi, finishPath, cancelPath } from './canvas.js';
 import { beginTextEdit, endAllEditing } from './textedit.js';
 import { combo, isTyping, fileExt } from './util.js';
 import { IMAGE_EXTS, VIDEO_EXTS } from './api.js';
@@ -67,6 +67,13 @@ window.addEventListener('keydown', (e) => {
   const c = combo(e);
   if (SUPPRESS.has(c)) e.preventDefault();
   if (state.modal || state.menu || state.shapePicker) return;
+  // Drawing a motion path: Enter keeps it, Esc drops it.
+  if (state.drawPath && (e.key === 'Enter' || e.key === 'Escape')) {
+    e.preventDefault();
+    if (e.key === 'Enter') finishPath();
+    else cancelPath();
+    return;
+  }
   const typing = isTyping(e.target);
 
   // Clipboard: route through a hidden editable so copy/paste events fire

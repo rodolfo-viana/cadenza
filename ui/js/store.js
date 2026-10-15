@@ -486,6 +486,8 @@ export async function play(fromCurrent = false) {
   if (!state.doc) return;
   if (!(await flushEdits())) return;
   set({ editing: null, menu: null });
+  // Frees the camera for the show (see camera.js).
+  window.dispatchEvent(new Event('cz-present-start'));
   try {
     await invoke('present_start', { fromSlide: fromCurrent ? state.slideId : null, presenter: null });
   } catch (e) {

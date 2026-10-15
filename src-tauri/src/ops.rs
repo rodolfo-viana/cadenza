@@ -330,10 +330,24 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             Ok(outcome("Align", Some(slide), vec![]))
         }
         Op::SetBuildOrder { slide, ids } => {
+            // Build events in play order: "ID" is an element's build-in,
+            // "ID#path" its motion path. A chart built by series takes one
+            // more step per series.
             let s = find_slide(deck, &slide)?;
-            for (k, id) in ids.iter().enumerate() {
+            let mut step = 1;
+            for token in &ids {
+                let (id, is_path) = match token.strip_suffix("#path") {
+                    Some(id) => (id, true),
+                    None => (token.as_str(), false),
+                };
                 if let Some(el) = s.element_mut(id) {
-                    el.build.order = k as u32 + 1;
+                    if is_path {
+                        el.build.path_order = step;
+                        step += 1;
+                    } else {
+                        el.build.order = step;
+                        step += 1 + el.series_steps();
+                    }
                 }
             }
             Ok(outcome("Reorder Builds", Some(slide), vec![]))
@@ -703,6 +717,40 @@ mod tests {
             .is_err()
         );
         assert_eq!(d, snapshot);
+    }
+
+    #[test]
+    fn build_order_gives_chart_series_and_paths_their_steps() {
+        let mut d = deck3();
+        let sid = d.slides[0].id.clone();
+        let chart = Element {
+            content: Content::Chart(ChartContent::default()),
+            build: Build {
+                effect: "cz-wipe-up".into(),
+                delivery: "series".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let series = chart.series_steps();
+        assert!(series > 1);
+        let mover = Element {
+            build: Build {
+                effect: "fade-in".into(),
+                path: vec![[0.0, 0.0], [100.0, 50.0]],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let (c, m) = (chart.id.clone(), mover.id.clone());
+        d.slides[0].elements.extend([chart, mover]);
+        let order = vec![m.clone(), c.clone(), format!("{m}#path")];
+        apply(&mut d, Op::SetBuildOrder { slide: sid, ids: order }).unwrap();
+        let s = &d.slides[0];
+        let (chart, mover) = (s.elements.iter().find(|e| e.id == c).unwrap(), s.elements.iter().find(|e| e.id == m).unwrap());
+        assert_eq!(mover.build.order, 1);
+        assert_eq!(chart.build.order, 2);
+        assert_eq!(mover.build.path_order, 3 + series, "the path comes after every series step");
     }
 
     #[test]

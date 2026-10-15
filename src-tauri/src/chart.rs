@@ -65,7 +65,28 @@ fn fmt_value(v: f64) -> String {
     }
 }
 
-pub fn chart_svg(chart: &ChartContent, w: f64, h: f64) -> String {
+/// Chart builds by series: the build-in effect and the step of the first
+/// series. Each series (pie and donut: each slice) becomes its own reveal.js
+/// fragment, one step after another.
+#[derive(Clone, Copy)]
+pub struct SeriesSteps<'a> {
+    pub effect: &'a str,
+    pub first: u32,
+}
+
+fn open_step(svg: &mut String, steps: Option<SeriesSteps>, k: u32) {
+    if let Some(st) = steps {
+        let _ = write!(svg, r#"<g class="fragment {}" data-fragment-index="{}">"#, esc(st.effect), st.first + k);
+    }
+}
+
+fn close_step(svg: &mut String, steps: Option<SeriesSteps>) {
+    if steps.is_some() {
+        svg.push_str("</g>");
+    }
+}
+
+pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps>) -> String {
     let w = w.max(40.0);
     let h = h.max(40.0);
     let f = chart.font_size.clamp(8.0, 96.0);
@@ -86,9 +107,9 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64) -> String {
     let legend_h = if chart.show_legend && !legend_items.is_empty() { f * 2.0 } else { 0.0 };
     let plot_h = h - legend_h;
     if pie {
-        pie_chart(&mut svg, chart, w, plot_h, f);
+        pie_chart(&mut svg, chart, w, plot_h, f, steps);
     } else {
-        axis_chart(&mut svg, chart, w, plot_h, f);
+        axis_chart(&mut svg, chart, w, plot_h, f, steps);
     }
     if legend_h > 0.0 {
         legend(&mut svg, &legend_items, w, h - legend_h * 0.5, f);
@@ -121,7 +142,7 @@ fn legend(svg: &mut String, items: &[(String, String)], w: f64, cy: f64, f: f64)
     }
 }
 
-fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
+fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
     let horizontal = chart.chart == "bar";
     let n = chart.labels.len().max(chart.series.iter().map(|s| s.values.len()).max().unwrap_or(0));
     if n == 0 || chart.series.is_empty() {
@@ -255,6 +276,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
             let area = chart.chart == "area";
             let mut base = vec![0.0f64; n];
             for s in 0..ns {
+                open_step(svg, steps, s as u32);
                 let color = series_color(chart, s);
                 let pts: Vec<(f64, f64, f64)> = (0..n)
                     .map(|i| {
@@ -305,6 +327,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
                         );
                     }
                 }
+                close_step(svg, steps);
             }
         }
         _ => {
@@ -315,6 +338,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
             let mut pos_base = vec![0.0f64; n];
             let mut neg_base = vec![0.0f64; n];
             for s in 0..ns {
+                open_step(svg, steps, s as u32);
                 let color = series_color(chart, s);
                 for i in 0..n {
                     let v = value(s, i);
@@ -368,12 +392,13 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
                         }
                     }
                 }
+                close_step(svg, steps);
             }
         }
     }
 }
 
-fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
+fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
     let values: Vec<f64> = chart
         .series
         .first()
@@ -387,10 +412,13 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
     let r = (w.min(h) / 2.0 - f * 0.5).max(4.0);
     let hole = if chart.chart == "donut" { r * 0.58 } else { 0.0 };
     let mut angle = -std::f64::consts::FRAC_PI_2;
+    let mut slice = 0;
     for (i, v) in values.iter().enumerate() {
         if *v <= 0.0 {
             continue;
         }
+        open_step(svg, steps, slice);
+        slice += 1;
         let sweep = v / total * std::f64::consts::TAU;
         let color = slice_color(i);
         if (sweep - std::f64::consts::TAU).abs() < 1e-9 {
@@ -458,6 +486,7 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
                 num(pct.round())
             );
         }
+        close_step(svg, steps);
         angle += sweep;
     }
 }
@@ -486,7 +515,7 @@ mod tests {
                     show_values: true,
                     ..Default::default()
                 };
-                let svg = chart_svg(&c, 800.0, 450.0);
+                let svg = chart_svg(&c, 800.0, 450.0, None);
                 assert!(svg.contains("<svg") && svg.ends_with("</svg>"), "{kind}");
                 assert!(!svg.contains("NaN"), "{kind}");
             }
@@ -500,6 +529,40 @@ mod tests {
             series: vec![],
             ..Default::default()
         };
-        assert!(chart_svg(&c, 100.0, 100.0).contains("</svg>"));
+        assert!(chart_svg(&c, 100.0, 100.0, None).contains("</svg>"));
+    }
+
+    #[test]
+    fn builds_one_series_or_slice_per_step() {
+        let steps = Some(SeriesSteps {
+            effect: "cz-wipe-up",
+            first: 3,
+        });
+        for kind in ["column", "bar", "line", "area"] {
+            let c = ChartContent {
+                chart: kind.into(),
+                ..Default::default()
+            };
+            let svg = chart_svg(&c, 800.0, 450.0, steps);
+            for k in 0..c.series.len() {
+                assert!(
+                    svg.contains(&format!(r#"<g class="fragment cz-wipe-up" data-fragment-index="{}">"#, 3 + k)),
+                    "{kind}"
+                );
+            }
+            assert_eq!(svg.matches("<g ").count(), svg.matches("</g>").count(), "{kind}");
+            assert!(!chart_svg(&c, 800.0, 450.0, None).contains("fragment"), "{kind}");
+        }
+        let pie = ChartContent {
+            chart: "pie".into(),
+            series: vec![crate::model::Series {
+                values: vec![3.0, 0.0, 2.0],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let svg = chart_svg(&pie, 400.0, 400.0, steps);
+        assert_eq!(svg.matches("class=\"fragment").count(), 2, "zero slices take no step");
+        assert!(svg.contains(r#"data-fragment-index="4""#));
     }
 }

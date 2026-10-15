@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use std::fmt::Write as _;
 
-use crate::chart::chart_svg;
+use crate::chart::{SeriesSteps, chart_svg};
 use crate::mathtext::{has_math, wrap_math};
 use crate::model::*;
 use crate::shapes::shape_svg;
@@ -314,8 +314,9 @@ pub fn element(deck: &Deck, el: &Element, ctx: &Ctx) -> String {
         Content::Math(m) => math_element(m, el),
         Content::Embed(e) => embed_element(e, el, ctx),
         Content::Table(t) => table_element(t, el),
-        Content::Chart(c) => chart_element(c, el),
+        Content::Chart(c) => chart_element(c, el, ctx),
         Content::Diagram(d) => diagram_element(d, el, deck, ctx),
+        Content::Camera(c) => camera_element(c, el, ctx),
     };
     let Some(inner) = inner else { return String::new() };
 
@@ -341,6 +342,23 @@ pub fn element(deck: &Deck, el: &Element, ctx: &Ctx) -> String {
         let _ = write!(out, r#" data-id="{}""#, esc(&el.link));
     }
     let _ = write!(out, r#" style="{}">"#, style);
+
+    // A motion path moves the whole element (outside its rotation) when its
+    // step comes: CSS offset-path, driven by the fragment's `visible` class.
+    let path = !ctx.editor() && el.build.has_path();
+    if path {
+        let secs = if el.build.path_duration > 0.0 {
+            el.build.path_duration.clamp(0.1, 60.0)
+        } else {
+            1.5
+        };
+        let _ = write!(
+            out,
+            r#"<div class="cz-frag fragment cz-path"{} style="{}">"#,
+            fragment_index(el.build.path_order),
+            esc(&format!("offset-path:path('{}');--cz-path-duration:{}s", motion_path_d(&el.build), num(secs)))
+        );
+    }
 
     // Rotation lives on an inner node so that auto-animate (which drives the
     // wrapper's transform) and rotation do not fight.
@@ -385,7 +403,34 @@ pub fn element(deck: &Deck, el: &Element, ctx: &Ctx) -> String {
         out.push_str("</div>");
     }
     out.push_str("</div></div>");
+    if path {
+        out.push_str("</div>");
+    }
     out
+}
+
+/// SVG path data of a motion path, relative to where the element stands.
+/// Smooth paths are Catmull-Rom curves through the points (the editor draws
+/// them the same way).
+pub fn motion_path_d(b: &Build) -> String {
+    let Some(first) = b.path.first() else { return String::new() };
+    let pts: Vec<(f64, f64)> = b.path.iter().map(|p| (p[0] - first[0], p[1] - first[1])).collect();
+    let mut d = format!("M{} {}", num(pts[0].0), num(pts[0].1));
+    if b.path_smooth && pts.len() > 2 {
+        for i in 0..pts.len() - 1 {
+            let prev = pts[i.saturating_sub(1)];
+            let (p1, p2) = (pts[i], pts[i + 1]);
+            let next = pts[(i + 2).min(pts.len() - 1)];
+            let c1 = (p1.0 + (p2.0 - prev.0) / 6.0, p1.1 + (p2.1 - prev.1) / 6.0);
+            let c2 = (p2.0 - (next.0 - p1.0) / 6.0, p2.1 - (next.1 - p1.1) / 6.0);
+            let _ = write!(d, "C{} {} {} {} {} {}", num(c1.0), num(c1.1), num(c2.0), num(c2.1), num(p2.0), num(p2.1));
+        }
+    } else {
+        for p in &pts[1..] {
+            let _ = write!(d, "L{} {}", num(p.0), num(p.1));
+        }
+    }
+    d
 }
 
 fn fragment_index(order: u32) -> String {
@@ -857,7 +902,11 @@ fn table_element(t: &TableContent, el: &Element) -> Option<String> {
     Some(html)
 }
 
-fn chart_element(c: &ChartContent, el: &Element) -> Option<String> {
+fn chart_element(c: &ChartContent, el: &Element, ctx: &Ctx) -> Option<String> {
+    let steps = (!ctx.editor() && el.series_steps() > 0).then(|| SeriesSteps {
+        effect: &el.build.effect,
+        first: el.build.order + 1,
+    });
     let mut style = box_css(&el.style, true);
     let color = css_value(&c.color);
     if !color.is_empty() {
@@ -867,7 +916,28 @@ fn chart_element(c: &ChartContent, el: &Element) -> Option<String> {
     Some(format!(
         r#"<div class="cz-box cz-chart-box" style="{}">{}</div>"#,
         esc(&style),
-        chart_svg(c, (el.w - pad).max(10.0), (el.h - pad).max(10.0))
+        chart_svg(c, (el.w - pad).max(10.0), (el.h - pad).max(10.0), steps)
+    ))
+}
+
+/// Live camera. The editor shows a placeholder; in a presentation the
+/// runtime (runtime.js) turns the camera on while the slide is shown.
+fn camera_element(c: &CameraContent, el: &Element, ctx: &Ctx) -> Option<String> {
+    let mut style = box_css(&el.style, true);
+    if c.mask == "circle" {
+        style.push_str("border-radius:50%;");
+    }
+    if ctx.editor() {
+        return Some(format!(
+            r#"<div class="cz-box cz-camera-box cz-image-empty" style="{}"><div class="cz-placeholder-media"><span class="cz-ph-icon cz-ph-video"></span><span>Live camera</span></div></div>"#,
+            esc(&style)
+        ));
+    }
+    Some(format!(
+        r#"<div class="cz-box cz-camera-box" style="{}"><video class="cz-camera{}" data-device="{}" muted playsinline></video></div>"#,
+        esc(&style),
+        if c.mirror { " cz-mirror" } else { "" },
+        esc(&c.device_id)
     ))
 }
 
@@ -1196,6 +1266,58 @@ mod tests {
         assert_eq!(video_embed("https://youtu.be/dQw4w9WgXcQ"), Some(("youtube", "dQw4w9WgXcQ".into())));
         assert_eq!(video_embed("https://vimeo.com/76979871"), Some(("vimeo", "76979871".into())));
         assert_eq!(video_embed("https://example.com/v.mp4"), None);
+    }
+
+    #[test]
+    fn charts_build_by_series_in_shows_only() {
+        let mut deck = deck_with(Content::Chart(ChartContent::default()));
+        deck.slides[0].elements[0].build = Build {
+            effect: "cz-wipe-up".into(),
+            order: 2,
+            delivery: "series".into(),
+            ..Default::default()
+        };
+        let show = sections(&deck, &ctx(Mode::Show));
+        assert!(show.contains(r#"<g class="fragment cz-wipe-up" data-fragment-index="3">"#), "{show}");
+        let editor = slide_for_editor(&deck, &deck.slides[0], &ctx(Mode::Editor)).html;
+        assert!(!editor.contains("fragment"));
+    }
+
+    #[test]
+    fn motion_paths_move_the_element_at_their_step() {
+        let mut deck = deck_with(Content::Shape(ShapeContent::default()));
+        deck.slides[0].elements[0].build = Build {
+            path: vec![[10.0, 10.0], [110.0, 10.0], [110.0, 60.0]],
+            path_order: 4,
+            path_duration: 2.0,
+            ..Default::default()
+        };
+        let show = sections(&deck, &ctx(Mode::Show));
+        assert!(show.contains(r#"class="cz-frag fragment cz-path" data-fragment-index="4""#), "{show}");
+        assert!(show.contains("offset-path:path(&#39;M0 0L100 0L100 50&#39;)"), "{show}");
+        assert!(show.contains("--cz-path-duration:2s"));
+        let mut smooth = deck.slides[0].elements[0].build.clone();
+        smooth.path_smooth = true;
+        let d = motion_path_d(&smooth);
+        assert!(d.starts_with("M0 0C") && d.ends_with(" 100 50") && d.matches('C').count() == 2, "{d}");
+        assert_eq!(show.matches("<div").count(), show.matches("</div>").count());
+    }
+
+    #[test]
+    fn live_camera_is_a_placeholder_until_presenting() {
+        let deck = deck_with(Content::Camera(CameraContent {
+            device_id: "cam\"1".into(),
+            mask: "circle".into(),
+            ..Default::default()
+        }));
+        let editor = slide_for_editor(&deck, &deck.slides[0], &ctx(Mode::Editor)).html;
+        assert!(editor.contains("Live camera") && !editor.contains("<video"), "{editor}");
+        let show = sections(&deck, &ctx(Mode::Show));
+        assert!(
+            show.contains(r#"<video class="cz-camera cz-mirror" data-device="cam&quot;1" muted playsinline>"#),
+            "{show}"
+        );
+        assert!(show.contains("border-radius:50%"));
     }
 
     #[test]

@@ -457,3 +457,35 @@ export function goToNextSlideWithSelection(delta) {
   const n = slides[i + delta];
   if (n) goToSlide(n.id);
 }
+
+// ---------------------------------------------------------------------------
+// Build steps
+// ---------------------------------------------------------------------------
+
+/** Steps a chart takes after its build-in when it builds by series (same rule as `Element::series_steps`). */
+export function seriesSteps(el) {
+  if (!el.build.effect || el.build.delivery !== 'series' || el.content.kind !== 'chart') return 0;
+  const c = el.content;
+  if (c.chart === 'pie' || c.chart === 'donut') return (c.series[0]?.values || []).filter((v) => Number.isFinite(v) && v > 0).length;
+  return c.series.length;
+}
+
+export const hasPath = (el) => (el.build.path?.length || 0) >= 2;
+
+/** The slide's builds in play order: each element's build-in and its motion path. */
+export function buildEvents(slide) {
+  return slide.elements
+    .flatMap((el) => [el.build.effect && { el, kind: 'in', step: el.build.order }, hasPath(el) && { el, kind: 'path', step: el.build.pathOrder }].filter(Boolean))
+    .sort((a, b) => (a.step || 999) - (b.step || 999) || (a.kind === 'in' ? -1 : 1));
+}
+
+/** The first step after every build on the slide. */
+export function nextBuildStep(slide) {
+  const last = (el) => Math.max(el.build.order ? el.build.order + seriesSteps(el) : 0, el.build.outOrder || 0, el.build.pathOrder || 0);
+  return Math.max(0, ...slide.elements.map(last)) + 1;
+}
+
+/** Numbers the slide's builds one step after another, in `events` order. */
+export function setBuildOrder(slide, events) {
+  return apply({ op: 'setBuildOrder', slide: slide.id, ids: events.map((ev) => (ev.kind === 'path' ? `${ev.el.id}#path` : ev.el.id)) });
+}

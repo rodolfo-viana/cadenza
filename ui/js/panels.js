@@ -2,7 +2,7 @@
 
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo } from './store.js';
+import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo, toast } from './store.js';
 import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField } from './controls.js';
 import * as A from './actions.js';
 import { exec, setLink, isEditing, queryState, beginTextEdit, endTextEdit, beginTableEdit, insertInlineMath } from './textedit.js';
@@ -11,6 +11,7 @@ import { cls } from './util.js';
 import { Button } from './ui.js';
 import { renderDiagram, svgAspect, DIAGRAM_TEMPLATES } from './diagrams.js';
 import { opener } from './api.js';
+import { previewing, startPreview, stopPreview } from './camera.js';
 import { t, N_ } from './i18n.js';
 
 const ids = (els) => els.map((e) => e.id).join(',');
@@ -441,6 +442,59 @@ export function VideoPanel({ els }) {
       />
     <//>`}
     ${online && html`<${Hint}>${t('Online videos need an internet connection while presenting.')}</${Hint}>`}
+  <//>`;
+}
+
+export function CameraPanel({ els }) {
+  const single = els.length === 1 ? els[0] : null;
+  const c = (k) => same(els, (e) => e.content[k]);
+  const set_ = (patch) => patchAll(els, { content: patch }, null);
+  const [devices, setDevices] = useState([]);
+  const loadDevices = () =>
+    navigator.mediaDevices
+      ?.enumerateDevices()
+      .then((list) => setDevices(list.filter((d) => d.kind === 'videoinput')))
+      .catch(() => {});
+  // The preview ends when the element is no longer the one selected.
+  useEffect(() => {
+    loadDevices();
+    return () => stopPreview();
+  }, [single?.id]);
+  const on = single && previewing(single.id);
+  const toggle = async () => {
+    if (on) return stopPreview();
+    try {
+      await startPreview(single);
+      loadDevices();
+    } catch {
+      toast(t('The camera could not be turned on. Check that it is connected and not used by another app.'), 'error');
+    }
+  };
+  const label = (d, i) => d.label || t('Camera {n}', { n: i + 1 });
+  return html`<${Section} title=${t('Live Camera')} id="camera">
+    <${Row} label=${t('Camera')}>
+      <${Select}
+        value=${c('deviceId') ?? ''}
+        options=${[{ value: '', label: t('Default camera') }, ...devices.map((d, i) => ({ value: d.deviceId, label: label(d, i) }))]}
+        onChange=${(v) => {
+          const i = devices.findIndex((d) => d.deviceId === v);
+          set_({ deviceId: v, deviceLabel: i >= 0 ? label(devices[i], i) : '' });
+        }}
+      />
+    <//>
+    <${Row}><${Toggle} value=${c('mirror')} label=${t('Mirror image')} onChange=${(v) => set_({ mirror: v })} /><//>
+    <${Row} label=${t('Shape')}>
+      <${Segmented}
+        value=${c('mask')}
+        options=${[
+          { value: 'rect', label: t('Rectangle') },
+          { value: 'circle', label: t('Circle') },
+        ]}
+        onChange=${(v) => set_({ mask: v })}
+      />
+    <//>
+    ${single && html`<div class="row-inline"><${Button} size="sm" icon=${on ? 'eye-off' : 'eye'} label=${on ? t('Stop Preview') : t('Preview')} onClick=${toggle} /></div>`}
+    <${Hint}>${t('The camera turns on only while you present a slide with live video, or during a preview here. For a round picture, choose Circle with a square frame.')}</${Hint}>
   <//>`;
 }
 

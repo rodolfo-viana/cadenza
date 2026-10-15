@@ -141,7 +141,7 @@
     }
 
     return Promise.all(waits).then(function () {
-      return window.CadenzaRuntime.start(cfg, { notes: false });
+      return window.CadenzaRuntime.start(cfg, { notes: false, camera: mode === 'show' });
     }).then(function () {
       var loading = document.getElementById('cz-loading');
       if (loading) loading.remove();

@@ -25,7 +25,9 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
   it as reveal.js CSS.
 - Google Fonts: every family is searchable offline, and the fonts you pick are embedded in the
   presentation, so it looks the same on any computer.
-- Builds (step-by-step animations), slide transitions and Magic Move (reveal.js auto-animate).
+- Builds (step-by-step animations, including wipes), charts that build one series at a time,
+  motion paths drawn right on the slide, slide transitions and Magic Move (reveal.js
+  auto-animate).
 - Per-presentation custom CSS for anything else.
 
 **Media**
@@ -33,6 +35,7 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
   Pexels, Pixabay and GIPHY with a free API key.
 - YouTube and Vimeo videos: browse the sites as usual and click **Insert**, or paste a link. No key
   needed.
+- Live camera: show yourself on any slide while you present, in a rectangle or a circle.
 
 **Presenting and sharing**
 - Fullscreen show with a presenter display: speaker notes, timer, clock and the next slide.

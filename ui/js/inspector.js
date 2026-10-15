@@ -4,8 +4,9 @@ import { html } from './lib.js';
 import { Icon } from './icons.js';
 import { state, set, apply, useStore, currentSlide, selectedElements, updateSlides, updateDeck, deck, themeInfo } from './store.js';
 import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField } from './controls.js';
-import { TextPanel, BoxPanel, ShapePanel, ImagePanel, VideoPanel, EmbedPanel, CodePanel, MathPanel, TablePanel, ChartPanel, DiagramPanel, ArrangePanel, LinkPanel, slideTitle } from './panels.js';
+import { TextPanel, BoxPanel, ShapePanel, ImagePanel, VideoPanel, CameraPanel, EmbedPanel, CodePanel, MathPanel, TablePanel, ChartPanel, DiagramPanel, ArrangePanel, LinkPanel, slideTitle } from './panels.js';
 import * as A from './actions.js';
+import { drawPath } from './canvas.js';
 import { Button } from './ui.js';
 import { cardFromDef, openThemeBuilder, applyCustomTheme, importTheme, themeMenu } from './themebuilder.js';
 import { cls } from './util.js';
@@ -47,6 +48,7 @@ const KIND_LABEL = {
   table: N_('Table'),
   chart: N_('Chart'),
   diagram: N_('Diagram'),
+  camera: N_('Live Camera'),
 };
 
 /** An element's display name: its own name, or else the label of its kind (translated). */
@@ -71,6 +73,7 @@ function ElementFormat({ els }) {
     html`<${ShapePanel} els=${els} />${els.every((e) => e.content.shape !== 'line') && html`<${TextPanel} els=${els} title=${t('Text in shape')} />`}`}
     ${k === 'image' && html`<${ImagePanel} els=${els} /><${BoxPanel} els=${els} title=${t('Frame')} fill=${false} padding=${false} />`}
     ${k === 'video' && html`<${VideoPanel} els=${els} /><${BoxPanel} els=${els} title=${t('Frame')} fill=${false} padding=${false} />`}
+    ${k === 'camera' && html`<${CameraPanel} els=${els} /><${BoxPanel} els=${els} title=${t('Frame')} fill=${false} padding=${false} />`}
     ${k === 'embed' && html`<${EmbedPanel} els=${els} /><${BoxPanel} els=${els} title=${t('Frame')} fill=${false} padding=${false} />`}
     ${k === 'code' && html`<${CodePanel} els=${els} />`}
     ${k === 'math' && html`<${MathPanel} els=${els} /><${BoxPanel} els=${els} />`}
@@ -226,6 +229,10 @@ const BUILD_IN = [
     { value: 'fade-down', label: N_('Fade down') },
     { value: 'fade-left', label: N_('Fade from right') },
     { value: 'fade-right', label: N_('Fade from left') },
+    { value: 'cz-wipe-up', label: N_('Wipe from bottom') },
+    { value: 'cz-wipe-down', label: N_('Wipe from top') },
+    { value: 'cz-wipe-right', label: N_('Wipe from left') },
+    { value: 'cz-wipe-left', label: N_('Wipe from right') },
     { value: 'zoom-in', label: N_('Zoom in') },
     { value: 'fade-in-then-out', label: N_('Appear, then disappear') },
     { value: 'fade-in-then-semi-out', label: N_('Appear, then dim') },
@@ -265,17 +272,31 @@ const effectLabel = (v) => {
 function AnimatePanel({ els }) {
   const slide = currentSlide();
   if (!slide) return null;
-  const builds = slide.elements.filter((e) => e.build.effect).sort((a, b) => (a.build.order || 999) - (b.build.order || 999));
-  const nextOrder = () => Math.max(0, ...slide.elements.map((e) => Math.max(e.build.order, e.build.outOrder))) + 1;
+  const events = A.buildEvents(slide);
+  const nextOrder = () => A.nextBuildStep(slide);
   const setBuild = (patch) =>
     apply({ op: 'updateElements', slide: slide.id, updates: els.map((e, i) => ({ id: e.id, patch: { build: typeof patch === 'function' ? patch(e, i) : patch } })) });
   const one = els.length === 1 ? els[0] : null;
   const move = (i, d) => {
-    const order = builds.map((e) => e.id);
     const j = i + d;
-    if (j < 0 || j >= order.length) return;
+    if (j < 0 || j >= events.length) return;
+    const order = [...events];
     [order[i], order[j]] = [order[j], order[i]];
-    apply({ op: 'setBuildOrder', slide: slide.id, ids: order });
+    A.setBuildOrder(slide, order);
+  };
+  const isBuildIn = (v) => BUILD_IN[0].options.some((o) => o.value === v && v);
+  const pie = one?.content.kind === 'chart' && (one.content.chart === 'pie' || one.content.chart === 'donut');
+  const series = one ? A.seriesSteps(one) : 0;
+  // Building a chart by series takes more steps: renumber if they now
+  // overlap other builds.
+  const setDelivery = async (delivery) => {
+    await setBuild({ delivery });
+    const s = currentSlide();
+    const chart = s?.elements.find((e) => e.id === one.id);
+    if (!chart) return;
+    const from = chart.build.order;
+    const to = from + A.seriesSteps(chart);
+    if (A.buildEvents(s).some((ev) => ev.el.id !== chart.id && ev.step > from && ev.step <= to)) A.setBuildOrder(s, A.buildEvents(s));
   };
   return html`
     ${els.length > 0 &&
@@ -291,6 +312,23 @@ function AnimatePanel({ els }) {
         />
       <//>
       ${one?.build.effect && html`<${Row} label=${t('Step')}><${NumberField} value=${one.build.order} min=${1} max=${99} onChange=${(v) => setBuild({ order: v })} /><//>`}
+      ${one?.content.kind === 'chart' && isBuildIn(one.build.effect) &&
+      html`<${Row} label=${t('Delivery')}>
+          <${Segmented}
+            value=${one.build.delivery || ''}
+            options=${[
+              { value: '', label: t('All at once') },
+              { value: 'series', label: pie ? t('By slice') : t('By series') },
+            ]}
+            onChange=${setDelivery}
+          />
+        <//>
+        ${series > 0 &&
+        html`<${Hint}>
+          ${pie
+            ? t('The chart appears at step {first}, then one slice per step until step {last}.', { first: one.build.order, last: one.build.order + series })
+            : t('The chart appears at step {first}, then one series per step until step {last}.', { first: one.build.order, last: one.build.order + series })}
+        </${Hint}>`}`}
       <${Row} label=${t('Build out')}>
         <${Select}
           value=${one ? one.build.outEffect : ''}
@@ -300,6 +338,19 @@ function AnimatePanel({ els }) {
       <//>
       ${one?.build.outEffect && html`<${Row} label=${t('Out step')}><${NumberField} value=${one.build.outOrder} min=${1} max=${99} onChange=${(v) => setBuild({ outOrder: v })} /><//>`}
       <${Hint}>${t('Builds play one click at a time during the presentation. Objects with the same step appear together.')}</${Hint}>
+    <//>`}
+    ${one &&
+    html`<${Section} title=${t('Motion Path')} id="motion-path">
+      ${A.hasPath(one)
+        ? html`<${Row} label=${t('Step')}><${NumberField} value=${one.build.pathOrder} min=${1} max=${99} onChange=${(v) => setBuild({ pathOrder: v })} /><//>
+            <${Row} label=${t('Duration')}><${NumberField} value=${one.build.pathDuration || 1.5} min=${0.1} max=${60} step=${0.1} unit="s" onChange=${(v) => setBuild({ pathDuration: v })} /><//>
+            <${Row}><${Toggle} value=${one.build.pathSmooth} label=${t('Smooth curve')} onChange=${(v) => setBuild({ pathSmooth: v })} /><//>
+            <div class="row-inline">
+              <${Button} size="sm" icon="spline" label=${t('Redraw')} onClick=${() => drawPath(one)} />
+              <${Button} size="sm" variant="ghost" icon="trash-2" label=${t('Remove')} onClick=${() => setBuild({ path: [], pathOrder: 0 })} />
+            </div>`
+        : html`<div class="row-inline"><${Button} size="sm" icon="spline" label=${t('Draw Path')} onClick=${() => drawPath(one)} /></div>`}
+      <${Hint}>${t('Click on the slide to add points; press Enter or double-click to finish, Esc to cancel. Drag the points to adjust the path.')}</${Hint}>
     <//>`}
     ${els.length === 0 &&
     html`<${Section} title=${t('Transition')} id="transition">
@@ -334,21 +385,25 @@ function AnimatePanel({ els }) {
         <${NumberField} value=${slide.autoSlide} min=${0} max=${3600} step=${0.5} unit="s" title=${t('0 = use the presentation setting')} onChange=${(v) => updateSlides([slide.id], { autoSlide: v })} />
       <//>
     <//>`}
-    <${Section} title=${t('Build Order ({n})', { n: builds.length })} id="build-order">
-      ${builds.length === 0 && html`<${Hint}>${t('No builds on this slide. Select an object and choose a “Build in” effect.')}</${Hint}>`}
+    <${Section} title=${t('Build Order ({n})', { n: events.length })} id="build-order">
+      ${events.length === 0 && html`<${Hint}>${t('No builds on this slide. Select an object and choose a “Build in” effect.')}</${Hint}>`}
       <div class="build-list">
-        ${builds.map(
-          (e, i) => html`<div class=${cls('build-item', state.selection.includes(e.id) && 'active')} onClick=${() => set({ selection: [e.id] })}>
-            <span class="build-step">${e.build.order || '–'}</span>
-            <span class="build-name">
-              ${elementName(e)}<small>${effectLabel(e.build.effect)}${e.build.outEffect ? ` · ${t('out: {effect}', { effect: effectLabel(e.build.outEffect) })}` : ''}</small>
-            </span>
+        ${events.map((ev, i) => {
+          const e = ev.el;
+          const extra = ev.kind === 'in' ? A.seriesSteps(e) : 0;
+          const what =
+            ev.kind === 'path'
+              ? t('Motion path')
+              : `${effectLabel(e.build.effect)}${extra ? ` · ${e.content.chart === 'pie' || e.content.chart === 'donut' ? t('by slice') : t('by series')}` : ''}${e.build.outEffect ? ` · ${t('out: {effect}', { effect: effectLabel(e.build.outEffect) })}` : ''}`;
+          return html`<div key=${e.id + ev.kind} class=${cls('build-item', state.selection.includes(e.id) && 'active')} onClick=${() => set({ selection: [e.id] })}>
+            <span class="build-step">${ev.step ? (extra ? `${ev.step}–${ev.step + extra}` : ev.step) : '–'}</span>
+            <span class="build-name">${elementName(e)}<small>${what}</small></span>
             <span class="build-move">
-              <button title=${t('Earlier')} onClick=${(ev) => { ev.stopPropagation(); move(i, -1); }}><${Icon} name="chevron-up" size=${14} /></button>
-              <button title=${t('Later')} onClick=${(ev) => { ev.stopPropagation(); move(i, 1); }}><${Icon} name="chevron-down" size=${14} /></button>
+              <button title=${t('Earlier')} onClick=${(evt) => { evt.stopPropagation(); move(i, -1); }}><${Icon} name="chevron-up" size=${14} /></button>
+              <button title=${t('Later')} onClick=${(evt) => { evt.stopPropagation(); move(i, 1); }}><${Icon} name="chevron-down" size=${14} /></button>
             </span>
-          </div>`,
-        )}
+          </div>`;
+        })}
       </div>
     <//>
   `;

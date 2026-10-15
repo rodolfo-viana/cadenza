@@ -405,3 +405,51 @@
 .reveal .cz-math-display { display: block; margin: 0.25em 0; text-align: center; }
 .reveal .cz-math-display .katex-display { margin: 0; }
 .reveal .cz-math-display .katex { font-size: 1.08em; }
+
+/* ---- Builds: wipes, chart series, motion paths --------------------------------- */
+
+/* Wipes reveal the object from one edge (reveal.js fragments otherwise fade). */
+.reveal .slides section .fragment.cz-wipe-up,
+.reveal .slides section .fragment.cz-wipe-down,
+.reveal .slides section .fragment.cz-wipe-left,
+.reveal .slides section .fragment.cz-wipe-right {
+  opacity: 1;
+  visibility: inherit;
+  transition: clip-path 0.8s ease;
+}
+.reveal .slides section .fragment.cz-wipe-up { clip-path: inset(100% 0 0 0); }
+.reveal .slides section .fragment.cz-wipe-down { clip-path: inset(0 0 100% 0); }
+.reveal .slides section .fragment.cz-wipe-left { clip-path: inset(0 0 0 100%); }
+.reveal .slides section .fragment.cz-wipe-right { clip-path: inset(0 100% 0 0); }
+.reveal .slides section .fragment.cz-wipe-up.visible,
+.reveal .slides section .fragment.cz-wipe-down.visible,
+.reveal .slides section .fragment.cz-wipe-left.visible,
+.reveal .slides section .fragment.cz-wipe-right.visible {
+  clip-path: inset(0 0 0 0);
+}
+
+/* A chart's series scale and zoom from their own center. */
+.reveal .cz-chart-svg g.fragment {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Motion path: the element stays visible and moves along its offset-path
+   (set inline) when its step comes. */
+.reveal .slides section .fragment.cz-path {
+  opacity: 1;
+  visibility: inherit;
+  offset-anchor: 0 0;
+  offset-rotate: 0deg;
+  offset-distance: 0%;
+  transition: offset-distance var(--cz-path-duration, 1.5s) ease-in-out;
+}
+.reveal .slides section .fragment.cz-path.visible {
+  offset-distance: 100%;
+}
+
+/* ---- Live camera ------------------------------------------------------------- */
+
+.reveal .cz-camera-box { overflow: hidden; background: #000; }
+.reveal .cz-camera { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.reveal .cz-camera.cz-mirror { transform: scaleX(-1); }

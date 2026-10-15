@@ -213,6 +213,7 @@ pub fn new_element(kind: &str, variant: &str, width: u32, height: u32) -> Elemen
         "shape" if variant == "line" => (f.w * 0.3, 24.0),
         "shape" => (f.h * 0.3, f.h * 0.3),
         "image" | "video" | "embed" => (f.w * 0.5, f.w * 0.5 * 9.0 / 16.0),
+        "camera" => (f.w * 0.35, f.w * 0.35 * 9.0 / 16.0),
         "code" => (f.w * 0.6, f.h * 0.45),
         "math" => (f.w * 0.5, f.h * 0.2),
         "table" => (f.w * 0.6, f.h * 0.4),
@@ -245,6 +246,7 @@ pub fn new_element(kind: &str, variant: &str, width: u32, height: u32) -> Elemen
         }),
         "embed" => Content::Embed(EmbedContent::default()),
         "diagram" => Content::Diagram(DiagramContent::default()),
+        "camera" => Content::Camera(CameraContent::default()),
         "table" => Content::Table(TableContent {
             font_size: f.font(26.0),
             ..Default::default()
@@ -278,6 +280,7 @@ pub fn new_element(kind: &str, variant: &str, width: u32, height: u32) -> Elemen
     let mut el = Element {
         name: match kind {
             "shape" => crate::shapes::SHAPES.iter().find(|s| s.0 == variant).map(|s| s.1).unwrap_or("Shape").into(),
+            "camera" => "Live Camera".into(),
             k => {
                 let mut c = k.chars();
                 c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()

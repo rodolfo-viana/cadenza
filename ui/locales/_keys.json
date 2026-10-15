@@ -258,6 +258,12 @@
   ]
  },
  {
+  "key": "All at once",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
   "key": "All slides are skipped — there is nothing to present.",
   "files": [
    "lib.rs"
@@ -677,6 +683,30 @@
   ]
  },
  {
+  "key": "By series",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "by series",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "By slice",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "by slice",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
   "key": "Cadenza failed to start:",
   "files": [
    "main.js"
@@ -699,6 +729,18 @@
   "files": [
    "inspector.js",
    "welcome.js"
+  ]
+ },
+ {
+  "key": "Camera",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Camera {n}",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -866,6 +908,12 @@
   ]
  },
  {
+  "key": "Circle",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Class",
   "files": [
    "diagrams.js"
@@ -895,6 +943,12 @@
   "key": "Clear formatting",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Click on the slide to add points; press Enter or double-click to finish, Esc to cancel. Drag the points to adjust the path.",
+  "files": [
+   "inspector.js"
   ]
  },
  {
@@ -1195,6 +1249,12 @@
   ]
  },
  {
+  "key": "Default camera",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Delete",
   "files": [
    "commands.js",
@@ -1220,6 +1280,12 @@
    "navigator.js"
   ],
   "one": "Delete {n} Slide"
+ },
+ {
+  "key": "Delivery",
+  "files": [
+   "inspector.js"
+  ]
  },
  {
   "key": "Describe the image",
@@ -1405,6 +1471,18 @@
   ]
  },
  {
+  "key": "Drag to move · double-click to remove",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Draw Path",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
   "key": "Drop a presentation to open it",
   "files": [
    "main.js"
@@ -1434,6 +1512,12 @@
   "files": [
    "commands.js",
    "ops.rs"
+  ]
+ },
+ {
+  "key": "Duration",
+  "files": [
+   "inspector.js"
   ]
  },
  {
@@ -2588,6 +2672,20 @@
   ]
  },
  {
+  "key": "Live Camera",
+  "files": [
+   "commands.js",
+   "inspector.js",
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Live camera",
+  "files": [
+   "slideview.js"
+  ]
+ },
+ {
   "key": "Live preview",
   "files": [
    "themebuilder.js"
@@ -2654,6 +2752,12 @@
   "key": "lowercase",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Made by {author}",
+  "files": [
+   "dialogs.js"
   ]
  },
  {
@@ -2745,6 +2849,12 @@
   ]
  },
  {
+  "key": "Mirror image",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Mirror the text (for teleprompter glass)",
   "files": [
    "teleprompter.js"
@@ -2760,6 +2870,18 @@
   "key": "Mono",
   "files": [
    "controls.js"
+  ]
+ },
+ {
+  "key": "Motion Path",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Motion path",
+  "files": [
+   "inspector.js"
   ]
  },
  {
@@ -3450,6 +3572,12 @@
   ]
  },
  {
+  "key": "Preview",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Previous",
   "files": [
    "presenter.html"
@@ -3534,6 +3662,7 @@
   "key": "Rectangle",
   "files": [
    "commands.js",
+   "panels.js",
    "shapes.rs"
   ]
  },
@@ -3552,6 +3681,12 @@
   ]
  },
  {
+  "key": "Redraw",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
   "key": "Redux",
   "files": [
    "panels.js"
@@ -3566,7 +3701,8 @@
  {
   "key": "Remove",
   "files": [
-   "dialogs.js"
+   "dialogs.js",
+   "inspector.js"
   ]
  },
  {
@@ -4226,6 +4362,12 @@
   ]
  },
  {
+  "key": "Smooth curve",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
   "key": "Snap to Guides",
   "files": [
    "toolbar.js"
@@ -4377,6 +4519,12 @@
  },
  {
   "key": "Step highlights",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Stop Preview",
   "files": [
    "panels.js"
   ]
@@ -4547,6 +4695,30 @@
   "files": [
    "panels.js",
    "teleprompter.js"
+  ]
+ },
+ {
+  "key": "The camera could not be turned on. Check that it is connected and not used by another app.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "The camera turns on only while you present a slide with live video, or during a preview here. For a round picture, choose Circle with a square frame.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "The chart appears at step {first}, then one series per step until step {last}.",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "The chart appears at step {first}, then one slice per step until step {last}.",
+  "files": [
+   "inspector.js"
   ]
  },
  {
@@ -5136,6 +5308,30 @@
   "key": "Window",
   "files": [
    "app_menu.rs"
+  ]
+ },
+ {
+  "key": "Wipe from bottom",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Wipe from left",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Wipe from right",
+  "files": [
+   "inspector.js"
+  ]
+ },
+ {
+  "key": "Wipe from top",
+  "files": [
+   "inspector.js"
   ]
  },
  {

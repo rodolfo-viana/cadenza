@@ -179,6 +179,8 @@ function About() {
       <h2>Cadenza</h2>
       <p class="muted">${t('Version {version} · {platform}', { version: state.info.version, platform: state.info.platform })}</p>
       <p>${withLinks(t('A presentation studio built with Rust and the {engine} engine.'), { engine: link('https://revealjs.com', 'reveal.js') })}</p>
+      <p>${t('Made by {author}', { author: 'Rodolfo Viana' })}</p>
+      <p>${link('https://github.com/rodolfo-viana/cadenza', 'github.com/rodolfo-viana/cadenza')}</p>
       <p class="small muted">
         ${withLinks(t('Made with {tauri}, {reveal} (MIT), {katex} (MIT), {highlight} (BSD), {preact} (MIT) and {lucide} icons (ISC).'), {
           tauri: link('https://tauri.app', 'Tauri'),

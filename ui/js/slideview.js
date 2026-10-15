@@ -30,6 +30,7 @@ export const PLACEHOLDERS = [
   N_('What this number means'),
   N_('Double-click to choose an image'),
   N_('Double-click to choose a video'),
+  N_('Live camera'),
   N_('YouTube video'),
   N_('Vimeo video'),
   N_('Web page — set its address in the inspector'),

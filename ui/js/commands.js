@@ -49,6 +49,7 @@ export const COMMANDS = [
   { id: 'insert.ellipse', group: N_('Insert'), label: N_('Oval'), icon: 'circle', when: hasDoc, run: () => A.insert('shape', 'ellipse') },
   { id: 'insert.line', group: N_('Insert'), label: N_('Arrow Line'), icon: 'arrow-right', when: hasDoc, run: () => A.insert('shape', 'line') },
   { id: 'insert.image', group: N_('Insert'), label: N_('Image…'), icon: 'image', keys: ['Mod+Shift+I'], when: hasDoc, run: A.insertImage },
+  { id: 'insert.camera', group: N_('Insert'), label: N_('Live Camera'), icon: 'video', when: hasDoc, run: () => A.insert('camera') },
   { id: 'insert.video', group: N_('Insert'), label: N_('Video File…'), icon: 'film', when: hasDoc, run: A.insertVideoFile },
   { id: 'insert.onlineVideo', group: N_('Insert'), label: N_('Online Video (YouTube, Vimeo)…'), icon: 'square-play', when: hasDoc, run: () => import('./media.js').then((m) => m.openMediaLibrary('videos')) },
   { id: 'media.photos', group: N_('Insert'), label: N_('Photos (Openverse, Wikimedia, Pexels, Pixabay)…'), icon: 'images', keys: ['Mod+Shift+M'], when: hasDoc, run: () => import('./media.js').then((m) => m.openMediaLibrary('photos')) },

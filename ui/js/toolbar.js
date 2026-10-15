@@ -72,6 +72,7 @@ function mediaMenu() {
     { heading: t('From this computer') },
     cmd('insert.image'),
     cmd('insert.video'),
+    cmd('insert.camera'),
     '-',
     cmd('insert.web'),
   ];

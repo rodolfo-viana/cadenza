@@ -1011,8 +1011,10 @@ fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_sl
         .title("Cadenza — Presentation")
         .visible(false)
         .decorations(false)
+        .on_permission_request(camera_only)
         .build()
         .map_err(err)?;
+    enable_camera(&w);
     if let Some(m) = &audience {
         let _ = w.set_position(tauri::Position::Physical(*m.position()));
         let _ = w.set_size(tauri::Size::Physical(*m.size()));
@@ -1142,14 +1144,46 @@ fn open_editor_window(app: &AppHandle, file: Option<PathBuf>) -> tauri::Result<(
     {
         p.insert(label.clone(), f);
     }
-    WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+    let w = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title("Cadenza")
         .inner_size(1440.0, 900.0)
         .min_inner_size(900.0, 560.0)
         .center()
+        .on_permission_request(camera_only)
         .build()?;
+    // The editor previews live video elements on request.
+    enable_camera(&w);
     Ok(())
 }
+
+/// Cadenza's own pages may use the camera (live video elements), never the
+/// microphone.
+fn camera_only<R: tauri::Runtime>(_: tauri::Webview<R>, kind: tauri::webview::PermissionKind) -> tauri::webview::PermissionResponse {
+    use tauri::webview::{PermissionKind, PermissionResponse};
+    match kind {
+        PermissionKind::Camera => PermissionResponse::Allow,
+        PermissionKind::Microphone => PermissionResponse::Deny,
+        _ => PermissionResponse::Default,
+    }
+}
+
+/// WebKitGTK lets pages use the camera only with MediaStream enabled.
+#[cfg(target_os = "linux")]
+fn enable_camera(w: &tauri::WebviewWindow) {
+    let _ = w.with_webview(|wv| {
+        use webkit2gtk::{SettingsExt, WebViewExt};
+        if let Some(settings) = WebViewExt::settings(&wv.inner()) {
+            settings.set_enable_media_stream(true);
+            // Test displays have no camera: WebKit can fake one.
+            if cfg!(debug_assertions) && std::env::var_os("CADENZA_FAKE_CAMERA").is_some() {
+                settings.set_enable_mock_capture_devices(true);
+            }
+        }
+    });
+}
+
+#[cfg(not(target_os = "linux"))]
+fn enable_camera(_w: &tauri::WebviewWindow) {}
 
 #[tauri::command]
 fn window_new(app: AppHandle, path: Option<String>) -> CmdResult<()> {

@@ -23,6 +23,7 @@ import { item } from './commands.js';
 import { beginTextEdit, endTextEdit, editingNode, beginTableEdit, endTableEdit, tableNode, isEditing, isEditingTable } from './textedit.js';
 import { bounds, unionBounds, intersects, rotate, clamp, cls } from './util.js';
 import { t, language } from './i18n.js';
+import { attachPreview } from './camera.js';
 
 const PAD = 48; // space around the slide
 const MIN = 8; // minimum element size
@@ -108,6 +109,8 @@ export function Canvas() {
   const [tip, setTip] = useState(null);
   const [scroll, setScroll] = useState({ x: 0, y: 0 });
   const [gdrag, setGdrag] = useState(null);
+  const [pathHover, setPathHover] = useState(null);
+  const [pathLive, setPathLive] = useState(null);
   const showRulers = settings().showRulers !== false;
   const showGuides = settings().showGuides !== false;
   const userGuides = showGuides ? deck.guides : null;
@@ -146,9 +149,14 @@ export function Canvas() {
     measure();
   }, [rendered?.html, slide?.id, st.editing, st.editingTable, language()]);
 
-  // Leaving the slide ends inline editing.
+  // A live camera preview lives inside its element's markup: put it back
+  // after every render.
+  useLayoutEffect(() => attachPreview(viewRef.current, slide));
+
+  // Leaving the slide ends inline editing and path drawing.
   useEffect(() => {
     return () => {
+      if (state.drawPath) set({ drawPath: null });
       endTextEdit();
       endTableEdit();
     };
@@ -497,6 +505,11 @@ export function Canvas() {
 
   async function onPointerDown(e) {
     if (e.button !== 0) return;
+    if (st.drawPath) {
+      e.preventDefault();
+      addPathPoint(toSlide(e));
+      return;
+    }
     set({ focus: 'canvas', menu: null });
     const target = e.target;
     const editNode = editingNode();
@@ -531,6 +544,10 @@ export function Canvas() {
   }
 
   function onDoubleClick(e) {
+    if (st.drawPath) {
+      finishPath();
+      return;
+    }
     const elNode = e.target.closest?.('.cz-el[data-cz-id]');
     if (!elNode) return;
     const el = slide.elements.find((x) => x.id === elNode.getAttribute('data-cz-id'));
@@ -561,6 +578,7 @@ export function Canvas() {
   }
 
   function onPointerMove(e) {
+    if (st.drawPath) setPathHover(toSlide(e));
     if (document.body.classList.contains('dragging')) return;
     const elNode = e.target.closest?.('.cz-el[data-cz-id]');
     const id = elNode && slideRef.current.contains(elNode) ? elNode.getAttribute('data-cz-id') : null;
@@ -620,6 +638,75 @@ export function Canvas() {
     if (gdrag && gdrag.v != null) guideLines.push({ ...gdrag, active: true });
   }
 
+  // -- motion path ------------------------------------------------------------------
+
+  const pathEl = (() => {
+    if (st.drawPath) return slide.elements.find((x) => x.id === st.drawPath.id) || null;
+    return st.tab === 'animate' && single && A.hasPath(single) ? single : null;
+  })();
+
+  function addPathPoint(p) {
+    const el = slide.elements.find((x) => x.id === state.drawPath?.id);
+    if (!el) return;
+    const g = geom(el);
+    const pt = [Math.round((p.x - g.x - g.w / 2) * 2) / 2, Math.round((p.y - g.y - g.h / 2) * 2) / 2];
+    set({ drawPath: { ...state.drawPath, points: [...state.drawPath.points, pt] } });
+  }
+
+  function dragPathPoint(e, el, k) {
+    e.stopPropagation();
+    e.preventDefault();
+    const p0 = toSlide(e);
+    const orig = el.build.path.map((p) => [...p]);
+    let last = null;
+    track(
+      (ev) => {
+        const p = toSlide(ev);
+        last = orig.map((q, i) => (i === k ? [Math.round((q[0] + p.x - p0.x) * 2) / 2, Math.round((q[1] + p.y - p0.y) * 2) / 2] : q));
+        setPathLive(last);
+      },
+      async () => {
+        if (last) await apply({ op: 'updateElements', slide: slide.id, updates: [{ id: el.id, patch: { build: { path: last } } }] });
+        setPathLive(null);
+      },
+    );
+  }
+
+  function removePathPoint(e, el, k) {
+    e.stopPropagation();
+    if (el.build.path.length <= 2) return;
+    apply({ op: 'updateElements', slide: slide.id, updates: [{ id: el.id, patch: { build: { path: el.build.path.filter((_, i) => i !== k) } } }] });
+  }
+
+  function motionPathOverlay() {
+    if (!pathEl) return null;
+    const g = geom(pathEl);
+    const drawing = !!st.drawPath;
+    const pts = drawing ? [...st.drawPath.points] : pathLive || pathEl.build.path;
+    if (drawing && pathHover) pts.push([pathHover.x - g.x - g.w / 2, pathHover.y - g.y - g.h / 2]);
+    if (pts.length < 1) return null;
+    const cx = g.x + g.w / 2;
+    const cy = g.y + g.h / 2;
+    const screen = pts.map(([dx, dy]) => [(cx + dx - pts[0][0]) * scale, (cy + dy - pts[0][1]) * scale]);
+    const end = pts[pts.length - 1];
+    const ghost = { x: g.x + end[0] - pts[0][0], y: g.y + end[1] - pts[0][1], w: g.w, h: g.h, rotation: g.rotation };
+    return html`<svg class="motion-path" width=${W * scale} height=${H * scale}>
+        ${pts.length > 1 && html`<path d=${pathData(screen, !drawing && pathEl.build.pathSmooth)} />`}
+      </svg>
+      ${pts.length > 1 && html`<div class="motion-ghost" style=${box2screen(ghost)} />`}
+      ${!drawing &&
+      screen.slice(1).map(
+        ([x, y], i) => html`<div
+          key=${i}
+          class="motion-point"
+          style=${{ left: x + 'px', top: y + 'px' }}
+          title=${t('Drag to move · double-click to remove')}
+          onPointerDown=${(e) => dragPathPoint(e, pathEl, i + 1)}
+          onDblClick=${(e) => removePathPoint(e, pathEl, i + 1)}
+        />`,
+      )}`;
+  }
+
   const theme = document.documentElement.dataset.ui;
   return html`<div class=${cls('canvas-area', showRulers && 'with-rulers')}>
     ${showRulers &&
@@ -646,7 +733,7 @@ export function Canvas() {
       />`}
     <div class="canvas-wrap" ref=${wrapRef} onWheel=${onWheel} onScroll=${(e) => setScroll({ x: e.currentTarget.scrollLeft, y: e.currentTarget.scrollTop })}>
     <div
-      class="stage"
+      class=${cls('stage', st.drawPath && 'drawing-path')}
       style=${{ width: stageW + 'px', height: stageH + 'px' }}
       onPointerDown=${onPointerDown}
       onDblClick=${onDoubleClick}
@@ -703,6 +790,7 @@ export function Canvas() {
         )}
         ${guides?.x != null && html`<div class="guide v" style=${{ left: guides.x * scale + 'px', top: -frameY + 'px', height: stageH + 'px' }} />`}
         ${guides?.y != null && html`<div class="guide h" style=${{ top: guides.y * scale + 'px', left: -frameX + 'px', width: stageW + 'px' }} />`}
+        ${motionPathOverlay()}
         ${marquee && html`<div class="marquee" style=${box2screen(marquee)} />`}
         ${tip && html`<div class="geo-tip" style=${{ left: tip.x * scale + 'px', top: tip.y * scale + 'px' }}>${tip.text}</div>`}
       </div>
@@ -710,6 +798,54 @@ export function Canvas() {
     </div>
   </div>
   </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Motion paths
+// ---------------------------------------------------------------------------
+
+/** SVG path data through screen points; smooth = Catmull-Rom curves, as in `render::motion_path_d`. */
+function pathData(pts, smooth) {
+  let d = `M${pts[0][0]} ${pts[0][1]}`;
+  if (smooth && pts.length > 2) {
+    for (let i = 0; i < pts.length - 1; i++) {
+      const prev = pts[Math.max(0, i - 1)];
+      const [p1, p2] = [pts[i], pts[i + 1]];
+      const next = pts[Math.min(pts.length - 1, i + 2)];
+      const c1 = [p1[0] + (p2[0] - prev[0]) / 6, p1[1] + (p2[1] - prev[1]) / 6];
+      const c2 = [p2[0] - (next[0] - p1[0]) / 6, p2[1] - (next[1] - p1[1]) / 6];
+      d += `C${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${p2[0]} ${p2[1]}`;
+    }
+  } else {
+    for (const p of pts.slice(1)) d += `L${p[0]} ${p[1]}`;
+  }
+  return d;
+}
+
+/** Starts drawing a motion path for `el`: clicks on the slide add points. */
+export function drawPath(el) {
+  set({ drawPath: { id: el.id, points: [[0, 0]] }, selection: [el.id], tab: 'animate', focus: 'canvas' });
+}
+
+/** Keeps the drawn path (Enter or double-click). */
+export async function finishPath() {
+  const dp = state.drawPath;
+  set({ drawPath: null });
+  if (!dp) return;
+  // A double-click also adds its two clicks as points: drop repeats.
+  const pts = dp.points.filter((p, i, a) => i === 0 || Math.hypot(p[0] - a[i - 1][0], p[1] - a[i - 1][1]) > 3);
+  const slide = currentSlide();
+  const el = slide?.elements.find((x) => x.id === dp.id);
+  if (!el || pts.length < 2) return;
+  await apply({
+    op: 'updateElements',
+    slide: slide.id,
+    updates: [{ id: el.id, patch: { build: { path: pts, pathOrder: el.build.pathOrder || A.nextBuildStep(slide) } } }],
+  });
+}
+
+export function cancelPath() {
+  set({ drawPath: null });
 }
 
 // ---------------------------------------------------------------------------
