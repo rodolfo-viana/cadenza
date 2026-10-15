@@ -34,8 +34,26 @@
     var pairs = [];
     this.findAutoAnimateMatches(pairs, fromSlide, toSlide, '.cz-el[data-id]', function (node) {
       return 'cz:::' + node.getAttribute('data-id');
-    });
+    }, { measure: measureElement });
     return pairs;
+  }
+
+  /**
+   * An element's box for Magic Move, moved as far as its motion path has
+   * taken it (reveal.js would measure where the path started). Same units
+   * as reveal's own measure with `center: false`.
+   */
+  function measureElement(el) {
+    var scale = window.Reveal.getScale();
+    var box = { x: el.offsetLeft * scale, y: el.offsetTop * scale, width: el.offsetWidth * scale, height: el.offsetHeight * scale };
+    var path = el.querySelector(':scope > .cz-path');
+    if (path) {
+      var a = el.getBoundingClientRect();
+      var b = path.getBoundingClientRect();
+      box.x += b.left - a.left;
+      box.y += b.top - a.top;
+    }
+    return box;
   }
 
   // YouTube refuses to play without a Referer (error 153), and pages opened

@@ -6,6 +6,7 @@
 
 use serde::Serialize;
 use serde_json::{Value, json};
+use std::collections::HashSet;
 use std::fmt::Write as _;
 
 use crate::chart::{SeriesSteps, chart_svg};
@@ -127,7 +128,8 @@ fn editor_background(slide: &Slide, ctx: &Ctx) -> String {
 }
 
 /// Attributes of the `<section>` element of a slide in show mode.
-fn section_attrs(slide: &Slide, ctx: &Ctx) -> String {
+/// `leads_magic`: the next slide has Magic Move.
+fn section_attrs(slide: &Slide, leads_magic: bool, ctx: &Ctx) -> String {
     let mut a = format!(r#" id="{}""#, esc(&slide.id));
     if !slide.transition.is_empty() {
         let _ = write!(a, r#" data-transition="{}""#, esc(&slide.transition));
@@ -135,8 +137,15 @@ fn section_attrs(slide: &Slide, ctx: &Ctx) -> String {
     if !slide.transition_speed.is_empty() && slide.transition_speed != "default" {
         let _ = write!(a, r#" data-transition-speed="{}""#, esc(&slide.transition_speed));
     }
-    if slide.auto_animate {
+    // reveal.js animates only between two slides that both have
+    // data-auto-animate, while Magic Move is set on the second slide alone.
+    // The slide before one with Magic Move gets the attribute too, plus a
+    // restart so its own predecessor does not animate into it.
+    if slide.auto_animate || leads_magic {
         a.push_str(" data-auto-animate");
+    }
+    if !slide.auto_animate && leads_magic {
+        a.push_str(" data-auto-animate-restart");
     }
     if slide.auto_slide > 0.0 {
         let _ = write!(a, r#" data-autoslide="{}""#, (slide.auto_slide * 1000.0).round() as i64);
@@ -180,9 +189,10 @@ fn section_attrs(slide: &Slide, ctx: &Ctx) -> String {
 }
 
 /// One `<section>` for a slide (show mode), including speaker notes.
-pub fn section(deck: &Deck, slide: &Slide, ctx: &Ctx) -> String {
+/// `leads_magic`: the next slide has Magic Move.
+pub fn section(deck: &Deck, slide: &Slide, leads_magic: bool, ctx: &Ctx) -> String {
     let mut s = String::with_capacity(2048);
-    let _ = write!(s, "<section{}>", section_attrs(slide, ctx));
+    let _ = write!(s, "<section{}>", section_attrs(slide, leads_magic, ctx));
     let _ = write!(s, r#"<div class="cz-slide" style="width:{}px;height:{}px">"#, deck.width, deck.height);
     for el in &slide.elements {
         s.push_str(&element(deck, el, ctx));
@@ -222,15 +232,19 @@ pub fn visible_groups(deck: &Deck) -> Vec<Vec<&Slide>> {
 /// vertical stacks.
 pub fn sections(deck: &Deck, ctx: &Ctx) -> String {
     let mut out = String::with_capacity(deck.slides.len() * 2048);
-    for group in visible_groups(deck) {
+    let groups = visible_groups(deck);
+    let order: Vec<&Slide> = groups.iter().flatten().copied().collect();
+    let leaders: HashSet<&str> = order.windows(2).filter(|w| w[1].auto_animate).map(|w| w[0].id.as_str()).collect();
+    let leads_magic = |slide: &Slide| leaders.contains(slide.id.as_str());
+    for group in &groups {
         if group.len() > 1 {
             out.push_str("<section>");
             for slide in group {
-                out.push_str(&section(deck, slide, ctx));
+                out.push_str(&section(deck, slide, leads_magic(slide), ctx));
             }
             out.push_str("</section>");
         } else {
-            out.push_str(&section(deck, group[0], ctx));
+            out.push_str(&section(deck, group[0], leads_magic(group[0]), ctx));
         }
     }
     out
@@ -1461,6 +1475,28 @@ mod tests {
         assert_eq!(slide_indices(&deck, "b"), Some((1, 0)));
         assert_eq!(slide_indices(&deck, "b-child-2"), Some((1, 1)));
         assert_eq!(slide_indices(&deck, "c"), Some((2, 0)));
+    }
+
+    #[test]
+    fn magic_move_marks_the_slide_before_it() {
+        // reveal.js animates only between two auto-animate slides. Hidden
+        // slides are not shown, so d animates from b.
+        let deck: Deck = serde_json::from_value(json!({"slides": [
+            {"id": "z", "autoAnimate": true}, {"id": "a"}, {"id": "b", "autoAnimate": true},
+            {"id": "c", "hidden": true}, {"id": "d", "autoAnimate": true}, {"id": "e"}
+        ]}))
+        .unwrap();
+        let html = sections(&deck, &ctx(Mode::Show));
+        let attrs = |id: &str| {
+            let start = html.find(&format!(r#"<section id="{id}""#)).unwrap();
+            html[start..start + html[start..].find('>').unwrap()].to_string()
+        };
+        assert!(attrs("z").ends_with(" data-auto-animate"), "{}", attrs("z"));
+        // a has no Magic Move of its own: nothing animates from z into it.
+        assert!(attrs("a").ends_with(" data-auto-animate data-auto-animate-restart"), "{}", attrs("a"));
+        assert!(attrs("b").ends_with(" data-auto-animate"), "{}", attrs("b"));
+        assert!(attrs("d").ends_with(" data-auto-animate"), "{}", attrs("d"));
+        assert!(!attrs("e").contains("data-auto-animate"), "{}", attrs("e"));
     }
 
     #[test]
