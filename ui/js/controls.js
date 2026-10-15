@@ -2,7 +2,7 @@
 
 import { html, useEffect, useLayoutEffect, useMemo, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state } from './store.js';
+import { state, registerFlush } from './store.js';
 import { clamp, cls } from './util.js';
 import { t, N_ } from './i18n.js';
 
@@ -45,8 +45,21 @@ export function Hint({ children }) {
   return html`<p class="ihint">${children}</p>`;
 }
 
+/**
+ * Save and Close first commit what is typed in the focused field: text
+ * waiting for Enter, the field losing the focus or a debounce would
+ * otherwise be left out (Ctrl+S and Ctrl+W work while typing). `flush` gets
+ * the field's current text, read from the field itself.
+ */
+function useFlushWhenFocused(field, flush) {
+  const latest = useRef(flush);
+  latest.current = flush;
+  useEffect(() => registerFlush(() => (field.current && document.activeElement === field.current ? latest.current(field.current.value) : undefined)), []);
+}
+
 /** Number input; drag its label horizontally to scrub the value. */
 export function NumberField({ value, onChange, min = -100000, max = 100000, step = 1, unit, label, title, width, disabled, precision }) {
+  const field = useRef(null);
   const [text, setText] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
   useEffect(() => {
@@ -62,8 +75,9 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
   const commit = (v, live = false) => {
     if (v === '' || v === null || Number.isNaN(Number(v))) return;
     const n = clamp(Number(v), min, max);
-    if (n !== value) onChange(n, live);
+    if (n !== value) return onChange(n, live);
   };
+  useFlushWhenFocused(field, (v) => commit(v));
 
   const onScrubStart = (e) => {
     if (disabled || e.button !== 0) return;
@@ -93,6 +107,7 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
   return html`<div class=${cls('numfield', disabled && 'disabled')} style=${width ? { width: width + 'px' } : null} title=${title}>
     ${label && html`<span class="numfield-label" onPointerDown=${onScrubStart}>${label}</span>`}
     <input
+      ref=${field}
       type="text"
       inputmode="decimal"
       value=${text}
@@ -175,14 +190,17 @@ export function TextField({ value, onChange, placeholder, multiline, rows = 4, m
   const [text, setText] = useState(value ?? '');
   const [focused, setFocused] = useState(false);
   const timer = useRef(null);
+  const field = useRef(null);
   useEffect(() => {
     if (!focused) setText(value ?? '');
   }, [value, focused]);
   const flush = (v) => {
     clearTimeout(timer.current);
-    if (v !== value) onChange(v);
+    if (v !== value) return onChange(v);
   };
+  useFlushWhenFocused(field, flush);
   const props = {
+    ref: field,
     value: text,
     placeholder,
     spellcheck,
