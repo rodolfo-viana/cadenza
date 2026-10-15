@@ -788,7 +788,7 @@ fn run_media_browser(context: tauri::Context<tauri::Wry>, provider: String, lang
         .setup(move |app| {
             let text = translator(app.handle(), &lang);
             let prov = provider.clone();
-            let w = WebviewWindowBuilder::new(app, "media-browser", WebviewUrl::External(start.parse()?))
+            let w = window_builder(app, "media-browser", WebviewUrl::External(start.parse()?))
                 .title(tr(&text, "{name} — pick something to insert into Cadenza").replace("{name}", name))
                 .inner_size(1200.0, 840.0)
                 .initialization_script(browse::bar_script(&provider, &text))
@@ -890,7 +890,7 @@ fn export_pdf(app: AppHandle, window: Window) -> CmdResult<()> {
         let _ = w.close();
     }
     let url = format!("present.html?doc={}&print-pdf", util::encode_uri_component(window.label()));
-    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+    window_builder(&app, &label, WebviewUrl::App(url.into()))
         .title("Cadenza — Print / Export PDF")
         .inner_size(1100.0, 800.0)
         .build()
@@ -1007,7 +1007,7 @@ fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_sl
 
     let present_label = format!("present-{owner}");
     let url = format!("present.html?doc={}&h={h}&v={v}", util::encode_uri_component(&owner));
-    let w = WebviewWindowBuilder::new(&app, &present_label, WebviewUrl::App(url.into()))
+    let w = window_builder(&app, &present_label, WebviewUrl::App(url.into()))
         .title("Cadenza — Presentation")
         .visible(false)
         .decorations(false)
@@ -1028,7 +1028,7 @@ fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_sl
     if presenter {
         let pl = format!("presenter-{owner}");
         let url = format!("presenter.html?doc={}", util::encode_uri_component(&owner));
-        let p = WebviewWindowBuilder::new(&app, &pl, WebviewUrl::App(url.into()))
+        let p = window_builder(&app, &pl, WebviewUrl::App(url.into()))
             .title("Cadenza — Presenter")
             .inner_size(1280.0, 800.0)
             .visible(false)
@@ -1144,7 +1144,7 @@ fn open_editor_window(app: &AppHandle, file: Option<PathBuf>) -> tauri::Result<(
     {
         p.insert(label.clone(), f);
     }
-    WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+    window_builder(app, &label, WebviewUrl::App("index.html".into()))
         .title("Cadenza")
         .inner_size(1440.0, 900.0)
         .min_inner_size(900.0, 560.0)
@@ -1270,6 +1270,16 @@ fn keep_unsaved_work(app: &AppHandle) {
 /// portable installs.
 fn data_dir_override() -> Option<PathBuf> {
     std::env::var_os("CADENZA_DATA_DIR").filter(|v| !v.is_empty()).map(PathBuf::from)
+}
+
+/// A new window. An isolated profile (`CADENZA_DATA_DIR`) keeps the pages'
+/// own storage there too, apart from the installed app's.
+fn window_builder<'a, R: tauri::Runtime, M: Manager<R>>(manager: &'a M, label: &str, url: WebviewUrl) -> WebviewWindowBuilder<'a, R, M> {
+    let builder = WebviewWindowBuilder::new(manager, label, url);
+    match data_dir_override() {
+        Some(dir) => builder.data_directory(dir.join("webview")),
+        None => builder,
+    }
 }
 
 pub fn run() {
