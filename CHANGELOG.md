@@ -2,6 +2,39 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## 0.3.1 — 2026-10-15
+
+Ten new chart types plus maps of the world, continents and countries, charts that build one series at a time, motion paths, and the presenter's live camera on a slide.
+
+### New
+
+- New chart types: stacked column, stacked bar, streamgraph, treemap, parliament, scatterplot, heatmap, candlestick, Sankey diagram and network graph. Sankey diagrams and network graphs take a list of links (from, to, value).
+- Map charts: the world, a continent, or a country's states or provinces, colored by value. Rows name regions in any of Cadenza's languages or by code, Add All Regions fills in the table, and faraway parts (Alaska, the Canary Islands…) get boxes of their own. Map data comes from Natural Earth.
+- Charts can build one series at a time (pie and donut: one slice at a time; parliament: one party at a time).
+- Motion paths: Animate ▸ Motion Path ▸ Draw Path, then click points on the slide. The object moves along the path at its build step, in straight lines or a smooth curve.
+- Live camera (Media ▸ Live Camera): the presenter's camera on a slide, mirrored or not, as a rectangle or a circle. Only the audience window shows it, and only while you present in Cadenza; exported presentations and printouts leave it out.
+- Four Wipe build effects.
+- Images from a link: paste the address of an image, a Wikimedia Commons or Wikipedia file, or a web page in the photo search of the Media Library. Wikimedia files bring their author and license for the photo credit.
+- Ctrl+B, Ctrl+I and Ctrl+U work on selected text boxes too, not only on text being edited.
+- The About dialog shows who makes Cadenza and links to its repository.
+
+### Changes
+
+- With some text selected, Font, Size and Color change only that text, like Bold and Italic. Select the box to change all of its text.
+- Stacked column, bar and area charts are chart types of their own instead of a switch. Stacked charts in older presentations stay stacked.
+
+### Fixes
+
+- Bold and Italic on a selected text box couldn't turn off the bold of titles and headings or the italic of quotes.
+- Ctrl+U didn't underline text while editing it.
+- After turning a list off, the text no longer followed font changes to its box.
+- Saving or closing right after typing in an inspector field (an equation, a size) left out what was just typed, and closing didn't ask about it.
+- Importing Markdown into a one-slide presentation with an image, chart or other content replaced it without asking.
+- On Linux, PDF export put each slide at the top of an A4 portrait page, black below. Pages now have the size of a slide.
+- Magic Move did nothing unless the slide before it also had Magic Move.
+- Downloads from some websites (images, Google Fonts) waited 15 seconds or more before starting.
+- Photo credits from Wikimedia Commons ran the author's lines together.
+
 ## 0.3.0 — 2026-10-14
 
 Videos now play in presentations (YouTube, videos from your computer and slide backgrounds), and the Media Library has free photos from Wikimedia Commons, Pexels and Pixabay.
