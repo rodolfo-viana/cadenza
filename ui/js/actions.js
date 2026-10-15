@@ -385,7 +385,11 @@ export async function importMarkdown() {
   const path = await dialog.open({ title: t('Import Markdown'), multiple: false, filters: [{ name: t('Markdown'), extensions: ['md', 'markdown', 'txt'] }] });
   if (!path) return;
   const d = deck();
-  const onlyEmpty = d.slides.length === 1 && d.slides[0].elements.every((e) => !e.content.html);
+  // Replacing goes without asking only for a new presentation's untouched
+  // first slide: empty text boxes, no notes, the theme's background.
+  const untouched = (s) =>
+    !s.notes.trim() && s.background.kind === 'theme' && s.elements.every((e) => e.content.kind === 'text' && !e.content.html.trim());
+  const onlyEmpty = d.slides.length === 1 && untouched(d.slides[0]);
   let replace = onlyEmpty;
   if (!onlyEmpty) {
     const choice = await ask('choice', {
