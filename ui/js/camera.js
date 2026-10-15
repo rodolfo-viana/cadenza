@@ -26,6 +26,11 @@ export function stopPreview() {
   if (!preview.id) return;
   preview.stream?.getTracks().forEach((t) => t.stop());
   preview = { id: null, device: '', stream: null };
+  // Re-rendering can keep the element's markup, and with it the last frame.
+  document.querySelectorAll('.cz-camera-box video.cz-camera').forEach((v) => {
+    v.srcObject = null;
+    v.remove();
+  });
   set({});
 }
 

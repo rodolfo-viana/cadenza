@@ -95,14 +95,22 @@
     ready.then(
       function (stream) {
         videos.forEach(function (v) {
+          v.parentNode.classList.remove('cz-camera-off');
           if (v.srcObject !== stream) v.srcObject = stream;
           v.play().catch(function () {});
         });
       },
-      function () {
+      function (e) {
+        if (e && e.message === 'superseded') return;
         videos.forEach(function (v) { v.parentNode.classList.add('cz-camera-off'); });
       }
     );
+  }
+
+  /** Shows a camera icon in place of live video that won't be turned on. */
+  function camerasOff(root) {
+    var videos = root.querySelectorAll('video.cz-camera');
+    for (var i = 0; i < videos.length; i++) videos[i].parentNode.classList.add('cz-camera-off');
   }
 
   /**
@@ -123,10 +131,13 @@
     cfg.autoAnimateMatcher = autoAnimateMatcher;
     var deck = window.Reveal;
     return Promise.resolve(deck.initialize(cfg)).then(function () {
-      if (options.camera !== false && navigator.mediaDevices && document.querySelector('video.cz-camera')) {
+      if (!document.querySelector('video.cz-camera')) return deck;
+      if (options.camera !== false && navigator.mediaDevices) {
         deck.on('slidechanged', function () { syncCameras(deck); });
         window.addEventListener('pagehide', stopCamera);
         syncCameras(deck);
+      } else {
+        camerasOff(document);
       }
       return deck;
     });

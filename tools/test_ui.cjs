@@ -532,3 +532,33 @@ test('teleprompter scrolling is steady and stops at the end of the notes', async
   assert.equal(P.rgba('#ff8000', 0.5), 'rgba(255, 128, 0, 0.5)');
   assert.equal(P.rgba('not a color', 2), 'rgba(17, 24, 39, 1)');
 });
+
+test('build steps count chart series, pie slices and motion paths', async () => {
+  const { A } = await ui(async () => ({}));
+  const chart = (kind, values, delivery = 'series', effect = 'cz-wipe-up') => ({
+    id: 'chart',
+    build: { effect, order: 2, delivery, outOrder: 0, pathOrder: 0, path: [] },
+    content: { kind: 'chart', chart: kind, series: [{ values }, { values }, { values }] },
+  });
+  assert.equal(A.seriesSteps(chart('column', [1, 2])), 3, 'one step per series');
+  assert.equal(A.seriesSteps(chart('pie', [3, 0, 2, NaN])), 2, 'one step per non-empty slice');
+  assert.equal(A.seriesSteps(chart('column', [1], '')), 0, 'all at once');
+  assert.equal(A.seriesSteps(chart('column', [1], 'series', '')), 0, 'no build-in');
+
+  const mover = {
+    id: 'mover',
+    build: { effect: 'fade-in', order: 1, outOrder: 9, pathOrder: 6, path: [[0, 0], [100, 0]] },
+    content: { kind: 'shape' },
+  };
+  const still = { id: 'still', build: { effect: '', order: 0, outOrder: 0, pathOrder: 0, path: [[0, 0]] }, content: { kind: 'text' } };
+  const slide = { id: 's', elements: [chart('column', [1]), mover, still] };
+  assert.deepEqual(
+    A.buildEvents(slide).map((e) => `${e.el.id}:${e.kind}:${e.step}`),
+    ['mover:in:1', 'chart:in:2', 'mover:path:6'],
+    'a single point is not a path',
+  );
+  assert.equal(A.nextBuildStep(slide), 10, 'after the build-out at step 9');
+  mover.build.outOrder = 0;
+  mover.build.pathOrder = 3;
+  assert.equal(A.nextBuildStep(slide), 6, 'after the chart’s last series (2 + 3)');
+});

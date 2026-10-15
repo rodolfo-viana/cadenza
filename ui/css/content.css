@@ -249,7 +249,8 @@
 }
 
 .reveal .cz-ph-image { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21'/%3E%3C/svg%3E"); }
-.reveal .cz-ph-video { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11'/%3E%3Crect x='2' y='6' width='14' height='12' rx='2'/%3E%3C/svg%3E"); }
+.reveal .cz-ph-video,
+.reveal .cz-camera-off { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11'/%3E%3Crect x='2' y='6' width='14' height='12' rx='2'/%3E%3C/svg%3E"); }
 .reveal .cz-ph-play { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M8 5.1v13.8a1 1 0 0 0 1.5.9l11-6.9a1 1 0 0 0 0-1.7l-11-6.9A1 1 0 0 0 8 5.1z'/%3E%3C/svg%3E"); }
 .reveal .cz-ph-web { --cz-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20'/%3E%3C/svg%3E"); }
 
@@ -448,8 +449,32 @@
   offset-distance: 100%;
 }
 
-/* ---- Live camera ------------------------------------------------------------- */
+/* ---- Live camera --------------------------------------------------------- */
 
 .reveal .cz-camera-box { overflow: hidden; background: #000; }
-.reveal .cz-camera { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+.reveal .cz-camera {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  object-fit: cover;
+}
 .reveal .cz-camera.cz-mirror { transform: scaleX(-1); }
+
+/* No picture (presenter previews, no camera, permission refused): an icon. */
+.reveal .cz-camera-off .cz-camera { display: none; }
+.reveal .cz-camera-off::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 30%;
+  height: 30%;
+  margin: auto;
+  background: rgba(255, 255, 255, 0.45);
+  -webkit-mask: var(--cz-icon) center / contain no-repeat;
+  mask: var(--cz-icon) center / contain no-repeat;
+}
