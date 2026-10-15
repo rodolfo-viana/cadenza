@@ -68,15 +68,29 @@ export async function beginTextEdit(view, el, point = null, { selectAll = false 
     slide: state.slideId,
     view,
     node,
-    lastHtml: wasEmpty ? '' : node.innerHTML,
+    lastHtml: wasEmpty ? '' : cleanHtml(node.innerHTML),
     timer: null,
+    range: null,
   };
+  onSelectionChange();
+  document.addEventListener('selectionchange', onSelectionChange);
   node.addEventListener('input', onInput);
   node.addEventListener('paste', onPaste);
   node.addEventListener('keydown', onKeyDown);
   const s = session;
   s.unregister = registerFlush(() => commit(s));
   set({ editing: el.id, selection: [el.id], focus: 'canvas' });
+}
+
+/**
+ * Keeps the last selection in the edited text: the inspector's fields take
+ * the focus (a font search, a size), and formatting still goes to that text.
+ */
+function onSelectionChange() {
+  const sel = window.getSelection();
+  if (session && sel?.rangeCount && session.node.contains(sel.anchorNode) && session.node.contains(sel.focusNode)) {
+    session.range = sel.getRangeAt(0).cloneRange();
+  }
 }
 
 function onInput() {
@@ -133,10 +147,27 @@ async function commitText(s) {
   }
 }
 
-/** Drops the empty markup editors leave behind. */
+/**
+ * Drops the empty markup editors leave behind, and the styles WebKit copies
+ * from the theme into the text (turning a list back into a paragraph, joining
+ * paragraphs): pinned there, they would keep the text from following its
+ * box's font, color or alignment.
+ */
 function cleanHtml(html) {
   const trimmed = html.trim();
-  return trimmed === '<p><br></p>' || trimmed === '<br>' || trimmed === '<div><br></div>' ? '' : html;
+  if (trimmed === '<p><br></p>' || trimmed === '<br>' || trimmed === '<div><br></div>') return '';
+  if (!/var\(--r-|inherit/.test(html)) return html;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  for (const e of [...tpl.content.querySelectorAll('[style]')]) {
+    for (const prop of [...e.style]) {
+      const v = e.style.getPropertyValue(prop);
+      if (v.includes('var(--r-') || v === 'inherit') e.style.removeProperty(prop);
+    }
+    if (!e.getAttribute('style')) e.removeAttribute('style');
+    if (e.tagName === 'SPAN' && !e.attributes.length) e.replaceWith(...e.childNodes);
+  }
+  return tpl.innerHTML;
 }
 
 /** Finishes editing, committing any pending change. */
@@ -146,6 +177,7 @@ export async function endTextEdit() {
   if (!(await commit(s))) return false;
   if (session !== s) return true;
   session = null;
+  document.removeEventListener('selectionchange', onSelectionChange);
   s.node.removeEventListener('input', onInput);
   s.node.removeEventListener('paste', onPaste);
   s.node.removeEventListener('keydown', onKeyDown);
@@ -164,15 +196,81 @@ export async function endTextEdit() {
 /** Runs a formatting command on the current text selection. */
 export function exec(cmd, value = null) {
   if (!session) return false;
+  const sel = window.getSelection();
+  const inside = sel.rangeCount > 0 && session.node.contains(sel.anchorNode);
   session.node.focus({ preventScroll: true });
+  if (!inside && session.range) {
+    sel.removeAllRanges();
+    sel.addRange(session.range);
+  }
   let v = value;
   if (typeof v === 'string' && v.startsWith('var(')) {
     const c = parseColor(v);
     v = c ? toCss(c) : v;
   }
   const ok = document.execCommand(cmd, false, v);
+  // Now, not when selectionchange comes: the focus may go back to a field.
+  onSelectionChange();
   onInput();
   return ok;
+}
+
+/** Whether some text is selected (not just a caret) in the text being edited. */
+export const textSelected = () => !!session?.range && !session.range.collapsed && session.node.contains(session.range.commonAncestorContainer);
+
+/**
+ * Sets a style on the selected text: a font, a size in px or a color; ''
+ * takes it away, so that the text looks like the rest of its box again.
+ */
+export function styleSelection(prop, value) {
+  if (!session) return;
+  // Commands WebKit knows, then their marker values become the real ones.
+  const [cmd, marker, found] = {
+    'font-family': ['fontName', 'cz-mark', (v) => v.replace(/["']/g, '') === 'cz-mark'],
+    'font-size': ['fontSize', '7', (v) => v === '-webkit-xxx-large' || v === 'xxx-large'],
+    color: ['foreColor', '#010203', (v) => v === 'rgb(1, 2, 3)' || v === '#010203'],
+  }[prop];
+  const back = document.activeElement;
+  if (!exec(cmd, marker)) return;
+  for (const e of session.node.querySelectorAll('[style], font')) {
+    if (e.tagName === 'FONT') {
+      // Older WebKit writes <font size="7">.
+      const span = document.createElement('span');
+      if (e.getAttribute('size') === '7') span.style.setProperty('font-size', value);
+      if (e.getAttribute('face') === 'cz-mark') span.style.setProperty('font-family', value);
+      if (e.getAttribute('color') === '#010203') span.style.setProperty('color', value);
+      span.append(...e.childNodes);
+      e.replaceWith(span);
+    } else if (found(e.style.getPropertyValue(prop))) {
+      if (value) e.style.setProperty(prop, value);
+      else e.style.removeProperty(prop);
+      if (!e.getAttribute('style')) e.removeAttribute('style');
+      if (!value && e.tagName === 'SPAN' && !e.attributes.length) e.replaceWith(...e.childNodes);
+    }
+  }
+  onInput();
+  // The inspector's field keeps the focus (Up and Down in the size field).
+  if (back?.tagName === 'INPUT' && !session.node.contains(back)) back.focus({ preventScroll: true });
+}
+
+/** A style of the selected text where it differs from its box ('' if not). */
+export function selectionStyle(prop) {
+  if (!textSelected()) return '';
+  let e = session.range.startContainer;
+  if (e.nodeType !== Node.ELEMENT_NODE) e = e.parentElement;
+  for (; e && e !== session.node; e = e.parentElement) {
+    const v = e.style?.getPropertyValue(prop);
+    if (v) return v;
+  }
+  return '';
+}
+
+/** The font size of the selected text, in px. */
+export function selectionFontSize() {
+  if (!textSelected()) return 0;
+  let e = session.range.startContainer;
+  if (e.nodeType !== Node.ELEMENT_NODE) e = e.parentElement;
+  return parseFloat(getComputedStyle(e).fontSize) || 0;
 }
 
 export function queryState(cmd) {

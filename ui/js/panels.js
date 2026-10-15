@@ -5,7 +5,8 @@ import { Icon } from './icons.js';
 import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo } from './store.js';
 import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField } from './controls.js';
 import * as A from './actions.js';
-import { exec, setLink, isEditing, queryState, beginTextEdit, endTextEdit, beginTableEdit, insertInlineMath } from './textedit.js';
+import { exec, setLink, isEditing, beginTextEdit, beginTableEdit, insertInlineMath, textSelected, styleSelection, selectionStyle, selectionFontSize } from './textedit.js';
+import { formatActive, formatBox, toggleBoxes } from './textformat.js';
 import { canvasApi } from './canvas.js';
 import { cls } from './util.js';
 import { Button } from './ui.js';
@@ -48,6 +49,16 @@ const ROLES = [
 
 export function TextPanel({ els, title = t('Text') }) {
   const editing = isEditing();
+  // While editing, the buttons show the selected text: follow the selection.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!editing) return;
+    const update = () => setTick((n) => n + 1);
+    document.addEventListener('selectionchange', update);
+    return () => document.removeEventListener('selectionchange', update);
+  }, [editing]);
+  // Selected text gets fonts, sizes and colors of its own; else the box.
+  const part = editing && textSelected();
   const style = (el) => richOf(el).style;
   const setStyle = (patch, key, live) => patchAll(els, (el) => richPatch(el, { style: typeof patch === 'function' ? patch(el) : patch }), key && (live ? key : null));
   const role = same(els, (e) => style(e).role);
@@ -56,8 +67,6 @@ export function TextPanel({ els, title = t('Text') }) {
   const color = same(els, (e) => style(e).color);
   const align = same(els, (e) => style(e).align);
   const valign = same(els, (e) => style(e).valign);
-  const weight = same(els, (e) => style(e).fontWeight);
-  const italic = same(els, (e) => style(e).italic);
   const lh = same(els, (e) => style(e).lineHeight);
   const ls = same(els, (e) => style(e).letterSpacing);
   const ps = same(els, (e) => style(e).paragraphSpacing);
@@ -69,16 +78,19 @@ export function TextPanel({ els, title = t('Text') }) {
   const isText = els.every((e) => e.content.kind === 'text');
 
   /** Applies an inline command, editing the whole text when not editing. */
-  const inline = async (cmd, value) => {
-    if (isEditing()) return exec(cmd, value);
-    if (!single) return;
-    beginTextEdit(canvasApi.view, single, null, { selectAll: true });
-    exec(cmd, value);
-    await endTextEdit();
+  const inline = (cmd, value) => (isEditing() ? exec(cmd, value) : single && formatBox(single, cmd, value));
+
+  /** Smaller or larger text: the selected text, or else whole boxes. */
+  const resize = (f) => {
+    if (isEditing() && textSelected()) {
+      const px = Math.max(4, Math.round(selectionFontSize() * f));
+      return styleSelection('font-size', `${px}px`);
+    }
+    setStyle((el) => ({ fontSize: Math.max(4, Math.round(style(el).fontSize * f)) }), 'fontSize', true);
   };
 
-  const boldActive = editing ? queryState('bold') : weight >= 600;
-  const italicActive = editing ? queryState('italic') : italic;
+  const boldActive = formatActive(els, 'bold');
+  const italicActive = formatActive(els, 'italic');
 
   return html`<${Section} title=${title} id="text">
     <${Row} label=${t('Style')}>
@@ -91,24 +103,35 @@ export function TextPanel({ els, title = t('Text') }) {
         }}
       />
     <//>
-    <${Row} label=${t('Font')}><${FontField} value=${family ?? ''} onChange=${(v) => setStyle({ fontFamily: v }, 'font')} /><//>
+    <${Row} label=${t('Font')}>
+      <${FontField}
+        value=${(part && selectionStyle('font-family')) || family || ''}
+        onChange=${(v) => (isEditing() && textSelected() ? styleSelection('font-family', v) : setStyle({ fontFamily: v }, 'font'))}
+      />
+    <//>
     <${Row} label=${t('Size')}>
       <div class="row-inline">
-        <${NumberField} value=${size} min=${4} max=${800} unit="px" onChange=${(v, live) => setStyle({ fontSize: v }, 'fontSize', live)} />
+        <${NumberField}
+          value=${part ? Math.round(selectionFontSize()) || size : size}
+          min=${4}
+          max=${800}
+          unit="px"
+          onChange=${(v, live) => (isEditing() && textSelected() ? styleSelection('font-size', `${v}px`) : setStyle({ fontSize: v }, 'fontSize', live))}
+        />
         <div class="btn-group">
-          <${Button} icon="minus" size="sm" title=${t('Smaller')} onClick=${() => setStyle((el) => ({ fontSize: Math.max(4, Math.round(style(el).fontSize / 1.12)) }), 'fontSize', true)} />
-          <${Button} icon="plus" size="sm" title=${t('Larger')} onClick=${() => setStyle((el) => ({ fontSize: Math.round(style(el).fontSize * 1.12) }), 'fontSize', true)} />
+          <${Button} icon="minus" size="sm" title=${t('Smaller')} onMouseDown=${(e) => e.preventDefault()} onClick=${() => resize(1 / 1.12)} />
+          <${Button} icon="plus" size="sm" title=${t('Larger')} onMouseDown=${(e) => e.preventDefault()} onClick=${() => resize(1.12)} />
         </div>
       </div>
     <//>
     <${Row} label=${t('Color')}>
       <${ColorField}
-        value=${color ?? ''}
+        value=${(part && selectionStyle('color')) || color || ''}
         noneLabel=${t('Theme color')}
         onChange=${(v, live) => {
-          const sel = window.getSelection();
-          if (isEditing() && sel && !sel.isCollapsed && v) exec('foreColor', v);
-          else setStyle({ color: v }, 'color', live);
+          if (!isEditing() || !textSelected()) setStyle({ color: v }, 'color', live);
+          else if (v) exec('foreColor', v);
+          else styleSelection('color', '');
         }}
       />
     <//>
@@ -122,8 +145,8 @@ export function TextPanel({ els, title = t('Text') }) {
           { value: 's', icon: 'strikethrough', title: t('Strikethrough'), keepFocus: true },
         ].map((o) => ({ ...o, active: (o.value === 'b' && boldActive) || (o.value === 'i' && italicActive) }))}
         onChange=${(v) => {
-          if (v === 'b') isEditing() ? exec('bold') : setStyle({ fontWeight: weight >= 600 ? 0 : 700 }, 'bold');
-          if (v === 'i') isEditing() ? exec('italic') : setStyle({ italic: !italic }, 'italic');
+          if (v === 'b') isEditing() ? exec('bold') : toggleBoxes(els, 'bold');
+          if (v === 'i') isEditing() ? exec('italic') : toggleBoxes(els, 'italic');
           if (v === 'u') inline('underline');
           if (v === 's') inline('strikeThrough');
         }}

@@ -492,6 +492,8 @@ fn text_css(t: &TextStyle) -> String {
     }
     if t.italic {
         css.push_str("font-style:italic;");
+    } else if t.upright {
+        css.push_str("font-style:normal;");
     }
     match t.align.as_str() {
         "center" | "right" | "justify" => {
@@ -1483,6 +1485,20 @@ mod tests {
         assert_eq!(slide_indices(&deck, "b"), Some((1, 0)));
         assert_eq!(slide_indices(&deck, "b-child-2"), Some((1, 1)));
         assert_eq!(slide_indices(&deck, "c"), Some((2, 0)));
+    }
+
+    #[test]
+    fn upright_text_drops_the_italic_of_its_role() {
+        let mut t = TextStyle {
+            role: "quote".into(),
+            upright: true,
+            ..Default::default()
+        };
+        assert!(text_css(&t).contains("font-style:normal;"));
+        t.italic = true;
+        let css = text_css(&t);
+        assert!(css.contains("font-style:italic;") && !css.contains("font-style:normal"), "{css}");
+        assert!(!text_css(&TextStyle::default()).contains("font-style"));
     }
 
     #[test]

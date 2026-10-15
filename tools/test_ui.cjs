@@ -36,8 +36,8 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
     setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); if (ms >= 1000) timer.unref(); return timer; },
     navigator: { platform: 'Linux' },
     CustomEvent: class { constructor(type) { this.type = type; } },
-    document: { title: 'Cadenza', getElementById: () => null, createRange: () => ({ selectNodeContents() {}, collapse() {} }) },
-    window: { getSelection: () => ({ removeAllRanges() {}, addRange() {} }), dispatchEvent() {} },
+    document: { title: 'Cadenza', getElementById: () => null, addEventListener() {}, removeEventListener() {}, createRange: () => ({ selectNodeContents() {}, collapse() {} }) },
+    window: { getSelection: () => ({ rangeCount: 0, removeAllRanges() {}, addRange() {} }), dispatchEvent() {} },
   });
   const stubs = {
     'lib.js': { html() {}, useEffect() {}, useReducer() {}, useRef() {}, useState() {}, ...hooks },

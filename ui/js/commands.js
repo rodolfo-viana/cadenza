@@ -42,6 +42,11 @@ export const COMMANDS = [
     run: () => S.set({ selection: [], menu: null }) },
   { id: 'edit.lock', group: N_('Arrange'), label: N_('Lock / Unlock'), icon: 'lock', keys: ['Mod+L'], when: hasSel, run: A.toggleLock },
 
+  // Text: the selected text while editing, whole boxes otherwise.
+  { id: 'text.bold', group: N_('Text'), label: N_('Bold'), icon: 'bold', keys: ['Mod+B'], global: true, when: hasDoc, run: () => format('bold') },
+  { id: 'text.italic', group: N_('Text'), label: N_('Italic'), icon: 'italic', keys: ['Mod+I'], global: true, when: hasDoc, run: () => format('italic') },
+  { id: 'text.underline', group: N_('Text'), label: N_('Underline'), icon: 'underline', keys: ['Mod+U'], global: true, when: hasDoc, run: () => format('underline') },
+
   // Insert
   { id: 'insert.text', group: N_('Insert'), label: N_('Text Box'), icon: 'type', keys: ['Mod+Shift+T'], when: hasDoc, run: () => A.insert('text', 'body') },
   { id: 'insert.title', group: N_('Insert'), label: N_('Title'), icon: 'heading', when: hasDoc, run: () => A.insert('text', 'title') },
@@ -126,6 +131,8 @@ export const COMMANDS = [
   { id: 'app.shortcuts', group: N_('Help'), label: N_('Keyboard Shortcuts'), icon: 'keyboard', keys: ['Mod+/', 'F1'], global: true, run: () => S.openModal('shortcuts') },
   { id: 'app.about', group: N_('Help'), label: N_('About Cadenza'), icon: 'info', run: () => S.openModal('about') },
 ];
+
+const format = (cmd) => import('./textformat.js').then((m) => m.formatShortcut(cmd));
 
 function showTab(tab) {
   if (!S.settings().showInspector) S.updateSettings({ showInspector: true });

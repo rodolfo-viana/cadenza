@@ -646,6 +646,8 @@ pub struct TextStyle {
     /// 0 = from the role/theme.
     pub font_weight: u16,
     pub italic: bool,
+    /// Not italic even where the role is (quotes).
+    pub upright: bool,
     /// Empty = from the theme.
     pub color: String,
     /// "left", "center", "right" or "justify".
@@ -674,6 +676,7 @@ impl Default for TextStyle {
             font_size: 32.0,
             font_weight: 0,
             italic: false,
+            upright: false,
             color: String::new(),
             align: "left".into(),
             valign: "top".into(),
