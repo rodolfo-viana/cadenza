@@ -2,6 +2,7 @@
 
 ![platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square&color=%237c6cff) 
 ![release](https://img.shields.io/github/v/release/rodolfo-viana/cadenza?style=flat-square&label=latest%20release&color=%237c6cff) ![downloads](https://img.shields.io/github/downloads/rodolfo-viana/cadenza/total?style=flat-square&color=%237c6cff)
+
 [![release build](https://img.shields.io/github/actions/workflow/status/rodolfo-viana/cadenza/release.yml?label=release%20build&style=flat-square&color=%237c6cff)](https://github.com/rodolfo-viana/cadenza/actions/workflows/release.yml) [![codeql](https://img.shields.io/github/actions/workflow/status/rodolfo-viana/cadenza/codeql.yml?branch=main&label=codeql&style=flat-square&color=%237c6cff)](https://github.com/rodolfo-viana/cadenza/actions/workflows/codeql.yml) ![license](https://img.shields.io/github/license/rodolfo-viana/cadenza?style=flat-square&color=%237c6cff)
 
 
