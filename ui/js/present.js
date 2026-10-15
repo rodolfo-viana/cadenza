@@ -194,7 +194,9 @@
   }
 
   function bootPrint() {
+    var size = null;
     tauri.core.invoke('present_data').then(function (data) {
+      size = { width: data.width, height: data.height };
       return loadLanguage(data.language).then(function () { return boot(data); });
     }).then(function () {
       var bar = document.createElement('div');
@@ -202,13 +204,19 @@
       bar.innerHTML = '<span>' + t('Choose “Print to File” (PDF) or “Save as PDF” in the dialog.') + '</span>' +
         '<button id="cz-print">' + t('Print / Save PDF…') + '</button><button class="secondary" id="cz-close">' + t('Close') + '</button>';
       document.body.appendChild(bar);
-      document.getElementById('cz-print').onclick = function () { window.print(); };
+      // Linux prints through Cadenza, which sets pages the size of a slide.
+      var print = function () {
+        tauri.core.invoke('print_slides', size)
+          .then(function (done) { if (!done) window.print(); })
+          .catch(function () { window.print(); });
+      };
+      document.getElementById('cz-print').onclick = print;
       document.getElementById('cz-close').onclick = function () { tauri.window.getCurrentWindow().close(); };
       var printed = false;
       var go = function () {
         if (printed) return;
         printed = true;
-        setTimeout(function () { window.print(); }, 400);
+        setTimeout(print, 400);
       };
       Reveal.on('pdf-ready', go);
       setTimeout(go, 2500);

@@ -916,6 +916,54 @@ fn export_pdf(app: AppHandle, window: Window) -> CmdResult<()> {
     Ok(())
 }
 
+/// Opens the print dialog for the print window's slides, with pages the size
+/// of a slide and no margins. WebKitGTK leaves out the page size reveal.js
+/// asks for (`@page`), so the slides came out on A4 portrait pages, black
+/// below. False where the web engine prints at that size by itself: the page
+/// calls `window.print()` there.
+#[tauri::command]
+fn print_slides(webview: tauri::Webview, width: f64, height: f64) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        let _ = webview.with_webview(move |wv| {
+            use gtk::prelude::*;
+            use webkit2gtk::PrintOperationExt;
+            let view = wv.inner();
+            let op = webkit2gtk::PrintOperation::new(&view);
+            // CSS pixels are 3/4 of a point. The paper has the slide's own
+            // shape, upright: WebKit prints landscape pages blank.
+            let paper = gtk::PaperSize::new_custom("cadenza-slide", "Slide", width * 0.75, height * 0.75, gtk::Unit::Points);
+            let setup = gtk::PageSetup::new();
+            setup.set_paper_size(&paper);
+            for set in [
+                gtk::PageSetup::set_top_margin,
+                gtk::PageSetup::set_bottom_margin,
+                gtk::PageSetup::set_left_margin,
+                gtk::PageSetup::set_right_margin,
+            ] {
+                set(&setup, 0.0, gtk::Unit::Points);
+            }
+            op.set_page_setup(&setup);
+            // Tests write a PDF without choosing it in the dialog.
+            if let Some(uri) = std::env::var_os("CADENZA_PRINT_TO").filter(|_| cfg!(debug_assertions)) {
+                let settings = gtk::PrintSettings::new();
+                settings.set_printer("Print to File");
+                settings.set(gtk::PRINT_SETTINGS_OUTPUT_URI, uri.to_str());
+                settings.set(gtk::PRINT_SETTINGS_OUTPUT_FILE_FORMAT, Some("pdf"));
+                op.set_print_settings(&settings);
+            }
+            let parent = view.toplevel().and_then(|w| w.downcast::<gtk::Window>().ok());
+            op.run_dialog(parent.as_ref());
+        });
+        true
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (webview, width, height);
+        false
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Presenting
 // ---------------------------------------------------------------------------
@@ -1463,6 +1511,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             import_markdown,
             export_html,
             export_pdf,
+            print_slides,
             present_data,
             present_start,
             present_stop,
