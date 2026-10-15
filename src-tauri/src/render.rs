@@ -21,8 +21,11 @@ pub enum Mode {
     /// Editor canvas and thumbnails: no fragments, placeholders visible,
     /// heavy embeds replaced by previews.
     Editor,
-    /// Live presentation and exports.
+    /// Live presentation in the app.
     Show,
+    /// Exported presentations: the show, minus what exists only while
+    /// presenting live (the camera). People read exports later.
+    Export,
 }
 
 /// Rendering context: the mode plus a way to turn asset names into URLs.
@@ -941,6 +944,9 @@ fn camera_element(c: &CameraContent, el: &Element, ctx: &Ctx) -> Option<String> 
     if c.mask == "circle" {
         style.push_str("border-radius:50%;");
     }
+    if ctx.mode == Mode::Export {
+        return None;
+    }
     if ctx.editor() {
         return Some(format!(
             r#"<div class="cz-box cz-camera-box cz-image-empty" style="{}"><div class="cz-placeholder-media"><span class="cz-ph-icon cz-ph-video"></span><span>Live camera</span></div></div>"#,
@@ -1318,7 +1324,7 @@ mod tests {
     }
 
     #[test]
-    fn live_camera_is_a_placeholder_until_presenting() {
+    fn live_camera_is_only_in_the_live_show() {
         let deck = deck_with(Content::Camera(CameraContent {
             device_id: "cam\"1".into(),
             mask: "circle".into(),
@@ -1332,6 +1338,8 @@ mod tests {
             "{show}"
         );
         assert!(show.contains("border-radius:50%"));
+        // Exports are read later: no live video, not even a frame for it.
+        assert!(!sections(&deck, &ctx(Mode::Export)).contains("cz-camera"));
     }
 
     #[test]
@@ -1340,7 +1348,7 @@ mod tests {
             src: "https://www.youtube.com/watch?v=dQw4w9WgXcQ".into(),
             ..Default::default()
         }));
-        let exported = sections(&deck, &ctx(Mode::Show));
+        let exported = sections(&deck, &ctx(Mode::Export));
         assert!(exported.contains(r#"data-src="https://www.youtube.com/embed/dQw4w9WgXcQ?"#), "{exported}");
         let app = sections(
             &deck,

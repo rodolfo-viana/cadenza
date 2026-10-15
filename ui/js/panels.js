@@ -488,6 +488,7 @@ export function CameraPanel({ els }) {
     <//>
     <${Hint}>${[
       t('Only the audience sees the camera, and only while you present its slide: the editor and the presenter display never turn it on.'),
+      t('Exported presentations and printouts leave it out.'),
       !cameras.length && t('Your cameras are listed here by name after you present live video once.'),
       t('For a round picture, choose Circle with a square frame.'),
     ]

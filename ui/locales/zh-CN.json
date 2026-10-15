@@ -286,6 +286,7 @@
  "Export Theme": "导出主题",
  "Export Theme File…": "导出主题文件…",
  "Exported HTML file": "已导出的 HTML 文件",
+ "Exported presentations and printouts leave it out.": "导出的演示文稿和打印件中不包含摄像头画面。",
  "Exported website folder": "已导出的网站文件夹",
  "Exported {name}": "已导出 {name}",
  "Exporting…": "正在导出…",

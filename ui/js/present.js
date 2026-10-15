@@ -113,6 +113,11 @@
       waits.push(loadScript('vendor/katex/katex.min.js'));
     }
     document.querySelector('.reveal .slides').innerHTML = data.sections;
+    // A printout is read later: live video has no place in it.
+    if (mode === 'print') {
+      var cameras = document.querySelectorAll('.reveal .cz-el.cz-camera');
+      for (var i = 0; i < cameras.length; i++) cameras[i].remove();
+    }
 
     var cfg = {};
     for (var k in data.config) cfg[k] = data.config[k];

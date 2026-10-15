@@ -286,6 +286,7 @@
  "Export Theme": "テーマを書き出す",
  "Export Theme File…": "テーマファイルを書き出す…",
  "Exported HTML file": "書き出した HTML ファイル",
+ "Exported presentations and printouts leave it out.": "書き出したプレゼンテーションや印刷物には含まれません。",
  "Exported website folder": "書き出した Web サイトフォルダ",
  "Exported {name}": "{name} を書き出しました",
  "Exporting…": "書き出し中…",

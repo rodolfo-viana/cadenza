@@ -102,7 +102,7 @@ pub fn export_folder(deck: &Deck, assets_dir: &Path, dir: &Path, read: UiReader)
     fs::create_dir_all(dir).with_context(|| format!("Cannot create {}", dir.display()))?;
     let url = |name: &str| format!("assets/{name}");
     let ctx = Ctx {
-        mode: Mode::Show,
+        mode: Mode::Export,
         asset_url: &url,
         youtube_host: None,
     };
@@ -166,7 +166,7 @@ pub fn export_single(deck: &Deck, assets_dir: &Path, file: &Path, read: UiReader
         }
     };
     let ctx = Ctx {
-        mode: Mode::Show,
+        mode: Mode::Export,
         asset_url: &url,
         youtube_host: None,
     };

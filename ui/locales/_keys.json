@@ -1764,6 +1764,12 @@
   ]
  },
  {
+  "key": "Exported presentations and printouts leave it out.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Exported website folder",
   "files": [
    "actions.js"
