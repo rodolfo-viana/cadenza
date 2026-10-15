@@ -47,6 +47,7 @@
  "All": "সব",
  "All at once": "সব একসঙ্গে",
  "All slides are skipped — there is nothing to present.": "সব স্লাইড বাদ দেওয়া আছে — উপস্থাপন করার মতো কিছু নেই।",
+ "Already in an earlier row, so left out: {names}": "আগের একটি সারিতে আছে, তাই বাদ দেওয়া হয়েছে: {names}",
  "Alternative text for accessibility": "অ্যাক্সেসিবিলিটির জন্য বিকল্প টেক্সট",
  "Angle": "কোণ",
  "Animate": "অ্যানিমেশন",

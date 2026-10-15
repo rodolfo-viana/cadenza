@@ -47,6 +47,7 @@
  "All": "Все",
  "All at once": "Всё сразу",
  "All slides are skipped — there is nothing to present.": "Все слайды пропущены — показывать нечего.",
+ "Already in an earlier row, so left out: {names}": "Уже есть в одной из строк выше, поэтому пропущено: {names}",
  "Alternative text for accessibility": "Альтернативный текст для доступности",
  "Angle": "Угол",
  "Animate": "Анимация",

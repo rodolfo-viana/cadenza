@@ -47,6 +47,7 @@
  "All": "الكل",
  "All at once": "الكل معاً",
  "All slides are skipped — there is nothing to present.": "جميع الشرائح متخطّاة — لا شيء لعرضه.",
+ "Already in an earlier row, so left out: {names}": "موجودة في صف سابق، لذا لم تُحتسب: {names}",
  "Alternative text for accessibility": "نص بديل لإمكانية الوصول",
  "Angle": "الزاوية",
  "Animate": "تحريك",

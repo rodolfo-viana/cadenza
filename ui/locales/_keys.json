@@ -288,6 +288,12 @@
   ]
  },
  {
+  "key": "Already in an earlier row, so left out: {names}",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Alternative text for accessibility",
   "files": [
    "panels.js"

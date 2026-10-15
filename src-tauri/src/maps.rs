@@ -2,9 +2,11 @@
 //! map. Boundaries come from Natural Earth (public domain), simplified by
 //! tools/gen_maps.py into maps/*.bin and decoded once, on first use.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::sync::OnceLock;
+
+use serde::Serialize;
 
 use crate::util::{esc, num};
 
@@ -351,17 +353,23 @@ fn view(map: &str) -> View<'static> {
     }
 }
 
-/// Which row (category label) gives each region its value.
-fn match_rows(regions: &[&Region], labels: &[String]) -> HashMap<usize, usize> {
+/// The region each row (category label) names, by any of its names or
+/// codes, if any.
+fn row_regions(regions: &[&Region], labels: &[String]) -> Vec<Option<usize>> {
     let mut index: HashMap<String, usize> = HashMap::new();
     for (i, r) in regions.iter().enumerate() {
         for n in r.names() {
             index.entry(fold(n)).or_insert(i);
         }
     }
+    labels.iter().map(|l| index.get(&fold(l)).copied().filter(|_| !l.trim().is_empty())).collect()
+}
+
+/// Which row gives each region its value: the first that names it.
+fn match_rows(regions: &[&Region], labels: &[String]) -> HashMap<usize, usize> {
     let mut out = HashMap::new();
-    for (row, label) in labels.iter().enumerate() {
-        if let Some(&i) = index.get(&fold(label)).filter(|_| !label.trim().is_empty()) {
+    for (row, region) in row_regions(regions, labels).into_iter().enumerate() {
+        if let Some(i) = region {
             out.entry(i).or_insert(row);
         }
     }
@@ -382,20 +390,40 @@ pub fn countries(language: &str) -> Vec<(String, String)> {
     out
 }
 
-/// The regions of `map` as (id, name in `language`), and the labels that
-/// match none of them.
-pub fn regions(map: &str, language: &str, labels: &[String]) -> (Vec<(String, String)>, Vec<String>) {
+/// What the chart editor shows about a map's rows.
+#[derive(Serialize, Debug)]
+pub struct MapRows {
+    /// The map's regions as (id, name in the language, whether a row names
+    /// it), sorted by name.
+    pub regions: Vec<(String, String, bool)>,
+    /// Labels that name no region.
+    pub unmatched: Vec<String>,
+    /// Labels naming a region that an earlier row names already ("BR-AC"
+    /// and then "Acre"): their values are left out.
+    pub repeated: Vec<String>,
+}
+
+/// The regions of `map` and how the rows (labels) name them.
+pub fn regions(map: &str, language: &str, labels: &[String]) -> MapRows {
     let v = view(map);
-    let mut list: Vec<(String, String)> = v.regions.iter().map(|r| (r.id.clone(), r.name_in(language).to_string())).collect();
-    list.sort_by_cached_key(|(_, n)| fold(n));
-    let matched = match_rows(&v.regions, labels);
-    let unmatched = labels
+    let rows = row_regions(&v.regions, labels);
+    let named: HashSet<usize> = rows.iter().flatten().copied().collect();
+    let mut regions: Vec<(String, String, bool)> = v
+        .regions
         .iter()
         .enumerate()
-        .filter(|(row, l)| !l.trim().is_empty() && !matched.values().any(|r| r == row))
-        .map(|(_, l)| l.clone())
+        .map(|(i, r)| (r.id.clone(), r.name_in(language).to_string(), named.contains(&i)))
         .collect();
-    (list, unmatched)
+    regions.sort_by_cached_key(|(_, n, _)| fold(n));
+    let (mut unmatched, mut repeated, mut seen) = (Vec::new(), Vec::new(), HashSet::new());
+    for (label, region) in labels.iter().zip(&rows) {
+        match region {
+            None if !label.trim().is_empty() => unmatched.push(label.clone()),
+            Some(i) if !seen.insert(*i) => repeated.push(label.clone()),
+            _ => {}
+        }
+    }
+    MapRows { regions, unmatched, repeated }
 }
 
 /// Draws polygons as one SVG path (holes cut out with even-odd). Points
@@ -659,12 +687,26 @@ mod tests {
         let labels: Vec<String> = ["SAO PAULO", "BR-RJ", "minas gerais", "Atlantis", ""].iter().map(|s| s.to_string()).collect();
         let rows = match_rows(&v.regions, &labels);
         assert_eq!(rows.len(), 3);
-        let (_, unmatched) = regions("BRA", "pt-BR", &labels);
-        assert_eq!(unmatched, ["Atlantis"]);
+        let found = regions("BRA", "pt-BR", &labels);
+        assert_eq!(found.unmatched, ["Atlantis"]);
+        assert!(found.repeated.is_empty());
+        assert_eq!(found.regions.iter().filter(|r| r.2).count(), 3);
         let world = view("world");
         let rows = match_rows(&world.regions, &["Allemagne".into(), "DEU".into(), "Deutschland".into(), "日本".into()]);
         assert_eq!(rows.len(), 2, "French and German names find Germany, Japanese finds Japan");
         assert_eq!(fold("São Paulo"), fold("sao-paulo"));
+    }
+
+    #[test]
+    fn a_region_named_twice_is_found_once() {
+        // A code, then the name of the same state: Acre has a row already.
+        let labels: Vec<String> = ["BR-AC", "Acre", "Bahia"].iter().map(|s| s.to_string()).collect();
+        let found = regions("BRA", "en", &labels);
+        assert_eq!(found.repeated, ["Acre"]);
+        assert!(found.unmatched.is_empty());
+        let named: Vec<&str> = found.regions.iter().filter(|r| r.2).map(|r| r.0.as_str()).collect();
+        assert_eq!(named, ["BR-AC", "BR-BA"]);
+        assert_eq!(found.regions.len(), 27);
     }
 
     #[test]

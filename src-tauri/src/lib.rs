@@ -153,9 +153,9 @@ async fn map_countries(language: String) -> Vec<(String, String)> {
     maps::countries(&language)
 }
 
-/// The regions of a map as (id, name), and the labels that match none.
+/// The regions of a map and how a chart's rows (labels) name them.
 #[tauri::command]
-async fn map_regions(map: String, language: String, labels: Vec<String>) -> (Vec<(String, String)>, Vec<String>) {
+async fn map_regions(map: String, language: String, labels: Vec<String>) -> maps::MapRows {
     maps::regions(&map, &language, &labels)
 }
 

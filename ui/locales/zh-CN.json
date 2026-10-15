@@ -47,6 +47,7 @@
  "All": "全部",
  "All at once": "全部一起",
  "All slides are skipped — there is nothing to present.": "所有幻灯片均已跳过——没有可演示的内容。",
+ "Already in an earlier row, so left out: {names}": "已在前面的行中出现，因此未计入：{names}",
  "Alternative text for accessibility": "用于无障碍的替代文本",
  "Angle": "角度",
  "Animate": "动画",

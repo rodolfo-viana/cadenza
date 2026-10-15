@@ -47,6 +47,7 @@
  "All": "すべて",
  "All at once": "すべて同時",
  "All slides are skipped — there is nothing to present.": "すべてのスライドがスキップされているため、発表する内容がありません。",
+ "Already in an earlier row, so left out: {names}": "前の行にすでにあるため除外: {names}",
  "Alternative text for accessibility": "アクセシビリティ用の代替テキスト",
  "Angle": "角度",
  "Animate": "アニメーション",

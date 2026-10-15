@@ -47,6 +47,7 @@
  "All": "Tümü",
  "All at once": "Tümü birden",
  "All slides are skipped — there is nothing to present.": "Tüm slaytlar atlanıyor — sunulacak bir şey yok.",
+ "Already in an earlier row, so left out: {names}": "Önceki bir satırda zaten var, bu yüzden dışarıda bırakıldı: {names}",
  "Alternative text for accessibility": "Erişilebilirlik için alternatif metin",
  "Angle": "Açı",
  "Animate": "Canlandır",

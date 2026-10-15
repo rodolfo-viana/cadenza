@@ -47,6 +47,7 @@
  "All": "सभी",
  "All at once": "सब एक साथ",
  "All slides are skipped — there is nothing to present.": "सभी स्लाइडें छोड़ी गई हैं — प्रस्तुत करने के लिए कुछ नहीं है।",
+ "Already in an earlier row, so left out: {names}": "किसी पिछली पंक्ति में पहले से है, इसलिए छोड़ा गया: {names}",
  "Alternative text for accessibility": "सुलभता के लिए वैकल्पिक टेक्स्ट",
  "Angle": "कोण",
  "Animate": "एनिमेशन",

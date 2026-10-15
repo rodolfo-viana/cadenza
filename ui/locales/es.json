@@ -47,6 +47,7 @@
  "All": "Todo",
  "All at once": "Todo a la vez",
  "All slides are skipped — there is nothing to present.": "Se omiten todas las diapositivas: no hay nada que presentar.",
+ "Already in an earlier row, so left out: {names}": "Ya están en una fila anterior, así que se omiten: {names}",
  "Alternative text for accessibility": "Texto alternativo para accesibilidad",
  "Angle": "Ángulo",
  "Animate": "Animar",

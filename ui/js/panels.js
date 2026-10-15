@@ -683,16 +683,19 @@ function useMapCountries(on) {
   return list;
 }
 
-/** A map's regions (for suggestions) and the rows that match none. */
+/**
+ * A map's regions (for suggestions, and whether a row names each one), the
+ * rows that name none and the rows that name a region a second time.
+ */
 function useMapRegions(on, map, labels) {
   const lang = language();
-  const [info, setInfo] = useState({ regions: [], unmatched: [] });
+  const [info, setInfo] = useState({ regions: [], unmatched: [], repeated: [] });
   const key = labels.join('\n');
   useEffect(() => {
     if (!on) return;
     let live = true;
     invoke('map_regions', { map: map || 'world', language: lang, labels })
-      .then(([regions, unmatched]) => live && setInfo({ regions, unmatched }))
+      .then((rows) => live && setInfo(rows))
       .catch(() => {});
     return () => {
       live = false;
@@ -713,7 +716,7 @@ export function ChartPanel({ els }) {
   const fixed = one || kind === 'candlestick';
   const isMap = kind === 'map';
   const countries = useMapCountries(isMap);
-  const { regions, unmatched } = useMapRegions(isMap, ch.map, ch.labels);
+  const { regions, unmatched, repeated } = useMapRegions(isMap, ch.map, ch.labels);
   const n = ch.labels.length;
   const setCell = (s, i, v) => {
     const series = ch.series.map((x, k) => (k === s ? { ...x, values: Array.from({ length: n }, (_, j) => (j === i ? v : x.values[j] ?? 0)) } : x));
@@ -771,6 +774,7 @@ export function ChartPanel({ els }) {
     <//>`}
     ${hint && html`<${Hint}>${hint}</${Hint}>`}
     ${isMap && unmatched.length > 0 && html`<${Hint}>${t('Not on this map: {names}', { names: unmatched.join(', ') })}</${Hint}>`}
+    ${isMap && repeated.length > 0 && html`<${Hint}>${t('Already in an earlier row, so left out: {names}', { names: repeated.join(', ') })}</${Hint}>`}
     ${isMap &&
     html`<div class="row-inline">
       <${Button}
@@ -779,10 +783,10 @@ export function ChartPanel({ els }) {
         label=${t('Add All Regions')}
         title=${t('Adds a row for each region of the map that has none yet.')}
         onClick=${() => {
-          // The sample is replaced; rows someone wrote are kept.
+          // The sample is replaced; rows someone wrote are kept, and so are
+          // the regions they name (by a name, a code or another language).
           const fresh = isSample(ch, 'map');
-          const have = new Set(fresh ? [] : ch.labels);
-          const add = regions.map(([, name]) => name).filter((name) => !have.has(name));
+          const add = regions.filter(([, , named]) => fresh || !named).map(([, name]) => name);
           const labels = [...(fresh ? [] : ch.labels), ...add];
           const first = ch.series[0] || { name: t('Series {n}', { n: 1 }), color: '' };
           const values = [...(fresh ? [] : first.values.slice(0, ch.labels.length)), ...add.map(() => 0)];
