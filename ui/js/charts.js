@@ -9,6 +9,7 @@ export const CHART_ICONS = {
   bar: 'chart-bar',
   'stacked-bar': 'chart-bar-stacked',
   line: 'chart-line',
+  dot: 'grip',
   area: 'chart-area',
   'stacked-area': 'chart-area',
   streamgraph: 'waves',
@@ -34,6 +35,37 @@ export const MAP_AREAS = [
   ['oceania', N_('Oceania')],
   ['south-america', N_('South America')],
 ];
+
+/** Point shapes of lines, dot plots and scatterplots (chart.rs, MARKERS). */
+export const MARKERS = [
+  ['', N_('Circle')],
+  ['circle-open', N_('Ring')],
+  ['square', N_('Square')],
+  ['square-open', N_('Open square')],
+  ['triangle', N_('Triangle')],
+  ['triangle-open', N_('Open triangle')],
+  ['diamond', N_('Diamond')],
+  ['diamond-open', N_('Open diamond')],
+];
+
+/** Types with error bars (chart.rs draws them on these). */
+export const hasErrorBars = (kind) => ['column', 'stacked-column', 'bar', 'stacked-bar', 'line', 'dot'].includes(kind);
+
+/** Types with a value axis: its ends, axis titles and reference lines. */
+export const hasAxes = (kind) => ['column', 'stacked-column', 'bar', 'stacked-bar', 'line', 'dot', 'area', 'stacked-area', 'scatter', 'candlestick'].includes(kind);
+
+/** Types whose series are drawn as points. */
+export const hasMarkers = (kind) => ['line', 'dot', 'scatter'].includes(kind);
+
+/** Error bar modes, and the columns each one adds per series in the data grid. */
+export const ERROR_MODES = [
+  ['', N_('None')],
+  ['pm', N_('± an amount')],
+  ['amounts', N_('− and + amounts')],
+  ['range', N_('Lower and upper ends')],
+];
+export const errorColumns = (mode) =>
+  ({ pm: [['high', '±']], amounts: [['low', '−'], ['high', '+']], range: [['low', N_('Lower')], ['high', N_('Upper')]] })[mode] || [];
 
 /** Types drawn from links between named nodes instead of the table. */
 export const linkChart = (kind) => kind === 'sankey' || kind === 'network';

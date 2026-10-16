@@ -1,9 +1,6 @@
 # Cadenza
 
-![platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows-blue?style=flat-square&color=%237c6cff) 
-![release](https://img.shields.io/github/v/release/rodolfo-viana/cadenza?style=flat-square&label=latest%20release&color=%237c6cff) ![downloads](https://img.shields.io/github/downloads/rodolfo-viana/cadenza/total?style=flat-square&color=%237c6cff)
-
-[![release build](https://img.shields.io/github/actions/workflow/status/rodolfo-viana/cadenza/release.yml?label=release%20build&style=flat-square&color=%237c6cff)](https://github.com/rodolfo-viana/cadenza/actions/workflows/release.yml) [![codeql](https://img.shields.io/github/actions/workflow/status/rodolfo-viana/cadenza/codeql.yml?branch=main&label=codeql&style=flat-square&color=%237c6cff)](https://github.com/rodolfo-viana/cadenza/actions/workflows/codeql.yml) ![license](https://img.shields.io/github/license/rodolfo-viana/cadenza?style=flat-square&color=%237c6cff)
+![badge](https://shieldcn.dev/badge/platforms-Linux%20|%20Windows.svg?size=xs&theme=violet&font=jetbrains-mono&logo=lu%3ACircleCheckBig&labelOpacity=0.9) [![badge](https://shieldcn.dev/github/rodolfo-viana/cadenza/downloads.svg?size=xs&theme=violet&font=jetbrains-mono&labelOpacity=0.9)](https://github.com/rodolfo-viana/cadenza/releases) [![badge](https://shieldcn.dev/github/rodolfo-viana/cadenza/release.svg?size=xs&theme=violet&font=jetbrains-mono&labelOpacity=0.9)](https://github.com/rodolfo-viana/cadenza/releases) [![badge](https://shieldcn.dev/github/rodolfo-viana/cadenza/license.svg?size=xs&theme=violet&font=jetbrains-mono&labelOpacity=0.9)](https://github.com/rodolfo-viana/cadenza)
 
 
 **Presentations, powered by reveal.js.** Cadenza is a desktop presentation app in the spirit of
@@ -17,7 +14,9 @@ with [Tauri](https://tauri.app). It runs on Linux and Windows.
 **Editing**
 - Slides built from 12 layouts (title, section, two columns, quote, big number, code…), with text,
   shapes, images, video, tables, charts, code, equations and diagrams.
-- Charts edited in a data grid and rendered as crisp SVG: column, bar and area (stacked or not), line, streamgraph, pie, donut, treemap, parliament, scatterplot, heatmap, candlestick, Sankey diagram, network graph and maps (the world, a continent, or a country's states or provinces).
+- Charts edited in a data grid and rendered as crisp SVG: column, bar and area (stacked or not), line, dot plot, streamgraph, pie, donut, treemap, parliament, scatterplot, heatmap, candlestick, Sankey diagram, network graph and maps (the world, a continent, or a country's states or provinces).
+- Charts from data: paste cells from a spreadsheet or open a CSV file, see every chart the data can make, and insert one.
+- Error bars (±, − and + amounts, or lower and upper ends), value axes with ends of your own, axis titles, reference lines and point shapes.
 - Code blocks with syntax highlighting, line numbers and step-by-step line highlights.
 - LaTeX math with KaTeX, as equation objects or inline in any text: `$e^{i\pi}+1=0$`.
 - [Mermaid](https://mermaid.js.org) diagrams: flowcharts, sequences, timelines, mind maps and more.
@@ -58,7 +57,7 @@ with [Tauri](https://tauri.app). It runs on Linux and Windows.
 
 The interface is available in Arabic, Bengali, Chinese (Simplified), Dutch, English, French, German,
 Hindi, Italian, Japanese, Polish, Portuguese, Portuguese (Brazil), Russian, Spanish and
-Turkish. English is the default; change it in **Settings ▸ Language**.
+Turkish. English is the default; change it in **Settings > Language**.
 
 ## Download
 
@@ -71,13 +70,11 @@ Installers are published on the [Releases](https://github.com/rodolfo-viana/cade
 | Any Linux | `Cadenza_x.y.z_amd64.AppImage` | Make it executable and run it; it includes everything it needs |
 | Windows 10 and 11 | `Cadenza_x.y.z_x64-setup.exe` or `.msi` | Installs Microsoft WebView2 if it's missing |
 
-The `.deb` and `.rpm` packages need WebKitGTK 4.1 (Ubuntu 22.04, Debian 12, Fedora 37 or newer).
+> The `.deb` and `.rpm` packages need WebKitGTK 4.1 (Ubuntu 22.04, Debian 12, Fedora 37 or newer).
+> 
+> The installers aren't code-signed yet, so the first time you run Cadenza on Windows, SmartScreen may ask you to confirm (**More info > Run anyway**).
 
-The installers aren't code-signed yet, so the first time you run Cadenza on Windows, SmartScreen may
-ask you to confirm (**More info ▸ Run anyway**).
-
-There is no macOS version. Versions 0.2.0 to 0.3.2 had one, but it could never be tested on a Mac,
-so it is no longer made.
+Note: *There is no macOS version any longer. Versions 0.2.0 to 0.3.2 had one, but it could not be properly tested on a Mac on regular basis, so it is no longer made.*
 
 ## Privacy
 

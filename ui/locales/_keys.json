@@ -6,6 +6,12 @@
   ]
  },
  {
+  "key": "+ error",
+  "files": [
+   "chartdata.js"
+  ]
+ },
+ {
   "key": "0 = off",
   "files": [
    "inspector.js"
@@ -21,6 +27,12 @@
   "key": "A bold statement.",
   "files": [
    "slideview.js"
+  ]
+ },
+ {
+  "key": "A dashed line across the chart at a value, such as a target.",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -94,6 +106,12 @@
   "key": "Add photo credit",
   "files": [
    "media.js"
+  ]
+ },
+ {
+  "key": "Add Reference Line",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -458,6 +476,18 @@
   "key": "Auto-advance",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "axis maximum::Max",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "axis minimum::Min",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -911,6 +941,24 @@
   ]
  },
  {
+  "key": "Chart Data",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "Chart from Data",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "Chart from Data…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
   "key": "Chevron",
   "files": [
    "shapes.rs"
@@ -980,6 +1028,7 @@
  {
   "key": "Circle",
   "files": [
+   "charts.js",
    "panels.js"
   ]
  },
@@ -1105,6 +1154,12 @@
   "key": "Column",
   "files": [
    "chart.rs"
+  ]
+ },
+ {
+  "key": "Column {n}",
+  "files": [
+   "chartdata.js"
   ]
  },
  {
@@ -1315,6 +1370,12 @@
   ]
  },
  {
+  "key": "Data (CSV)",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "Data API key",
   "files": [
    "media.js"
@@ -1424,6 +1485,7 @@
  {
   "key": "Diamond",
   "files": [
+   "charts.js",
    "shapes.rs"
   ]
  },
@@ -1510,6 +1572,12 @@
   "key": "Dot",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Dot plot",
+  "files": [
+   "chart.rs"
   ]
  },
  {
@@ -1665,6 +1733,12 @@
   ]
  },
  {
+  "key": "Edit as CSV…",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Edit Cells",
   "files": [
    "canvas.js",
@@ -1797,6 +1871,30 @@
   "key": "Equation (LaTeX)",
   "files": [
    "commands.js"
+  ]
+ },
+ {
+  "key": "Error bars",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Error bars of {name}",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Error bars show on column, bar, line and dot charts.",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "error bars: {mode}",
+  "files": [
+   "datachart.js"
   ]
  },
  {
@@ -1970,6 +2068,12 @@
   ]
  },
  {
+  "key": "First row names the columns",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "Fit",
   "files": [
    "panels.js"
@@ -2124,6 +2228,7 @@
  {
   "key": "From",
   "files": [
+   "chartdata.js",
    "inspector.js",
    "panels.js"
   ]
@@ -2132,6 +2237,12 @@
   "key": "From Computer…",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "From Data…",
+  "files": [
+   "toolbar.js"
   ]
  },
  {
@@ -2235,6 +2346,12 @@
   "key": "Grid size",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "Groups",
+  "files": [
+   "chartdata.js"
   ]
  },
  {
@@ -2416,6 +2533,12 @@
   ]
  },
  {
+  "key": "Ignore",
+  "files": [
+   "chartdata.js"
+  ]
+ },
+ {
   "key": "Image",
   "files": [
    "actions.js",
@@ -2564,6 +2687,12 @@
   ]
  },
  {
+  "key": "Insert this chart",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "Insert this GIF",
   "files": [
    "browse.rs"
@@ -2663,6 +2792,18 @@
   ]
  },
  {
+  "key": "Label",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Labels",
+  "files": [
+   "chartdata.js"
+  ]
+ },
+ {
   "key": "Language",
   "files": [
    "dialogs.js",
@@ -2695,6 +2836,12 @@
  },
  {
   "key": "Learn more",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Leave empty to follow the data.",
   "files": [
    "panels.js"
   ]
@@ -2892,6 +3039,24 @@
   "key": "Low",
   "files": [
    "charts.js"
+  ]
+ },
+ {
+  "key": "Lower",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
+  "key": "Lower and upper ends",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
+  "key": "Lower end",
+  "files": [
+   "chartdata.js"
   ]
  },
  {
@@ -3193,6 +3358,18 @@
   ]
  },
  {
+  "key": "No chart fits this data yet.",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "No column of numbers to chart. Mark one as Values.",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "No fill",
   "files": [
    "panels.js"
@@ -3232,6 +3409,7 @@
  {
   "key": "None",
   "files": [
+   "charts.js",
    "inspector.js",
    "panels.js"
   ]
@@ -3414,6 +3592,24 @@
   ]
  },
  {
+  "key": "Open Data",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "Open diamond",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
+  "key": "Open File…",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "Open in my web browser instead",
   "files": [
    "media.js"
@@ -3432,9 +3628,21 @@
   ]
  },
  {
+  "key": "Open square",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
   "key": "Open the presenter display (notes, timer, next slide)",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "Open triangle",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -3604,6 +3812,18 @@
   ]
  },
  {
+  "key": "Paste cells from a spreadsheet, or data in CSV form.",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "Paste or open data in CSV form and pick the chart to make from it.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Paste Slides",
   "files": [
    "ops.rs"
@@ -3729,6 +3949,12 @@
   "key": "Plus",
   "files": [
    "shapes.rs"
+  ]
+ },
+ {
+  "key": "Point shape",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -3916,6 +4142,12 @@
   ]
  },
  {
+  "key": "Reference lines",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Remove",
   "files": [
    "dialogs.js",
@@ -3954,6 +4186,12 @@
  },
  {
   "key": "Remove last row",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Remove line",
   "files": [
    "panels.js"
   ]
@@ -4072,6 +4310,12 @@
   "key": "Right Triangle",
   "files": [
    "shapes.rs"
+  ]
+ },
+ {
+  "key": "Ring",
+  "files": [
+   "charts.js"
   ]
  },
  {
@@ -4694,6 +4938,12 @@
   ]
  },
  {
+  "key": "Square",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
   "key": "Square (1080×1080)",
   "files": [
    "inspector.js"
@@ -4858,6 +5108,12 @@
   ]
  },
  {
+  "key": "Swap rows and columns",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "switch windows",
   "files": [
    "presenter.html"
@@ -5001,6 +5257,12 @@
   ]
  },
  {
+  "key": "The charts you can make from your data appear here.",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "The copied media is no longer available. Copy the content again.",
   "files": [
    "clipboard.rs"
@@ -5016,6 +5278,12 @@
   "key": "The file is too large (40 MB max)",
   "files": [
    "media.rs"
+  ]
+ },
+ {
+  "key": "The file is too large to chart (over 20 MB).",
+  "files": [
+   "lib.rs"
   ]
  },
  {
@@ -5300,6 +5568,7 @@
  {
   "key": "To",
   "files": [
+   "chartdata.js",
    "inspector.js",
    "panels.js",
    "themebuilder.js"
@@ -5369,6 +5638,7 @@
  {
   "key": "Triangle",
   "files": [
+   "charts.js",
    "shapes.rs"
   ]
  },
@@ -5488,6 +5758,18 @@
   ]
  },
  {
+  "key": "Upper",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
+  "key": "Upper end",
+  "files": [
+   "chartdata.js"
+  ]
+ },
+ {
   "key": "UPPERCASE",
   "files": [
    "panels.js"
@@ -5512,6 +5794,12 @@
   ]
  },
  {
+  "key": "Use this chart",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "User journey",
   "files": [
    "diagrams.js"
@@ -5526,6 +5814,7 @@
  {
   "key": "Value",
   "files": [
+   "chartdata.js",
    "panels.js"
   ]
  },
@@ -5533,6 +5822,12 @@
   "key": "Value labels",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Values",
+  "files": [
+   "chartdata.js"
   ]
  },
  {
@@ -5706,6 +6001,30 @@
   ]
  },
  {
+  "key": "X axis",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "X-axis title",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Y axis",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Y-axis title",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "You can change the theme at any time from the Document inspector.",
   "files": [
    "welcome.js"
@@ -5841,6 +6160,20 @@
   ]
  },
  {
+  "key": "{n} rows",
+  "files": [
+   "datachart.js"
+  ],
+  "one": "{n} row"
+ },
+ {
+  "key": "{n} series",
+  "files": [
+   "datachart.js"
+  ],
+  "one": "{n} series"
+ },
+ {
   "key": "{n} slides",
   "files": [
    "inspector.js",
@@ -5858,6 +6191,18 @@
   "key": "{service} key saved in your system keychain",
   "files": [
    "media.js"
+  ]
+ },
+ {
+  "key": "± an amount",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
+  "key": "± error",
+  "files": [
+   "chartdata.js"
   ]
  },
  {
@@ -5882,6 +6227,18 @@
   "key": "“{title}” by {author}",
   "files": [
    "media.js"
+  ]
+ },
+ {
+  "key": "− and + amounts",
+  "files": [
+   "charts.js"
+  ]
+ },
+ {
+  "key": "− error",
+  "files": [
+   "chartdata.js"
   ]
  }
 ]

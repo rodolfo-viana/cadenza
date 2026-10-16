@@ -12,13 +12,14 @@ import { keyLabel, cls } from './util.js';
 import { opener, invoke } from './api.js';
 import { MediaLibrary, KeyPrompt } from './media.js';
 import { ThemeBuilder } from './themebuilder.js';
+import { ChartData } from './datachart.js';
 import { t, N_, LANGUAGES } from './i18n.js';
 
 export function ModalHost() {
   const st = useStore();
   const m = st.modal;
   if (!m) return null;
-  const C = { unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder }[m.type];
+  const C = { unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder, chartData: ChartData }[m.type];
   return C ? html`<${C} ...${m.props} />` : null;
 }
 

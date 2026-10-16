@@ -15,6 +15,7 @@ pub const CHART_TYPES: &[(&str, &str)] = &[
     ("bar", "Bar"),
     ("stacked-bar", "Stacked bar"),
     ("line", "Line"),
+    ("dot", "Dot plot"),
     ("area", "Area"),
     ("stacked-area", "Stacked area"),
     ("streamgraph", "Streamgraph"),
@@ -162,6 +163,8 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
     );
     let kind = chart.chart.as_str();
     let by_label = matches!(kind, "pie" | "donut" | "parliament") || (kind == "treemap" && chart.series.len() <= 1);
+    // Lines, dot plots and scatterplots show their series' points.
+    let points = matches!(kind, "line" | "dot" | "scatter");
     let legend_items: Vec<(String, String)> = match kind {
         "heatmap" | "candlestick" | "sankey" | "network" | "map" => Vec::new(),
         "parliament" if chart.show_values => {
@@ -197,6 +200,7 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
         "parliament" => parliament_chart(&mut svg, chart, w, plot_h, f, steps),
         "treemap" => treemap_chart(&mut svg, chart, w, plot_h, f, steps),
         "scatter" => scatter_chart(&mut svg, chart, w, plot_h, f, steps),
+        "dot" => dot_chart(&mut svg, chart, w, plot_h, f, steps),
         "heatmap" => heatmap_chart(&mut svg, chart, w, plot_h, f, steps),
         "streamgraph" => stream_chart(&mut svg, chart, w, plot_h, f, steps),
         "candlestick" => candle_chart(&mut svg, chart, w, plot_h, f),
@@ -215,7 +219,11 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
                 heat_legend(&mut svg, range, &scale_color(chart), w, h - legend_h * 0.5, f);
             }
         } else {
-            legend(&mut svg, &legend_items, w, h - legend_h * 0.5, f);
+            let first = usize::from(kind == "scatter" && chart.series.len() > 1);
+            let shapes: Vec<Option<&str>> = (0..legend_items.len())
+                .map(|k| points.then(|| chart.series.get(k + first).map_or("", |s| s.marker.as_str())))
+                .collect();
+            legend(&mut svg, &legend_items, &shapes, w, h - legend_h * 0.5, f);
         }
     }
     svg.push_str("</svg>");
@@ -227,22 +235,32 @@ fn rows(chart: &ChartContent) -> usize {
     chart.labels.len().max(chart.series.iter().map(|s| s.values.len()).max().unwrap_or(0))
 }
 
-fn legend(svg: &mut String, items: &[(String, String)], w: f64, cy: f64, f: f64) {
+/// Legend items in a row: a swatch (or the series' point `shapes`) and a name.
+fn legend(svg: &mut String, items: &[(String, String)], shapes: &[Option<&str>], w: f64, cy: f64, f: f64) {
     // Approximate text width: 0.55em per character.
     let widths: Vec<f64> = items.iter().map(|(l, _)| f * 1.4 + l.chars().count() as f64 * f * 0.55 + f).collect();
     let total: f64 = widths.iter().sum();
     let mut x = ((w - total) / 2.0).max(0.0);
-    for ((label, color), iw) in items.iter().zip(widths) {
+    for (k, ((label, color), iw)) in items.iter().zip(widths).enumerate() {
         let s = f * 0.8;
+        match shapes.get(k).copied().flatten() {
+            Some(shape) => marker(svg, shape, (x + s / 2.0, cy), s * 0.45, color, ""),
+            None => {
+                let _ = write!(
+                    svg,
+                    r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" style="fill:{}"/>"#,
+                    num(x),
+                    num(cy - s / 2.0),
+                    num(s),
+                    num(s),
+                    num(s * 0.25),
+                    esc(color)
+                );
+            }
+        }
         let _ = write!(
             svg,
-            r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}" style="fill:{}"/><text x="{}" y="{}" dominant-baseline="central">{}</text>"#,
-            num(x),
-            num(cy - s / 2.0),
-            num(s),
-            num(s),
-            num(s * 0.25),
-            esc(color),
+            r#"<text x="{}" y="{}" dominant-baseline="central">{}</text>"#,
             num(x + f * 1.2),
             num(cy),
             esc(label)
@@ -258,46 +276,84 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
     if n == 0 || chart.series.is_empty() {
         return;
     }
+    let ns = chart.series.len();
     let value = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite()).unwrap_or(0.0);
-    let (mut vmin, mut vmax) = (0.0f64, 0.0f64);
-    for i in 0..n {
-        if stacked {
-            let (mut pos, mut neg) = (0.0, 0.0);
-            for s in 0..chart.series.len() {
-                let v = value(s, i);
-                if v >= 0.0 { pos += v } else { neg += v }
-            }
-            vmax = vmax.max(pos);
-            vmin = vmin.min(neg);
-        } else {
-            for s in 0..chart.series.len() {
-                vmax = vmax.max(value(s, i));
-                vmin = vmin.min(value(s, i));
+    // Where each value starts and ends along the value axis. Stacked columns
+    // and bars pile positive and negative values apart; areas pile them all.
+    let mut seg = vec![vec![(0.0f64, 0.0f64); n]; ns];
+    let (mut pos, mut neg) = (vec![0.0f64; n], vec![0.0f64; n]);
+    for (s, row) in seg.iter_mut().enumerate() {
+        for (i, cell) in row.iter_mut().enumerate() {
+            let v = value(s, i);
+            *cell = if !stacked {
+                (0.0, v)
+            } else if kind == "area" || v >= 0.0 {
+                let st = pos[i];
+                pos[i] += v;
+                (st, st + v)
+            } else {
+                let st = neg[i];
+                neg[i] += v;
+                (st, st + v)
+            };
+        }
+    }
+    let errors = kind != "area";
+    // Error bars around where a value ends (a stacked value's top).
+    let error_at = |s: usize, i: usize| -> Option<(f64, f64)> {
+        if !errors {
+            return None;
+        }
+        let v = value(s, i);
+        let (a, b) = error_span(chart, s, i, v)?;
+        let end = seg[s][i].1;
+        Some((a - v + end, b - v + end))
+    };
+    let mut range = (0.0f64, 0.0f64);
+    for (s, row) in seg.iter().enumerate() {
+        for (i, &(st, en)) in row.iter().enumerate() {
+            range = (range.0.min(st).min(en), range.1.max(st).max(en));
+            if let Some((a, b)) = error_at(s, i) {
+                range = (range.0.min(a), range.1.max(b));
             }
         }
     }
-    let (lo, hi, step) = nice_scale(vmin, vmax, 5);
-    let max_label = (0..=((hi - lo) / step).round() as i64)
-        .map(|k| fmt_value(lo + k as f64 * step).len())
-        .max()
-        .unwrap_or(1) as f64;
+    let axis = value_axis(chart, Some(range), true);
+    let max_label = axis.ticks().map(|v| fmt_tick(v, axis.step).chars().count()).max().unwrap_or(1) as f64;
     let max_cat = chart.labels.iter().map(|l| l.chars().count()).max().unwrap_or(1) as f64;
-    let (left, bottom, top, right) = if horizontal {
-        ((max_cat * f * 0.58 + f * 0.8).min(w * 0.35), f * 1.8, f * 0.8, f * 1.2)
+    let (title_left, title_bottom) = title_room(chart, f);
+    let (left, top, right) = if horizontal {
+        (title_left + (max_cat * f * 0.58 + f * 0.8).min(w * 0.35), f * 0.8, f * 1.2)
     } else {
-        (max_label * f * 0.6 + f * 0.8, f * 1.8, f * 0.9, f * 0.6)
+        (title_left + max_label * f * 0.6 + f * 0.8, f * 0.9, f * 0.6)
     };
-    let (px, py, pw, ph) = (left, top, (w - left - right).max(10.0), (h - top - bottom).max(10.0));
+    let pw = (w - left - right).max(10.0);
+    // Labels too long for their room wrap onto more lines.
+    let (cat_chars, cat_lines) = if horizontal {
+        let chars = ((left - title_left - f * 0.8) / (f * 0.58)).floor().max(1.0) as usize;
+        let fit = ((h - top - f * 1.8 - title_bottom) / n as f64 / (f * 1.1)).floor().clamp(1.0, 3.0) as usize;
+        (chars, fit)
+    } else {
+        let chars = (pw / n as f64 / (f * 0.6)).floor().max(1.0) as usize;
+        (chars, category_lines(chart, chars, 2))
+    };
+    let below = if horizontal { 0.0 } else { (cat_lines - 1) as f64 * f * 1.1 };
+    let bottom = f * 1.8 + below + title_bottom;
+    let plot = Rect {
+        x: left,
+        y: top,
+        w: pw,
+        h: (h - top - bottom).max(10.0),
+    };
+    let (px, py, pw, ph) = (plot.x, plot.y, plot.w, plot.h);
     // Position along the value axis.
     let vpos = |v: f64| -> f64 {
-        let t = (v - lo) / (hi - lo);
+        let t = axis.t(v);
         if horizontal { px + t * pw } else { py + ph - t * ph }
     };
 
     // Grid + value labels.
-    let ticks = ((hi - lo) / step).round() as i64;
-    for k in 0..=ticks {
-        let v = lo + k as f64 * step;
+    for v in axis.ticks() {
         let p = vpos(v);
         if horizontal {
             if chart.show_grid {
@@ -314,7 +370,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                 r#"<text x="{}" y="{}" text-anchor="middle" opacity="0.75">{}</text>"#,
                 num(p),
                 num(py + ph + f * 1.3),
-                fmt_value(v)
+                fmt_tick(v, axis.step)
             );
         } else {
             if chart.show_grid {
@@ -331,12 +387,12 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                 r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central" opacity="0.75">{}</text>"#,
                 num(px - f * 0.5),
                 num(p),
-                fmt_value(v)
+                fmt_tick(v, axis.step)
             );
         }
     }
-    // Baseline.
-    let zero = vpos(0.0);
+    // Baseline: zero, or the end of the axis nearest to it.
+    let zero = vpos(0.0f64.clamp(axis.lo, axis.hi));
     if horizontal {
         let _ = write!(
             svg,
@@ -359,47 +415,28 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
     // Category labels.
     for i in 0..n {
         let label = chart.labels.get(i).map(String::as_str).unwrap_or("");
+        let lines = wrap_label(label, cat_chars, cat_lines);
         let c = (i as f64 + 0.5) * band;
         if horizontal {
-            let _ = write!(
-                svg,
-                r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central">{}</text>"#,
-                num(px - f * 0.5),
-                num(py + c),
-                esc(label)
-            );
+            label_text(svg, (px - f * 0.5, py + c), &lines, "end", true);
         } else {
-            let _ = write!(
-                svg,
-                r#"<text x="{}" y="{}" text-anchor="middle">{}</text>"#,
-                num(px + c),
-                num(py + ph + f * 1.3),
-                esc(label)
-            );
+            label_text(svg, (px + c, py + ph + f * 1.3), &lines, "middle", false);
         }
     }
 
-    let ns = chart.series.len();
+    let clip = open_clip(svg, chart, plot);
     match kind {
         "line" | "area" => {
             let area = kind == "area";
-            let mut base = vec![0.0f64; n];
-            for s in 0..ns {
+            let r = (f * 0.22).max(3.0);
+            for (s, row) in seg.iter().enumerate() {
                 open_step(svg, steps, s as u32);
                 let color = series_color(chart, s);
-                let pts: Vec<(f64, f64, f64)> = (0..n)
-                    .map(|i| {
-                        let v = value(s, i);
-                        let start = if stacked { base[i] } else { 0.0 };
-                        let end = start + v;
-                        (px + (i as f64 + 0.5) * band, vpos(end), vpos(start))
-                    })
+                let pts: Vec<(f64, f64, f64)> = row
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &(start, end))| (px + (i as f64 + 0.5) * band, vpos(end), vpos(start)))
                     .collect();
-                if stacked {
-                    for (i, b) in base.iter_mut().enumerate() {
-                        *b += value(s, i);
-                    }
-                }
                 let line: String = pts
                     .iter()
                     .enumerate()
@@ -417,14 +454,10 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                     num((f * 0.18).max(2.0))
                 );
                 for (k, (x, y, _)) in pts.iter().enumerate() {
-                    let _ = write!(
-                        svg,
-                        r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#,
-                        num(*x),
-                        num(*y),
-                        num((f * 0.22).max(3.0)),
-                        esc(&color)
-                    );
+                    if let Some((a, b)) = error_at(s, k) {
+                        error_bar(svg, false, *x, (vpos(a), vpos(b)), r * 1.4, f);
+                    }
+                    marker(svg, &chart.series[s].marker, (*x, *y), r, &color, "");
                     if chart.show_values {
                         let _ = write!(
                             svg,
@@ -444,21 +477,11 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
             let gap = band * 0.22;
             let inner = band - gap;
             let bw = if stacked { inner } else { inner / ns as f64 };
-            let mut pos_base = vec![0.0f64; n];
-            let mut neg_base = vec![0.0f64; n];
-            for s in 0..ns {
+            for (s, row) in seg.iter().enumerate() {
                 open_step(svg, steps, s as u32);
                 let color = series_color(chart, s);
-                for i in 0..n {
+                for (i, &(start, end)) in row.iter().enumerate() {
                     let v = value(s, i);
-                    let (start, end) = if stacked {
-                        let b = if v >= 0.0 { &mut pos_base[i] } else { &mut neg_base[i] };
-                        let st = *b;
-                        *b += v;
-                        (st, st + v)
-                    } else {
-                        (0.0, v)
-                    };
                     let offset = i as f64 * band + gap / 2.0 + if stacked { 0.0 } else { s as f64 * bw };
                     let (a, b) = (vpos(start), vpos(end));
                     let (lo_p, len) = (a.min(b), (a - b).abs());
@@ -478,6 +501,10 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                         num(r),
                         esc(&color)
                     );
+                    let across = if horizontal { py } else { px } + offset + bw / 2.0;
+                    if let Some((ea, eb)) = error_at(s, i) {
+                        error_bar(svg, horizontal, across, (vpos(ea), vpos(eb)), (bw * 0.25).min(f * 0.5), f);
+                    }
                     if chart.show_values && v != 0.0 {
                         let label = fmt_value(v);
                         if horizontal {
@@ -504,6 +531,421 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                 close_step(svg, steps);
             }
         }
+    }
+    close_clip(svg, clip);
+    ref_lines(svg, chart, plot, axis, horizontal, f);
+    axis_titles(svg, chart, plot, below, f);
+}
+
+// ---------------------------------------------------------------------------
+// Dot plot: each series a point per category, side by side
+// ---------------------------------------------------------------------------
+
+fn dot_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
+    let n = rows(chart);
+    let ns = chart.series.len();
+    if n == 0 || ns == 0 {
+        return;
+    }
+    let get = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite());
+    let mut range: Option<(f64, f64)> = None;
+    let mut extend = |a: f64, b: f64| range = Some(range.map_or((a, b), |(lo, hi)| (lo.min(a), hi.max(b))));
+    for s in 0..ns {
+        for i in 0..n {
+            if let Some(v) = get(s, i) {
+                let (a, b) = error_span(chart, s, i, v).unwrap_or((v, v));
+                extend(a, b);
+            }
+        }
+    }
+    let axis = value_axis(chart, range, false);
+    let (title_left, title_bottom) = title_room(chart, f);
+    let left = title_left + y_label_room(axis, f);
+    let pw = (w - left - f * 0.6).max(10.0);
+    let chars = (pw / n as f64 / (f * 0.6)).floor().max(1.0) as usize;
+    let lines = category_lines(chart, chars, 2);
+    let below = (lines - 1) as f64 * f * 1.1;
+    let plot = Rect {
+        x: left,
+        y: f * 0.9,
+        w: pw,
+        h: (h - f * 2.7 - below - title_bottom).max(10.0),
+    };
+    y_axis(svg, chart, plot, axis, f);
+    plot_frame(svg, plot);
+    let band = plot.w / n as f64;
+    let center = |i: usize| plot.x + (i as f64 + 0.5) * band;
+    for i in 0..n {
+        let label = chart.labels.get(i).map(String::as_str).unwrap_or("");
+        label_text(svg, (center(i), plot.y + plot.h + f * 1.3), &wrap_label(label, chars, lines), "middle", false);
+    }
+    let y = |v: f64| plot.y + plot.h - axis.t(v) * plot.h;
+    // Series side by side within a category, so that equal values stay apart.
+    let spacing = if ns > 1 { (band * 0.6 / ns as f64).min(f * 1.4) } else { 0.0 };
+    let r = (f * 0.3).max(3.0);
+    let clip = open_clip(svg, chart, plot);
+    for s in 0..ns {
+        open_step(svg, steps, s as u32);
+        let color = series_color(chart, s);
+        let dx = (s as f64 - (ns as f64 - 1.0) / 2.0) * spacing;
+        for i in 0..n {
+            let Some(v) = get(s, i) else { continue };
+            let x = center(i) + dx;
+            if let Some((a, b)) = error_span(chart, s, i, v) {
+                error_bar(svg, false, x, (y(a), y(b)), r * 1.1, f);
+            }
+            marker(svg, &chart.series[s].marker, (x, y(v)), r, &color, "");
+            if chart.show_values {
+                let _ = write!(
+                    svg,
+                    r#"<text x="{}" y="{}" dominant-baseline="central" font-size="{}">{}</text>"#,
+                    num(x + r + f * 0.2),
+                    num(y(v)),
+                    num(f * 0.7),
+                    fmt_value(v)
+                );
+            }
+        }
+        close_step(svg, steps);
+    }
+    close_clip(svg, clip);
+    ref_lines(svg, chart, plot, axis, false, f);
+    axis_titles(svg, chart, plot, below, f);
+}
+
+// ---------------------------------------------------------------------------
+// Parts shared by charts with axes
+// ---------------------------------------------------------------------------
+
+/// A value axis from `lo` to `hi`, with labels every `step`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Axis {
+    lo: f64,
+    hi: f64,
+    step: f64,
+}
+
+impl Axis {
+    fn of((lo, hi, step): (f64, f64, f64)) -> Axis {
+        Axis { lo, hi, step }
+    }
+
+    /// Where `v` falls between the ends: 0 at `lo`, 1 at `hi`.
+    fn t(self, v: f64) -> f64 {
+        (v - self.lo) / (self.hi - self.lo)
+    }
+
+    /// The multiples of the step from one end to the other.
+    fn ticks(self) -> impl Iterator<Item = f64> {
+        let first = (self.lo / self.step - 1e-6).ceil() as i64;
+        let last = (self.hi / self.step + 1e-6).floor() as i64;
+        let step = self.step;
+        (first..=last.min(first + 100)).map(move |k| k as f64 * step)
+    }
+}
+
+/// The value axis of a chart: the ends it was given, and otherwise "nice"
+/// ends around the data and its reference lines (from zero for columns,
+/// bars and areas).
+fn value_axis(chart: &ChartContent, data: Option<(f64, f64)>, from_zero: bool) -> Axis {
+    let (mut lo, mut hi) = data.unwrap_or((0.0, 1.0));
+    for l in chart.ref_lines.iter().filter(|l| l.value.is_finite()) {
+        lo = lo.min(l.value);
+        hi = hi.max(l.value);
+    }
+    if from_zero {
+        lo = lo.min(0.0);
+        hi = hi.max(0.0);
+    }
+    let min = chart.axis_min.filter(|v| v.is_finite());
+    let max = chart.axis_max.filter(|v| v.is_finite());
+    let (a, b) = (min.unwrap_or(lo), max.unwrap_or(hi));
+    if b <= a {
+        // Ends that leave no room: the data decides.
+        return Axis::of(nice_range(lo, hi, 5));
+    }
+    let (nlo, nhi, step) = nice_range(a, b, 5);
+    Axis {
+        lo: if min.is_some() { a } else { nlo },
+        hi: if max.is_some() { b } else { nhi },
+        step,
+    }
+}
+
+/// An axis label, with as many decimals as the step between labels needs.
+fn fmt_tick(v: f64, step: f64) -> String {
+    if v.abs() >= 10_000.0 {
+        return fmt_value(v);
+    }
+    let mut decimals = 0;
+    while decimals < 6 {
+        let scaled = step * 10f64.powi(decimals);
+        if (scaled - scaled.round()).abs() < 1e-6 {
+            break;
+        }
+        decimals += 1;
+    }
+    let text = format!("{:.*}", decimals as usize, v);
+    let text = if text.contains('.') {
+        text.trim_end_matches('0').trim_end_matches('.')
+    } else {
+        &text
+    };
+    if text == "-0" { "0".into() } else { text.to_string() }
+}
+
+/// Where the error bar of value `i` of series `s` (worth `v`) ends, as
+/// (low, high); `None` when it has none.
+fn error_span(chart: &ChartContent, s: usize, i: usize, v: f64) -> Option<(f64, f64)> {
+    let series = chart.series.get(s)?;
+    let at = |list: &[Option<f64>]| list.get(i).copied().flatten().filter(|x| x.is_finite());
+    let (low, high) = (at(&series.low), at(&series.high));
+    if low.is_none() && high.is_none() {
+        return None;
+    }
+    let (a, b) = match chart.error_bars.as_str() {
+        "pm" => {
+            let e = high.or(low)?.abs();
+            (v - e, v + e)
+        }
+        "amounts" => (v - low.unwrap_or(0.0).abs(), v + high.unwrap_or(0.0).abs()),
+        "range" => {
+            let (a, b) = (low.unwrap_or(v), high.unwrap_or(v));
+            (a.min(b), a.max(b))
+        }
+        _ => return None,
+    };
+    (b > a).then_some((a, b))
+}
+
+/// An error bar from `a` to `b` (positions along the value axis), `at`
+/// across it, with caps `cap` long on each side.
+fn error_bar(svg: &mut String, horizontal: bool, at: f64, (a, b): (f64, f64), cap: f64, f: f64) {
+    let (c0, c1) = (num(at - cap), num(at + cap));
+    let (at, a, b) = (num(at), num(a), num(b));
+    let d = if horizontal {
+        format!("M{a} {at}H{b}M{a} {c0}V{c1}M{b} {c0}V{c1}")
+    } else {
+        format!("M{at} {a}V{b}M{c0} {a}H{c1}M{c0} {b}H{c1}")
+    };
+    let _ = write!(
+        svg,
+        r#"<path class="cz-error" d="{d}" fill="none" stroke="currentColor" stroke-width="{}" stroke-opacity="0.9"/>"#,
+        num((f * 0.07).max(1.2))
+    );
+}
+
+/// Shapes for the points of lines, dot plots and scatterplots.
+pub const MARKERS: &[&str] = &[
+    "circle",
+    "circle-open",
+    "square",
+    "square-open",
+    "triangle",
+    "triangle-open",
+    "diamond",
+    "diamond-open",
+];
+
+/// A point of `shape` (see `MARKERS`; anything else is a dot) centered on
+/// `p`, about `r` in radius.
+fn marker(svg: &mut String, shape: &str, (x, y): Point, r: f64, color: &str, extra: &str) {
+    let open = shape.ends_with("-open");
+    let stroke = (r * 0.4).max(1.2);
+    let r = if open { r - stroke / 2.0 } else { r };
+    let paint = if open {
+        format!(r#"fill="none" style="stroke:{}" stroke-width="{}"{extra}"#, esc(color), num(stroke))
+    } else {
+        format!(r#"style="fill:{}"{extra}"#, esc(color))
+    };
+    let polygon = |pts: &[Point]| pts.iter().map(|(a, b)| format!("{},{}", num(*a), num(*b))).collect::<Vec<_>>().join(" ");
+    let _ = match shape.trim_end_matches("-open") {
+        "square" => {
+            let s = r * 0.88;
+            write!(
+                svg,
+                r#"<rect x="{}" y="{}" width="{}" height="{}" {paint}/>"#,
+                num(x - s),
+                num(y - s),
+                num(s * 2.0),
+                num(s * 2.0)
+            )
+        }
+        "triangle" => {
+            let s = r * 1.3;
+            let pts = polygon(&[(x, y - s), (x + s * 0.866, y + s * 0.5), (x - s * 0.866, y + s * 0.5)]);
+            write!(svg, r#"<polygon points="{pts}" {paint}/>"#)
+        }
+        "diamond" => {
+            let s = r * 1.25;
+            let pts = polygon(&[(x, y - s), (x + s, y), (x, y + s), (x - s, y)]);
+            write!(svg, r#"<polygon points="{pts}" {paint}/>"#)
+        }
+        _ => write!(svg, r#"<circle cx="{}" cy="{}" r="{}" {paint}/>"#, num(x), num(y), num(r)),
+    };
+}
+
+/// With ends of its own, the value axis cuts off what lies beyond them:
+/// the plot becomes a viewport that hides what overflows it.
+fn open_clip(svg: &mut String, chart: &ChartContent, plot: Rect) -> bool {
+    let clip = chart.axis_min.is_some_and(f64::is_finite) || chart.axis_max.is_some_and(f64::is_finite);
+    if clip {
+        let (x, y, w, h) = (num(plot.x), num(plot.y), num(plot.w), num(plot.h));
+        let _ = write!(
+            svg,
+            r#"<svg x="{x}" y="{y}" width="{w}" height="{h}" viewBox="{x} {y} {w} {h}" style="overflow:hidden">"#
+        );
+    }
+    clip
+}
+
+fn close_clip(svg: &mut String, clip: bool) {
+    if clip {
+        svg.push_str("</svg>");
+    }
+}
+
+/// The left and bottom edges of a plot.
+fn plot_frame(svg: &mut String, plot: Rect) {
+    let _ = write!(
+        svg,
+        r#"<path d="M{} {}V{}H{}" fill="none" stroke="currentColor" stroke-opacity="0.5"/>"#,
+        num(plot.x),
+        num(plot.y),
+        num(plot.y + plot.h),
+        num(plot.x + plot.w)
+    );
+}
+
+/// Dashed lines across `plot` at values of the value axis (vertical lines
+/// when the axis runs across), each with its label at the far end.
+fn ref_lines(svg: &mut String, chart: &ChartContent, plot: Rect, axis: Axis, horizontal: bool, f: f64) {
+    for l in chart
+        .ref_lines
+        .iter()
+        .filter(|l| l.value.is_finite() && l.value >= axis.lo && l.value <= axis.hi)
+    {
+        let t = axis.t(l.value);
+        let (x1, y1, x2, y2, lx, ly, anchor) = if horizontal {
+            let x = plot.x + t * plot.w;
+            (x, plot.y, x, plot.y + plot.h, x + f * 0.3, plot.y + f * 0.7, "start")
+        } else {
+            let y = plot.y + plot.h - t * plot.h;
+            (plot.x, y, plot.x + plot.w, y, plot.x + plot.w - f * 0.2, y - f * 0.35, "end")
+        };
+        let _ = write!(
+            svg,
+            r#"<line class="cz-ref" x1="{}" y1="{}" x2="{}" y2="{}" stroke="currentColor" stroke-width="{}" stroke-dasharray="{} {}" stroke-opacity="0.85"/>"#,
+            num(x1),
+            num(y1),
+            num(x2),
+            num(y2),
+            num((f * 0.08).max(1.2)),
+            num(f * 0.4),
+            num(f * 0.3)
+        );
+        if !l.label.trim().is_empty() {
+            let _ = write!(
+                svg,
+                r#"<text x="{}" y="{}" text-anchor="{anchor}" font-size="{}">{}</text>"#,
+                num(lx),
+                num(ly),
+                num(f * 0.75),
+                esc(l.label.trim())
+            );
+        }
+    }
+}
+
+/// A label in lines of at most `chars` characters, broken between words,
+/// `lines` at most: what does not fit ends in "…".
+fn wrap_label(label: &str, chars: usize, lines: usize) -> Vec<String> {
+    let chars = chars.max(3);
+    let cut = |s: &str| {
+        if s.chars().count() <= chars {
+            s.to_string()
+        } else {
+            format!("{}…", s.chars().take(chars - 1).collect::<String>().trim_end())
+        }
+    };
+    let mut out: Vec<String> = Vec::new();
+    for word in label.split_whitespace() {
+        match out.last_mut() {
+            Some(line) if line.chars().count() + 1 + word.chars().count() <= chars => {
+                line.push(' ');
+                line.push_str(word);
+            }
+            _ => out.push(word.to_string()),
+        }
+    }
+    if out.len() > lines.max(1) {
+        let rest = out.split_off(lines.max(1) - 1).join(" ");
+        out.push(rest);
+    }
+    if out.is_empty() {
+        out.push(String::new());
+    }
+    out.iter().map(|l| cut(l)).collect()
+}
+
+/// How many lines the category labels take, wrapped to `chars` characters.
+fn category_lines(chart: &ChartContent, chars: usize, max: usize) -> usize {
+    chart.labels.iter().map(|l| wrap_label(l, chars, max).len()).max().unwrap_or(1).max(1)
+}
+
+/// A label of one or more lines at `at`: the first line there, or the lines
+/// centered on it (`centered`).
+fn label_text(svg: &mut String, (x, y): Point, lines: &[String], anchor: &str, centered: bool) {
+    let shift = if centered { (lines.len() as f64 - 1.0) * -0.55 } else { 0.0 };
+    let baseline = if centered { r#" dominant-baseline="central""# } else { "" };
+    if lines.len() <= 1 {
+        let text = lines.first().map(String::as_str).unwrap_or("");
+        let _ = write!(
+            svg,
+            r#"<text x="{}" y="{}" text-anchor="{anchor}"{baseline}>{}</text>"#,
+            num(x),
+            num(y),
+            esc(text)
+        );
+        return;
+    }
+    let _ = write!(svg, r#"<text x="{}" y="{}" text-anchor="{anchor}"{baseline}>"#, num(x), num(y));
+    for (k, line) in lines.iter().enumerate() {
+        let dy = if k == 0 { shift } else { 1.1 };
+        let _ = write!(svg, r#"<tspan x="{}" dy="{}em">{}</tspan>"#, num(x), num(dy), esc(line));
+    }
+    svg.push_str("</text>");
+}
+
+/// Room for the axis titles: (left, bottom).
+fn title_room(chart: &ChartContent, f: f64) -> (f64, f64) {
+    let room = |t: &str| if t.trim().is_empty() { 0.0 } else { f * 1.5 };
+    (room(&chart.y_title), room(&chart.x_title))
+}
+
+/// The title of the horizontal axis under the plot's labels (`below` = the
+/// height of their lines after the first), and the one of the vertical axis
+/// along its left edge, turned.
+fn axis_titles(svg: &mut String, chart: &ChartContent, plot: Rect, below: f64, f: f64) {
+    let size = num(f * 0.9);
+    let x_title = chart.x_title.trim();
+    if !x_title.is_empty() {
+        let _ = write!(
+            svg,
+            r#"<text class="cz-axis-title" x="{}" y="{}" text-anchor="middle" font-size="{size}">{}</text>"#,
+            num(plot.x + plot.w / 2.0),
+            num(plot.y + plot.h + below + f * 2.9),
+            esc(x_title)
+        );
+    }
+    let y_title = chart.y_title.trim();
+    if !y_title.is_empty() {
+        let (x, y) = (num(f * 0.75), num(plot.y + plot.h / 2.0));
+        let _ = write!(
+            svg,
+            r#"<text class="cz-axis-title" x="{x}" y="{y}" transform="rotate(-90 {x} {y})" text-anchor="middle" dominant-baseline="central" font-size="{size}">{}</text>"#,
+            esc(y_title)
+        );
     }
 }
 
@@ -653,11 +1095,9 @@ fn label_stride(chart: &ChartContent, n: usize, band: f64, f: f64) -> usize {
 }
 
 /// Value grid and labels along the vertical axis of `plot`.
-fn y_axis(svg: &mut String, chart: &ChartContent, plot: Rect, (lo, hi, step): (f64, f64, f64), f: f64) {
-    let ticks = ((hi - lo) / step).round() as i64;
-    for k in 0..=ticks {
-        let v = lo + k as f64 * step;
-        let y = plot.y + plot.h - (v - lo) / (hi - lo) * plot.h;
+fn y_axis(svg: &mut String, chart: &ChartContent, plot: Rect, axis: Axis, f: f64) {
+    for v in axis.ticks() {
+        let y = plot.y + plot.h - axis.t(v) * plot.h;
         if chart.show_grid {
             let _ = write!(
                 svg,
@@ -672,18 +1112,14 @@ fn y_axis(svg: &mut String, chart: &ChartContent, plot: Rect, (lo, hi, step): (f
             r#"<text x="{}" y="{}" text-anchor="end" dominant-baseline="central" opacity="0.75">{}</text>"#,
             num(plot.x - f * 0.5),
             num(y),
-            fmt_value(v)
+            fmt_tick(v, axis.step)
         );
     }
 }
 
 /// Room for the labels of a value axis.
-fn y_label_room(range: (f64, f64, f64), f: f64) -> f64 {
-    let (lo, hi, step) = range;
-    let longest = (0..=((hi - lo) / step).round() as i64)
-        .map(|k| fmt_value(lo + k as f64 * step).len())
-        .max()
-        .unwrap_or(1) as f64;
+fn y_label_room(axis: Axis, f: f64) -> f64 {
+    let longest = axis.ticks().map(|v| fmt_tick(v, axis.step).chars().count()).max().unwrap_or(1) as f64;
     longest * f * 0.6 + f * 0.8
 }
 
@@ -836,21 +1272,21 @@ fn scatter_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
     }
     let (x0, x1) = points.iter().fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p.2), b.max(p.2)));
     let (y0, y1) = points.iter().fold((f64::MAX, f64::MIN), |(a, b), p| (a.min(p.3), b.max(p.3)));
-    let xr = nice_range(x0, x1, 5);
-    let yr = nice_range(y0, y1, 5);
-    let left = y_label_room(yr, f);
+    let xr = Axis::of(nice_range(x0, x1, 5));
+    let yr = value_axis(chart, Some((y0, y1)), false);
+    let (title_left, title_bottom) = title_room(chart, f);
+    let left = title_left + y_label_room(yr, f);
     let plot = Rect {
         x: left,
         y: f * 0.9,
         w: (w - left - f * 1.4).max(10.0),
-        h: (h - f * 2.7).max(10.0),
+        h: (h - f * 2.7 - title_bottom).max(10.0),
     };
     y_axis(svg, chart, plot, yr, f);
-    let px = |x: f64| plot.x + (x - xr.0) / (xr.1 - xr.0) * plot.w;
-    let py = |y: f64| plot.y + plot.h - (y - yr.0) / (yr.1 - yr.0) * plot.h;
-    let ticks = ((xr.1 - xr.0) / xr.2).round() as i64;
-    for k in 0..=ticks {
-        let x = px(xr.0 + k as f64 * xr.2);
+    let px = |x: f64| plot.x + xr.t(x) * plot.w;
+    let py = |y: f64| plot.y + plot.h - yr.t(y) * plot.h;
+    for tick in xr.ticks() {
+        let x = px(tick);
         if chart.show_grid {
             let _ = write!(
                 svg,
@@ -865,30 +1301,17 @@ fn scatter_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
             r#"<text x="{}" y="{}" text-anchor="middle" opacity="0.75">{}</text>"#,
             num(x),
             num(plot.y + plot.h + f * 1.3),
-            fmt_value(xr.0 + k as f64 * xr.2)
+            fmt_tick(tick, xr.step)
         );
     }
-    let _ = write!(
-        svg,
-        r#"<path d="M{} {}V{}H{}" fill="none" stroke="currentColor" stroke-opacity="0.5"/>"#,
-        num(plot.x),
-        num(plot.y),
-        num(plot.y + plot.h),
-        num(plot.x + plot.w)
-    );
+    plot_frame(svg, plot);
     let r = (f * 0.32).max(3.0);
+    let clip = open_clip(svg, chart, plot);
     for (k, &g) in groups.iter().enumerate() {
         open_step(svg, steps, k as u32);
         let color = series_color(chart, g);
         for &(_, i, x, y) in points.iter().filter(|p| p.0 == g) {
-            let _ = write!(
-                svg,
-                r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}" fill-opacity="0.85"/>"#,
-                num(px(x)),
-                num(py(y)),
-                num(r),
-                esc(&color)
-            );
+            marker(svg, &chart.series[g].marker, (px(x), py(y)), r, &color, r#" fill-opacity="0.85""#);
             if chart.show_values
                 && let Some(label) = chart.labels.get(i).filter(|l| !l.is_empty())
             {
@@ -904,6 +1327,9 @@ fn scatter_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
         }
         close_step(svg, steps);
     }
+    close_clip(svg, clip);
+    ref_lines(svg, chart, plot, yr, false, f);
+    axis_titles(svg, chart, plot, 0.0, f);
 }
 
 // ---------------------------------------------------------------------------
@@ -1321,19 +1747,21 @@ fn candle_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) 
     let Some((lo, hi)) = all.fold(None, |r, v| Some(r.map_or((v, v), |(a, b): (f64, f64)| (a.min(v), b.max(v))))) else {
         return;
     };
-    let range = nice_range(lo, hi, 5);
-    let left = y_label_room(range, f);
+    let range = value_axis(chart, Some((lo, hi)), false);
+    let (title_left, title_bottom) = title_room(chart, f);
+    let left = title_left + y_label_room(range, f);
     let plot = Rect {
         x: left,
         y: f * 0.9,
         w: (w - left - f * 0.6).max(10.0),
-        h: (h - f * 2.7).max(10.0),
+        h: (h - f * 2.7 - title_bottom).max(10.0),
     };
     y_axis(svg, chart, plot, range, f);
     let band = plot.w / n as f64;
     let center = |i: usize| plot.x + (i as f64 + 0.5) * band;
     x_categories(svg, chart, plot, n, center, band, f);
-    let y = |v: f64| plot.y + plot.h - (v - range.0) / (range.1 - range.0) * plot.h;
+    let y = |v: f64| plot.y + plot.h - range.t(v) * plot.h;
+    let clip = open_clip(svg, chart, plot);
     for (i, c) in candles.iter().enumerate() {
         let Some([open, high, low, close]) = *c else { continue };
         let color = if close >= open { RISING } else { FALLING };
@@ -1371,6 +1799,9 @@ fn candle_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) 
             );
         }
     }
+    close_clip(svg, clip);
+    ref_lines(svg, chart, plot, range, false, f);
+    axis_titles(svg, chart, plot, 0.0, f);
 }
 
 // ---------------------------------------------------------------------------
@@ -1749,6 +2180,212 @@ mod tests {
                 assert!(!svg.contains("NaN"), "{kind}");
             }
         }
+    }
+
+    /// A chart with everything the axis charts can add: error bars, ends of
+    /// its own, titles, a reference line and point shapes.
+    fn decorated(kind: &str) -> ChartContent {
+        let mut c = ChartContent {
+            chart: kind.into(),
+            error_bars: "amounts".into(),
+            axis_min: Some(-5.0),
+            axis_max: Some(28.0),
+            x_title: "Quarter".into(),
+            y_title: "Sales <€>".into(),
+            ref_lines: vec![crate::model::RefLine {
+                value: 20.0,
+                label: "Target & goal".into(),
+            }],
+            show_values: true,
+            ..Default::default()
+        };
+        for (k, s) in c.series.iter_mut().enumerate() {
+            s.marker = MARKERS[k * 3 % MARKERS.len()].into();
+            s.low = vec![Some(1.0), None, Some(2.0), Some(0.5)];
+            s.high = vec![Some(2.0), None, Some(2.0), None];
+        }
+        c
+    }
+
+    #[test]
+    fn every_chart_type_renders_with_every_option() {
+        for (kind, _) in CHART_TYPES {
+            let svg = chart_svg(&decorated(kind), 800.0, 450.0, None);
+            assert!(svg.starts_with("<svg") && svg.ends_with("</svg>"), "{kind}");
+            assert_eq!(svg.matches("<svg").count(), svg.matches("</svg>").count(), "{kind}");
+            assert!(!svg.contains("NaN") && !svg.contains("inf"), "{kind}");
+            assert!(
+                !svg.contains("Sales <€>") && !svg.contains("Target & goal"),
+                "{kind}: titles and labels are escaped"
+            );
+        }
+    }
+
+    #[test]
+    fn error_bars_follow_their_mode() {
+        let at = |mode: &str, low: Option<f64>, high: Option<f64>| {
+            let mut c = decorated("column");
+            c.error_bars = mode.into();
+            c.series[0].low = vec![low];
+            c.series[0].high = vec![high];
+            error_span(&c, 0, 0, 10.0)
+        };
+        assert_eq!(at("pm", None, Some(2.0)), Some((8.0, 12.0)), "± an amount");
+        assert_eq!(at("pm", Some(-3.0), None), Some((7.0, 13.0)), "± from the other column");
+        assert_eq!(at("amounts", Some(1.0), Some(4.0)), Some((9.0, 14.0)), "below and above");
+        assert_eq!(at("amounts", None, Some(4.0)), Some((10.0, 14.0)), "one side only");
+        assert_eq!(at("range", Some(12.0), Some(7.0)), Some((7.0, 12.0)), "ends, in any order");
+        assert_eq!(at("range", Some(8.0), None), Some((8.0, 10.0)));
+        assert_eq!(at("", Some(1.0), Some(1.0)), None, "turned off");
+        assert_eq!(at("pm", None, None), None, "no numbers");
+        assert_eq!(at("pm", None, Some(0.0)), None, "nothing to draw");
+        assert_eq!(at("range", Some(f64::NAN), None), None);
+    }
+
+    #[test]
+    fn error_bars_are_drawn_where_they_belong() {
+        let count = |kind: &str| chart_svg(&decorated(kind), 800.0, 450.0, None).matches("cz-error").count();
+        // Three values of each of the two series have numbers.
+        for kind in ["column", "bar", "stacked-column", "stacked-bar", "line", "dot"] {
+            assert_eq!(count(kind), 6, "{kind}");
+        }
+        for kind in ["area", "stacked-area", "pie", "treemap", "scatter", "heatmap"] {
+            assert_eq!(count(kind), 0, "{kind}");
+        }
+        let mut c = decorated("column");
+        c.error_bars.clear();
+        assert_eq!(chart_svg(&c, 800.0, 450.0, None).matches("cz-error").count(), 0, "turned off");
+        // Built by series, a series' error bars come with it.
+        let steps = Some(SeriesSteps { effect: "fade-in", first: 1 });
+        let svg = chart_svg(&decorated("column"), 800.0, 450.0, steps);
+        let second = &svg[svg.find(r#"data-fragment-index="2""#).unwrap()..];
+        assert_eq!(second.matches("cz-error").count(), 3);
+    }
+
+    #[test]
+    fn the_value_axis_takes_the_ends_it_is_given() {
+        let mut c = ChartContent::default();
+        assert_eq!(
+            value_axis(&c, Some((3.0, 31.0)), true),
+            Axis::of(nice_scale(3.0, 31.0, 5)),
+            "from zero by default"
+        );
+        assert_eq!(value_axis(&c, Some((0.55, 0.92)), false), Axis::of(nice_range(0.55, 0.92, 5)));
+        c.axis_min = Some(0.55);
+        c.axis_max = Some(0.92);
+        let axis = value_axis(&c, Some((0.59, 0.9)), true);
+        assert_eq!((axis.lo, axis.hi), (0.55, 0.92));
+        let ticks: Vec<String> = axis.ticks().map(|v| fmt_tick(v, axis.step)).collect();
+        assert_eq!(ticks, ["0.6", "0.7", "0.8", "0.9"], "labels only where they fit");
+        c.axis_max = None;
+        let axis = value_axis(&c, Some((0.59, 0.9)), true);
+        assert_eq!((axis.lo, axis.hi), (0.55, 0.9), "the other end from the data");
+        c.axis_max = Some(0.1);
+        assert_eq!(
+            value_axis(&c, Some((0.0, 31.0)), true),
+            Axis::of(nice_scale(0.0, 31.0, 5)),
+            "ends without room are ignored"
+        );
+        let lines = ChartContent {
+            ref_lines: vec![crate::model::RefLine {
+                value: 50.0,
+                label: String::new(),
+            }],
+            ..Default::default()
+        };
+        assert!(value_axis(&lines, Some((0.0, 31.0)), true).hi >= 50.0, "reference lines stay in view");
+    }
+
+    #[test]
+    fn axis_labels_have_the_decimals_their_step_needs() {
+        assert_eq!(fmt_tick(0.6000000000000001, 0.1), "0.6");
+        assert_eq!(fmt_tick(0.55, 0.05), "0.55");
+        assert_eq!(fmt_tick(7.5, 2.5), "7.5");
+        assert_eq!(fmt_tick(5.0, 2.5), "5");
+        assert_eq!(fmt_tick(0.005, 0.005), "0.005");
+        assert_eq!(fmt_tick(-0.0000001, 0.2), "0");
+        assert_eq!(fmt_tick(250_000.0, 50_000.0), "250k");
+    }
+
+    #[test]
+    fn ends_of_its_own_clip_the_plot() {
+        let mut c = ChartContent::default();
+        assert_eq!(chart_svg(&c, 800.0, 450.0, None).matches("<svg").count(), 1);
+        c.axis_max = Some(10.0);
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert_eq!(svg.matches("<svg").count(), 2, "the plot is a viewport");
+        assert!(svg.contains("overflow:hidden"));
+    }
+
+    #[test]
+    fn reference_lines_titles_and_shapes() {
+        let mut c = decorated("dot");
+        c.ref_lines.push(crate::model::RefLine {
+            value: 99.0,
+            label: "Out of view".into(),
+        });
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert_eq!(svg.matches("cz-ref").count(), 1, "only lines inside the axis");
+        assert!(svg.contains("Target &amp; goal") && !svg.contains("Out of view"));
+        assert_eq!(svg.matches("cz-axis-title").count(), 2);
+        assert!(svg.contains("rotate(-90"), "the vertical title is turned");
+        // circle, then square-open: four points each, and one in the legend.
+        assert_eq!(svg.matches("<circle").count(), 5);
+        assert_eq!(svg.matches(r#"fill="none" style="stroke"#).count(), 5, "open squares are outlined");
+        // Horizontal bars get a vertical reference line, labeled at the top.
+        let bar = chart_svg(&decorated("bar"), 800.0, 450.0, None);
+        let line = &bar[bar.find("cz-ref").unwrap()..];
+        let x = |name: &str| {
+            line[line.find(&format!("{name}=\"")).unwrap() + name.len() + 2..]
+                .split('"')
+                .next()
+                .unwrap()
+                .to_string()
+        };
+        assert_eq!(x("x1"), x("x2"));
+    }
+
+    #[test]
+    fn long_labels_wrap_between_words() {
+        assert_eq!(
+            wrap_label("regressão com perda de decisão (r9decx)", 18, 3),
+            ["regressão com", "perda de decisão", "(r9decx)"]
+        );
+        assert_eq!(
+            wrap_label("one two three four five", 9, 2),
+            ["one two", "three fo…"],
+            "the rest ends in an ellipsis"
+        );
+        assert_eq!(wrap_label("Supercalifragilistic", 8, 2), ["Superca…"]);
+        assert_eq!(wrap_label("", 8, 2), [""]);
+        // Horizontal bars give long names more lines instead of cutting them off.
+        let c = ChartContent {
+            chart: "bar".into(),
+            labels: vec!["regra com detecção perfeita, confirmação".into(), "r9decx".into()],
+            series: vec![series(&[5.0, 3.6])],
+            ..Default::default()
+        };
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert!(svg.contains("<tspan") && svg.contains("confirmação</tspan>"), "{svg}");
+    }
+
+    #[test]
+    fn a_dot_plot_keeps_its_series_apart_and_off_zero() {
+        let c = ChartContent {
+            chart: "dot".into(),
+            labels: vec!["a".into(), "b".into()],
+            series: vec![series(&[0.85, 0.71]), series(&[0.85, 0.73])],
+            show_legend: false,
+            ..Default::default()
+        };
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        let xs: Vec<f64> = svg
+            .match_indices("<circle cx=\"")
+            .map(|(i, _)| svg[i + 12..].split('"').next().unwrap().parse().unwrap())
+            .collect();
+        assert_eq!(xs.len(), 4);
+        assert!(xs[0] < xs[2] && xs[1] < xs[3], "the second series sits right of the first");
+        assert!(!svg.contains(">0</text>"), "the axis follows the data, not zero");
     }
 
     fn series(values: &[f64]) -> crate::model::Series {

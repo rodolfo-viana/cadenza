@@ -2,7 +2,7 @@
 
 import { html, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, set, useStore, settings, updateSettings, undo, redo, play, updateDeck, deckTitle } from './store.js';
+import { state, set, useStore, settings, updateSettings, undo, redo, play, updateDeck, deckTitle, openModal } from './store.js';
 import { ToolButton, showMenuAt } from './ui.js';
 import { item, COMMANDS } from './commands.js';
 import * as A from './actions.js';
@@ -91,7 +91,11 @@ function textMenu() {
 }
 
 function chartMenu() {
-  return state.info.charts.map((c) => ({ label: t(c.name), icon: CHART_ICONS[c.id], run: () => A.insert('chart', c.id, { content: chartSample(c.id) }) }));
+  return [
+    { label: t('From Data…'), icon: 'sheet', run: () => openModal('chartData') },
+    '-',
+    ...state.info.charts.map((c) => ({ label: t(c.name), icon: CHART_ICONS[c.id], run: () => A.insert('chart', c.id, { content: chartSample(c.id) }) })),
+  ];
 }
 
 function zoomMenu() {

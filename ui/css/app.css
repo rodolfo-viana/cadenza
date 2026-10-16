@@ -614,6 +614,36 @@ body.dragging .uguide { pointer-events: none; }
 .cell-x:hover, .cell-add:hover { color: var(--text); }
 th .cell-x { position: absolute; inset-inline-end: 0; top: 0; }
 .cell-add.wide { width: 100%; text-align: start; padding: 0 8px; height: 30px; }
+.datagrid .err-head { padding: 0 6px; font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.datagrid .cell.err { min-width: 48px; color: var(--text-2); }
+.series-style { display: flex; flex-direction: column; gap: 6px; }
+.chart-axes { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.ref-line { display: flex; align-items: center; gap: 6px; }
+.ref-line .numfield { flex: none; width: 82px; }
+.ref-line .textfield { flex: 1; min-width: 0; }
+
+/* Chart from Data */
+.dc-modal { height: min(780px, calc(100vh - 60px)); }
+.dc-modal .modal-body { padding: 0; flex: 1; min-height: 0; display: flex; }
+.dc { display: flex; flex: 1; min-height: 0; }
+.dc-input { width: 380px; flex: none; display: flex; flex-direction: column; gap: 10px; padding: 6px 16px 16px 20px; overflow-y: auto; border-inline-end: 1px solid var(--border); }
+.dc-bar { display: flex; align-items: center; gap: 10px; }
+.dc-bar .ihint { flex: 1; }
+.dc-text { min-height: 190px; height: 190px; padding: 8px 10px; resize: vertical; font-size: 12px; line-height: 1.45; white-space: pre; overflow: auto; tab-size: 12; }
+.dc-switches { display: flex; flex-direction: column; gap: 8px; }
+.dc-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.dc-col { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); }
+.dc-col.off { opacity: 0.6; }
+.dc-col-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dc-gallery { flex: 1; min-width: 0; overflow-y: auto; padding: 6px 20px 20px 16px; background: var(--canvas); }
+.dc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.dc-card { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; text-align: start; }
+.dc-card:hover, .dc-card:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+/* Drawn on the slide's background, in its colors and fonts. */
+.dc-preview { width: 100%; border-radius: 6px; overflow: hidden; background: var(--r-background-color, #fff); color: var(--r-main-color, #222); font-family: var(--r-main-font, sans-serif); }
+.dc-preview svg { display: block; width: 100%; height: 100%; }
+.dc-name { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+.dc-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); text-align: center; padding: 30px; }
 
 .build-list { display: flex; flex-direction: column; gap: 4px; }
 .build-item {

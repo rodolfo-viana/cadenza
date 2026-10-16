@@ -151,6 +151,22 @@ async fn map_regions(map: String, language: String, labels: Vec<String>) -> maps
     maps::regions(&map, &language, &labels)
 }
 
+/// A file of data for Chart from Data, as text.
+#[tauri::command]
+async fn read_data_file(path: String) -> CmdResult<String> {
+    let meta = std::fs::metadata(&path).map_err(err)?;
+    if meta.len() > 20 * 1024 * 1024 {
+        return Err("The file is too large to chart (over 20 MB).".into());
+    }
+    Ok(util::decode_text(&std::fs::read(&path).map_err(err)?))
+}
+
+/// Charts drawn `width` × `height` for the chart gallery (Chart from Data).
+#[tauri::command]
+async fn chart_previews(charts: Vec<model::ChartContent>, width: f64, height: f64) -> Vec<String> {
+    charts.iter().map(|c| chart::chart_svg(c, width, height, None)).collect()
+}
+
 #[tauri::command]
 fn settings_update(app: AppHandle, state: State<AppState>, patch: Value) -> CmdResult<Settings> {
     let updated = {
@@ -1572,6 +1588,8 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             app_info,
             map_countries,
             map_regions,
+            chart_previews,
+            read_data_file,
             settings_update,
             recent_list,
             recent_remove,

@@ -2,7 +2,7 @@
 
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo, fitsText } from './store.js';
+import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo, fitsText, openModal } from './store.js';
 import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField, Cell } from './controls.js';
 import * as A from './actions.js';
 import { exec, setLink, isEditing, beginTextEdit, beginTableEdit, insertInlineMath, textSelected, styleSelection, selectionStyle, selectionFontSize } from './textedit.js';
@@ -13,7 +13,7 @@ import { Button } from './ui.js';
 import { renderDiagram, svgAspect, DIAGRAM_TEMPLATES } from './diagrams.js';
 import { opener, invoke } from './api.js';
 import { t, N_, language } from './i18n.js';
-import { CHART_ICONS, MAP_AREAS, chartKind, isSample, linkChart, oneSeries, switchChart } from './charts.js';
+import { CHART_ICONS, MAP_AREAS, MARKERS, ERROR_MODES, chartKind, errorColumns, hasAxes, hasErrorBars, hasMarkers, isSample, linkChart, oneSeries, switchChart } from './charts.js';
 
 const ids = (els) => els.map((e) => e.id).join(',');
 
@@ -728,10 +728,40 @@ export function ChartPanel({ els }) {
     set_({ series }, 'data', true);
   };
   const setLabel = (i, v) => set_({ labels: ch.labels.map((l, j) => (j === i ? v : l)) }, 'labels', true);
+  // Error bars: one number (or none) per value, kept beside the values.
+  const padded = (list = []) => Array.from({ length: n }, (_, j) => list[j] ?? null);
+  const setErr = (k, i, key, v) => {
+    const series = ch.series.map((x, j) => (j === k ? { ...x, [key]: padded(x[key]).map((e, r) => (r === i ? v : e)) } : x));
+    set_({ series }, 'data', true);
+  };
   const addRow = () =>
-    set_({ labels: [...ch.labels, t('Item {n}', { n: n + 1 })], series: ch.series.map((s) => ({ ...s, values: [...s.values.slice(0, n), 0] })) }, 'rows');
-  const delRow = (i) => set_({ labels: ch.labels.filter((_, j) => j !== i), series: ch.series.map((s) => ({ ...s, values: s.values.filter((_, j) => j !== i) })) }, 'rows');
-  const addSeries = () => set_({ series: [...ch.series, { name: t('Series {n}', { n: ch.series.length + 1 }), values: ch.labels.map(() => 0), color: '' }] }, 'series');
+    set_(
+      {
+        labels: [...ch.labels, t('Item {n}', { n: n + 1 })],
+        series: ch.series.map((s) => ({
+          ...s,
+          values: [...s.values.slice(0, n), 0],
+          low: s.low?.length ? [...padded(s.low), null] : [],
+          high: s.high?.length ? [...padded(s.high), null] : [],
+        })),
+      },
+      'rows',
+    );
+  const delRow = (i) =>
+    set_(
+      {
+        labels: ch.labels.filter((_, j) => j !== i),
+        series: ch.series.map((s) => ({
+          ...s,
+          values: s.values.filter((_, j) => j !== i),
+          low: (s.low || []).filter((_, j) => j !== i),
+          high: (s.high || []).filter((_, j) => j !== i),
+        })),
+      },
+      'rows',
+    );
+  const addSeries = () =>
+    set_({ series: [...ch.series, { name: t('Series {n}', { n: ch.series.length + 1 }), values: ch.labels.map(() => 0), color: '', marker: '', low: [], high: [] }] }, 'series');
   const delSeries = (k) => set_({ series: ch.series.filter((_, j) => j !== k) }, 'series');
   const shownSeries = one ? ch.series.slice(0, 1) : ch.series;
   const linked = linkChart(kind);
@@ -755,7 +785,16 @@ export function ChartPanel({ els }) {
     network: t('One row per connection between two nodes. The value sets the line width.'),
     map: t('One row per region: its name or code, and its value. Regions without a row stay gray.'),
   }[kind];
-  const grid = ['column', 'stacked-column', 'bar', 'stacked-bar', 'line', 'area', 'stacked-area', 'streamgraph', 'scatter', 'candlestick'].includes(kind);
+  const grid = ['column', 'stacked-column', 'bar', 'stacked-bar', 'line', 'dot', 'area', 'stacked-area', 'streamgraph', 'scatter', 'candlestick'].includes(kind);
+  const errorsOn = hasErrorBars(kind) && !!ch.errorBars;
+  const errCols = errorsOn ? errorColumns(ch.errorBars) : [];
+  const markers = hasMarkers(kind);
+  const axes = hasAxes(kind);
+  const refLines = ch.refLines || [];
+  const setRef = (i, patch, live) => set_({ refLines: refLines.map((l, j) => (j === i ? { ...l, ...patch } : l)) }, 'ref', live);
+  const addRef = () => set_({ refLines: [...refLines, { value: typicalValue(ch), label: '' }] }, 'ref');
+  const delRef = (i) => set_({ refLines: refLines.filter((_, j) => j !== i) }, 'ref');
+  const step = axisStep(ch);
   return html`<${Section} title=${t('Chart')} id="chart">
     <div class="chart-types">
       ${state.info.charts.map(
@@ -764,6 +803,15 @@ export function ChartPanel({ els }) {
           <span>${t(c.name)}</span>
         </button>`,
       )}
+    </div>
+    <div class="row-inline">
+      <${Button}
+        size="sm"
+        icon="sheet"
+        label=${t('Edit as CSV…')}
+        title=${t('Paste or open data in CSV form and pick the chart to make from it.')}
+        onClick=${() => openModal('chartData', { target: el.id })}
+      />
     </div>
     ${isMap &&
     html`<${Row} label=${t('Map')}>
@@ -819,6 +867,10 @@ export function ChartPanel({ els }) {
       </table>
       <button class="cell-add wide" onClick=${addLink}>${t('+ Add row')}</button>
     </div>`}
+    ${hasErrorBars(kind) &&
+    html`<${Row} label=${t('Error bars')}>
+      <${Select} value=${ch.errorBars || ''} options=${ERROR_MODES.map(([value, label]) => ({ value, label: t(label) }))} onChange=${(v) => set_({ errorBars: v }, 'errors')} />
+    <//>`}
     ${!linked &&
     html`<div class="datagrid" ref=${ref}>
       <table>
@@ -829,7 +881,8 @@ export function ChartPanel({ els }) {
               (s, k) => html`<th>
                 <${Cell} class="cell head" value=${s.name} onChange=${(v) => set_({ series: ch.series.map((x, j) => (j === k ? { ...x, name: v } : x)) }, 'sname')} />
                 ${!fixed && ch.series.length > 1 && html`<button class="cell-x" title=${t('Remove series')} onClick=${() => delSeries(k)}>×</button>`}
-              </th>`,
+              </th>
+              ${errCols.map(([, head]) => html`<th class="err-head" title=${t('Error bars of {name}', { name: s.name })}>${t(head)}</th>`)}`,
             )}
             ${!fixed && html`<th><button class="cell-add" title=${t('Add series')} onClick=${addSeries}>+</button></th>`}
           </tr>
@@ -840,8 +893,13 @@ export function ChartPanel({ els }) {
               <td><${Cell} class="cell label" list=${isMap ? 'cz-map-regions' : undefined} value=${l} onChange=${(v) => setLabel(i, v)} /></td>
               ${shownSeries.map(
                 (s, k) => html`<td>
-                  <${Cell} class="cell num" number value=${s.values[i] ?? 0} onChange=${(v) => setCell(k, i, v)} />
-                </td>`,
+                    <${Cell} class="cell num" number value=${s.values[i] ?? 0} onChange=${(v) => setCell(k, i, v)} />
+                  </td>
+                  ${errCols.map(
+                    ([key]) => html`<td>
+                      <${Cell} class="cell num err" number nullable value=${s[key]?.[i] ?? null} onChange=${(v) => setErr(k, i, key, v)} />
+                    </td>`,
+                  )}`,
               )}
               <td><button class="cell-x" title=${t('Remove row')} onClick=${() => delRow(i)}>×</button></td>
             </tr>`,
@@ -854,11 +912,20 @@ export function ChartPanel({ els }) {
     html`<div class="series-colors">
       ${colored.map(
         ({ s, k }) => html`<${Row} label=${s.name}>
-          <${ColorField}
-            value=${s.color}
-            noneLabel=${t('Theme color {n}', { n: (k % 6) + 1 })}
-            onChange=${(v, live) => set_({ series: ch.series.map((x, j) => (j === k ? { ...x, color: v } : x)) }, 'scolor', live)}
-          />
+          <div class=${cls('series-style', markers && 'with-marker')}>
+            <${ColorField}
+              value=${s.color}
+              noneLabel=${t('Theme color {n}', { n: (k % 6) + 1 })}
+              onChange=${(v, live) => set_({ series: ch.series.map((x, j) => (j === k ? { ...x, color: v } : x)) }, 'scolor', live)}
+            />
+            ${markers &&
+            html`<${Select}
+              title=${t('Point shape')}
+              value=${s.marker || ''}
+              options=${MARKERS.map(([value, label]) => ({ value, label: t(label) }))}
+              onChange=${(v) => set_({ series: ch.series.map((x, j) => (j === k ? { ...x, marker: v } : x)) }, 'marker')}
+            />`}
+          </div>
         <//>`,
       )}
     </div>`}
@@ -871,7 +938,44 @@ export function ChartPanel({ els }) {
     ${grid && html`<${Row}><${Toggle} value=${ch.showGrid} label=${t('Grid lines')} onChange=${(v) => set_({ showGrid: v }, 'grid')} /><//>`}
     <${Row} label=${t('Text size')}><${NumberField} value=${ch.fontSize} min=${6} max=${96} unit="px" onChange=${(v, live) => set_({ fontSize: v }, 'fs', live)} /><//>
     <${Row} label=${t('Text color')}><${ColorField} value=${ch.color} noneLabel=${t('Theme text color')} onChange=${(v, live) => set_({ color: v }, 'color', live)} /><//>
+    ${axes &&
+    html`<div class="chart-axes">
+      <${Row} label=${kind === 'bar' || kind === 'stacked-bar' ? t('X axis') : t('Y axis')} hint=${t('Leave empty to follow the data.')}>
+        <div class="row-inline">
+          <${NumberField} label=${t('axis minimum::Min')} nullable placeholder=${t('Auto')} value=${ch.axisMin ?? null} step=${step} precision=${6} onChange=${(v, live) => set_({ axisMin: v }, 'amin', live)} />
+          <${NumberField} label=${t('axis maximum::Max')} nullable placeholder=${t('Auto')} value=${ch.axisMax ?? null} step=${step} precision=${6} onChange=${(v, live) => set_({ axisMax: v }, 'amax', live)} />
+        </div>
+      <//>
+      <${Row} label=${t('X-axis title')}><${TextField} value=${ch.xTitle || ''} onChange=${(v) => set_({ xTitle: v }, 'xt')} /><//>
+      <${Row} label=${t('Y-axis title')}><${TextField} value=${ch.yTitle || ''} onChange=${(v) => set_({ yTitle: v }, 'yt')} /><//>
+      ${refLines.length > 0 && html`<label class="field-label">${t('Reference lines')}</label>`}
+      ${refLines.map(
+        (l, i) => html`<div class="ref-line">
+          <${NumberField} value=${l.value} step=${step} precision=${6} title=${t('Value')} onChange=${(v, live) => setRef(i, { value: v }, live)} />
+          <${TextField} value=${l.label} placeholder=${t('Label')} onChange=${(v) => setRef(i, { label: v })} />
+          <${Button} icon="x" size="sm" variant="ghost" title=${t('Remove line')} onClick=${() => delRef(i)} />
+        </div>`,
+      )}
+      <div class="row-inline">
+        <${Button} size="sm" icon="plus" label=${t('Add Reference Line')} title=${t('A dashed line across the chart at a value, such as a target.')} onClick=${addRef} />
+      </div>
+    </div>`}
   <//>`;
+}
+
+/** Arrow keys and scrubbing in a chart's value fields move by about a tenth of its data's spread. */
+function axisStep(c) {
+  const values = c.series.flatMap((s) => s.values).filter(Number.isFinite);
+  const spread = values.length ? Math.max(...values) - Math.min(...values) : 0;
+  return spread > 0 ? 10 ** Math.floor(Math.log10(spread / 10)) : 1;
+}
+
+/** Where a new reference line starts: the average of the data, rounded to its step. */
+function typicalValue(c) {
+  const values = c.series.flatMap((s) => s.values).filter(Number.isFinite);
+  if (!values.length) return 0;
+  const step = axisStep(c);
+  return Number((Math.round(values.reduce((a, b) => a + b, 0) / values.length / step) * step).toFixed(10));
 }
 
 // ---------------------------------------------------------------------------

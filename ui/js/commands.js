@@ -65,6 +65,7 @@ export const COMMANDS = [
   { id: 'insert.web', group: N_('Insert'), label: N_('Web Page…'), icon: 'globe', when: hasDoc, run: A.insertWebPage },
   { id: 'insert.table', group: N_('Insert'), label: N_('Table'), icon: 'table', when: hasDoc, run: () => A.insert('table') },
   { id: 'insert.chart', group: N_('Insert'), label: N_('Chart'), icon: 'chart-column', when: hasDoc, run: () => A.insert('chart', 'column') },
+  { id: 'insert.chartData', group: N_('Insert'), label: N_('Chart from Data…'), icon: 'sheet', when: hasDoc, run: () => S.openModal('chartData') },
   { id: 'insert.code', group: N_('Insert'), label: N_('Code Block'), icon: 'code', when: hasDoc, run: () => A.insert('code') },
   { id: 'insert.math', group: N_('Insert'), label: N_('Equation (LaTeX)'), icon: 'sigma', when: hasDoc, run: () => A.insert('math') },
   { id: 'insert.diagram', group: N_('Insert'), label: N_('Diagram (Mermaid)'), icon: 'workflow', when: hasDoc, run: () => A.insert('diagram') },

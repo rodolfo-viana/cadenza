@@ -947,6 +947,19 @@ pub struct ChartContent {
     /// Map charts: "world", a continent ("europe") or a country's code
     /// ("BRA") for its states or provinces (see maps.rs).
     pub map: String,
+    /// Error bars of column, bar, line and dot charts: "" (none), "pm" (±
+    /// an amount), "amounts" (how far below and above the value they reach)
+    /// or "range" (where they end). The numbers are each series' `low` and
+    /// `high` ("pm" reads `high`).
+    pub error_bars: String,
+    /// Ends of the value axis; `None` = from the data.
+    pub axis_min: Option<f64>,
+    pub axis_max: Option<f64>,
+    /// Titles of the horizontal and the vertical axis.
+    pub x_title: String,
+    pub y_title: String,
+    /// Dashed lines across the plot at values of the value axis.
+    pub ref_lines: Vec<RefLine>,
 }
 
 impl Default for ChartContent {
@@ -958,12 +971,12 @@ impl Default for ChartContent {
                 Series {
                     name: "2025".into(),
                     values: vec![12.0, 19.0, 15.0, 24.0],
-                    color: String::new(),
+                    ..Default::default()
                 },
                 Series {
                     name: "2026".into(),
                     values: vec![16.0, 22.0, 21.0, 31.0],
-                    color: String::new(),
+                    ..Default::default()
                 },
             ],
             show_legend: true,
@@ -975,8 +988,22 @@ impl Default for ChartContent {
             scale_color: String::new(),
             links: Vec::new(),
             map: String::new(),
+            error_bars: String::new(),
+            axis_min: None,
+            axis_max: None,
+            x_title: String::new(),
+            y_title: String::new(),
+            ref_lines: Vec::new(),
         }
     }
+}
+
+/// A reference line of a chart, such as a target or a threshold.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct RefLine {
+    pub value: f64,
+    pub label: String,
 }
 
 /// A Mermaid diagram. The editor renders the source to SVG (light and dark
@@ -1024,6 +1051,13 @@ pub struct Series {
     pub values: Vec<f64>,
     /// Empty = from the palette.
     pub color: String,
+    /// Shape of the points of lines, dot plots and scatterplots (one of
+    /// `chart::MARKERS`; empty = a dot).
+    pub marker: String,
+    /// Error bars, one entry per value (null: none), read as
+    /// `ChartContent::error_bars` says.
+    pub low: Vec<Option<f64>>,
+    pub high: Vec<Option<f64>>,
 }
 
 #[cfg(test)]

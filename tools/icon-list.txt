@@ -185,3 +185,5 @@ chart-candlestick
 split
 chart-network
 earth
+grip
+sheet

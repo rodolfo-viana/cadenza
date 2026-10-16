@@ -659,6 +659,120 @@ test('changing the chart type keeps the colors picked for series', async () => {
   assert.deepEqual(colors(), ['#ef4444', '']);
 });
 
+const chartdata = () => standalone('chartdata.js', { 'i18n.js': { t: (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => v[k]), N_: (s) => s } });
+const plainJson = (v) => JSON.parse(JSON.stringify(v));
+// Arrays made inside the module's context: compared by their contents.
+const eq = (actual, expected, message) => assert.deepEqual(plainJson(actual), plainJson(expected), message);
+const KINDS = ['column', 'stacked-column', 'bar', 'stacked-bar', 'line', 'dot', 'area', 'stacked-area', 'streamgraph', 'pie', 'donut', 'treemap', 'parliament', 'scatter', 'heatmap', 'candlestick', 'sankey', 'network', 'map'];
+
+test('data in CSV form is read with its quotes, braces, separators and decimal commas', async () => {
+  const D = await chartdata();
+  eq((D.parseRows('a,"b, c","say ""hi"""\n\n1,2,3\r\n')), [['a', 'b, c', 'say "hi"'], ['1', '2', '3']]);
+  // pgfplots tables: braces keep commas, LaTeX commands become text.
+  eq((D.parseRows('label,gain\n{regressão, banco (r5x)},3.04\n{\\emph{plug-in} (q9x)},0.85')), [
+    ['label', 'gain'], ['regressão, banco (r5x)', '3.04'], ['plug-in (q9x)', '0.85'],
+  ]);
+  assert.equal(D.delimiterOf('a;b;c\n1,5;2,5;3'), ';');
+  assert.equal(D.delimiterOf('a\tb, c\n1\t2'), '\t', 'cells copied from a spreadsheet');
+  const n = (s, d = ',') => D.parseNumber(s, d);
+  assert.equal(n('0,8549', ';'), 0.8549, 'decimal comma');
+  assert.equal(n('1.234,5', ';'), 1234.5);
+  assert.equal(n('1,234.5'), 1234.5);
+  assert.equal(n('1,234'), 1234, 'thousands, when commas separate cells');
+  assert.equal(n('−3'), -3);
+  assert.equal(n('R$ 12'), 12);
+  assert.equal(n('45%'), 45);
+  assert.equal(n(''), null);
+  assert.equal(n('n/a'), null);
+  assert.ok(Number.isNaN(n('Q1')) && Number.isNaN(n('1,2,3')));
+  const table = D.readTable('Ano;Vendas\n2024;1,5\n2025;2,25');
+  assert.ok(table.header);
+  eq((table.columns.map((c) => c.numbers)), [[2024, 2025], [1.5, 2.25]]);
+  assert.equal(D.readTable('1,2\n3,4').header, false, 'numbers only: no names');
+  assert.equal(D.readTable('\t2025\t2026\nQ1\t1\t2').header, true, 'an empty corner names the columns');
+  eq((D.readTable('a,b\n1,2', { transpose: true }).columns.map((c) => c.cells)), [['a', 'b'], ['1', '2']], 'swapped: a column of names, one of numbers');
+});
+
+test('the columns of real data get their roles and make the charts they can', async () => {
+  const D = await chartdata();
+  // Error bars as amounts below and above, three series, an index column.
+  const groups = D.readTable(`idx,group,r9decx,r9decxminus,r9decxplus,meta,metaminus,metaplus,uniform,uniformminus,uniformplus
+0.0000,{completo},0.0628,0.2085,0.1691,0.5286,0.5365,0.6413,-0.7036,0.2896,0.2679
+1.0000,{ausências},0.0852,0.1844,0.1736,0.5821,0.3277,0.4347,-0.6199,0.2623,0.2557
+2.0000,{local uniforme},0.0483,0.2108,0.1706,0.5264,0.5335,0.6406,-0.6996,0.2964,0.2724`);
+  const roles = D.guessRoles(groups);
+  eq(roles, ['ignore', 'label', 'value', 'minus', 'plus', 'value', 'minus', 'plus', 'value', 'minus', 'plus']);
+  const data = D.chartData(groups, roles);
+  assert.equal(data.errorBars, 'amounts');
+  eq(data.labels, ['completo', 'ausências', 'local uniforme']);
+  eq(data.series.map((s) => s.name), ['r9decx', 'meta', 'uniform']);
+  eq(data.series[2].low, [0.2896, 0.2623, 0.2964]);
+  const kinds = D.chartChoices(groups, roles, KINDS).map((c) => c.kind);
+  assert.ok(['column', 'bar', 'stacked-column', 'dot', 'line', 'heatmap', 'scatter'].every((k) => kinds.includes(k)), kinds.join());
+  assert.ok(!kinds.includes('pie') && !kinds.includes('treemap'), 'negative values');
+
+  // One column of values, errors named alone, rows sorted into groups.
+  const gain = D.readTable(`idx,label,kind,gain,minus,plus
+0.0000,{1ª rodada},{fusao},1.4397,0.3262,0.3587
+1.0000,{plug-in (q9x)},{fusao},0.8504,0.3562,0.3849
+2.0000,{r9decx},{escolhida},3.8060,0.4536,0.4764
+3.0000,{regra},{regra},5.7045,0.6967,0.6736`);
+  const gainRoles = D.guessRoles(gain);
+  eq(gainRoles, ['ignore', 'label', 'group', 'value', 'minus', 'plus']);
+  const split = D.chartData(gain, gainRoles);
+  eq(split.series.map((s) => s.name), ['fusao', 'escolhida', 'regra']);
+  eq(split.series[1].values, [0, 0, 3.806, 0]);
+  eq(split.series[1].high, [null, null, 0.4764, null]);
+  const choices = D.chartChoices(gain, gainRoles, KINDS);
+  assert.ok(choices.some((c) => c.kind === 'stacked-bar'), 'one bar per row, colored by group');
+  assert.ok(choices.some((c) => c.kind === 'sankey'), 'labels flow into their groups');
+
+  // A column with one value throughout says nothing; the other names the rows.
+  const family = D.readTable('modality,family,joint,r9decx,rule\n{T1ce},{ruído},0.8549,0.8536,0.7656\n{T1ce},{ganho},0.7075,0.7336,0.7857');
+  eq(D.guessRoles(family), ['ignore', 'label', 'value', 'value', 'value']);
+
+  // Lower and upper ends, and ± given beside them, become ends.
+  const ends = D.readTable('x,mean,mean lower,mean upper,other,other sd\na,10,8,13,5,1\nb,20,15,22,6,2');
+  const endRoles = D.guessRoles(ends);
+  eq(endRoles, ['label', 'value', 'low', 'high', 'value', 'pm']);
+  const both = D.chartData(ends, endRoles);
+  assert.equal(both.errorBars, 'range');
+  eq([both.series[1].low, both.series[1].high], [[4, 4], [6, 8]]);
+
+  // Errors named in other languages.
+  const pt = D.readTable('Ano;Preço médio;Desvio padrão\n2022;10,5;1,2\n2023;12,25;0,8');
+  eq(D.guessRoles(pt), ['label', 'value', 'pm']);
+
+  // Candlesticks need high and low around opening and closing.
+  const ohlc = D.readTable('day,open,high,low,close\n1,10,12,9,11\n2,11,13,10,12\n3,12,12.5,10,10.5');
+  assert.ok(D.chartChoices(ohlc, D.guessRoles(ohlc), KINDS).some((c) => c.kind === 'candlestick'));
+  // A scatterplot of numbers only: the first column is X.
+  const xy = D.readTable('x,y\n1,2\n2,4\n3,5');
+  const scatter = D.chartChoices(xy, D.guessRoles(xy), KINDS).find((c) => c.kind === 'scatter');
+  eq((scatter.content.series.map((s) => s.values)), [[1, 2, 3], [2, 4, 5]]);
+  // Pies and parliaments take one series of positive values.
+  const seats = D.readTable('party,seats\nA,120\nB,95\nC,60');
+  const seatKinds = D.chartChoices(seats, D.guessRoles(seats), KINDS).map((c) => c.kind);
+  assert.ok(['pie', 'donut', 'parliament', 'treemap'].every((k) => seatKinds.includes(k)), seatKinds.join());
+});
+
+test('a chart written as CSV reads back the same', async () => {
+  const D = await chartdata();
+  for (const errorBars of ['', 'pm', 'amounts', 'range']) {
+    const chart = {
+      chart: 'column', errorBars, labels: ['Q1', 'Q2, late'],
+      series: [{ name: '2025', values: [12, 19.5], low: [1, null], high: [2, 3] }, { name: 'B "x"', values: [-1, 0], low: [0.5, 0.5], high: [0.5, 1] }],
+    };
+    const table = D.readTable(D.toCsv(chart));
+    const data = D.chartData(table, D.guessRoles(table));
+    eq(data.labels, chart.labels, errorBars);
+    eq(data.series.map((s) => [s.name, s.values]), chart.series.map((s) => [s.name, s.values]), errorBars);
+    assert.equal(data.errorBars, errorBars);
+    if (errorBars === 'pm') eq(data.series[0].high, [2, 3]);
+    else if (errorBars) eq([data.series[0].low, data.series[1].high], [[1, null], [0.5, 1]], errorBars);
+  }
+});
+
 /**
  * controls.js with just enough of Preact's hooks to render a control again
  * and call its handlers. `field` stands for the control's <input>.

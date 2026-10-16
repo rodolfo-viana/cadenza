@@ -57,8 +57,11 @@ function useFlushWhenFocused(field, flush) {
   useEffect(() => registerFlush(() => (field.current && document.activeElement === field.current ? latest.current(field.current.value) : undefined)), []);
 }
 
-/** Number input; drag its label horizontally to scrub the value. */
-export function NumberField({ value, onChange, min = -100000, max = 100000, step = 1, unit, label, title, width, disabled, precision }) {
+/**
+ * Number input; drag its label horizontally to scrub the value. A
+ * `nullable` field can be emptied (`null`), showing its `placeholder`.
+ */
+export function NumberField({ value, onChange, min = -100000, max = 100000, step = 1, unit, label, title, width, disabled, precision, nullable, placeholder }) {
   const field = useRef(null);
   const [text, setText] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
@@ -78,6 +81,7 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
   }
 
   const commit = (v, live = false) => {
+    if (nullable && String(v ?? '').trim() === '') return value === null || value === undefined ? undefined : onChange(null, live);
     if (v === '' || v === null || Number.isNaN(Number(v))) return;
     const n = clamp(Number(v), min, max);
     if (n !== value) return onChange(n, live);
@@ -116,6 +120,7 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
       type="text"
       inputmode="decimal"
       value=${text}
+      placeholder=${placeholder}
       disabled=${disabled}
       onMouseDown=${(e) => {
         clicked.current = document.activeElement !== e.target;
@@ -274,16 +279,18 @@ export function TextField({ value, onChange, placeholder, multiline, rows = 4, m
  * it) and when Save or Close run while it is being typed in; while it has
  * the focus, other updates leave what is typed alone.
  */
-export function Cell({ value, onChange, number, class: klass, list }) {
+/** A cell of a data grid; a `nullable` number cell can be left empty (`null`). */
+export function Cell({ value, onChange, number, nullable, class: klass, list }) {
   const field = useRef(null);
-  const [text, setText] = useState(String(value));
+  const shown = (v) => (v === null || v === undefined ? '' : String(v));
+  const [text, setText] = useState(shown(value));
   const [focused, setFocused] = useState(false);
   useEffect(() => {
-    if (!focused) setText(String(value));
+    if (!focused) setText(shown(value));
   }, [value, focused]);
   const commit = (v) => {
-    const next = number ? Number(v) || 0 : v;
-    if (next !== value) return onChange(next);
+    const next = number ? (nullable && String(v).trim() === '' ? null : Number(v) || 0) : v;
+    if (next !== (value ?? null)) return onChange(next);
   };
   useFlushWhenFocused(field, commit);
   return html`<input

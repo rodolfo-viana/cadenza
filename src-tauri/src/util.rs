@@ -226,6 +226,39 @@ pub fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// Text from a file of unknown encoding: UTF-8 or UTF-16 with a byte order
+/// mark, UTF-8 without one, and else Windows-1252 (what spreadsheets on
+/// Windows export).
+pub fn decode_text(bytes: &[u8]) -> String {
+    let utf16 = |rest: &[u8], le: bool| {
+        let units: Vec<u16> = rest
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&c| if le { u16::from_le_bytes(c) } else { u16::from_be_bytes(c) })
+            .collect();
+        String::from_utf16_lossy(&units)
+    };
+    match bytes {
+        [0xEF, 0xBB, 0xBF, rest @ ..] => String::from_utf8_lossy(rest).into_owned(),
+        [0xFF, 0xFE, rest @ ..] => utf16(rest, true),
+        [0xFE, 0xFF, rest @ ..] => utf16(rest, false),
+        _ => match std::str::from_utf8(bytes) {
+            Ok(s) => s.to_string(),
+            Err(_) => bytes.iter().map(|&b| windows_1252(b)).collect(),
+        },
+    }
+}
+
+/// A Windows-1252 byte as a character (Latin-1, but for 0x80–0x9F).
+fn windows_1252(b: u8) -> char {
+    const HIGH: [char; 32] = [
+        '€', '\u{81}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{8D}', 'Ž', '\u{8F}', '\u{90}', '‘', '’', '“', '”', '•', '–', '—', '˜', '™',
+        'š', '›', 'œ', '\u{9D}', 'ž', 'Ÿ',
+    ];
+    if (0x80..0xA0).contains(&b) { HIGH[(b - 0x80) as usize] } else { b as char }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,6 +317,15 @@ mod tests {
         assert!(css_safe("'Inter', sans-serif"));
         assert!(!css_safe("red; background:url(x)"));
         assert!(!css_safe("red}</style>"));
+    }
+
+    #[test]
+    fn decodes_text_files_from_spreadsheets() {
+        assert_eq!(decode_text("a;é\n".as_bytes()), "a;é\n");
+        assert_eq!(decode_text(b"\xEF\xBB\xBFx,y"), "x,y");
+        assert_eq!(decode_text(b"\xFF\xFEa\x00\xE9\x00"), "aé");
+        assert_eq!(decode_text(b"\xFE\xFF\x00a\x00\xE9"), "aé");
+        assert_eq!(decode_text(b"Ano;Pre\xE7o \x80\n"), "Ano;Preço €\n", "Windows-1252");
     }
 
     #[test]
