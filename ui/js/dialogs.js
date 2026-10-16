@@ -13,13 +13,14 @@ import { opener, invoke } from './api.js';
 import { MediaLibrary, KeyPrompt } from './media.js';
 import { ThemeBuilder } from './themebuilder.js';
 import { ChartData } from './datachart.js';
+import { UpdateDialog, checkForUpdates } from './updates.js';
 import { t, N_, LANGUAGES } from './i18n.js';
 
 export function ModalHost() {
   const st = useStore();
   const m = st.modal;
   if (!m) return null;
-  const C = { unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder, chartData: ChartData }[m.type];
+  const C = { unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder, chartData: ChartData, update: UpdateDialog }[m.type];
   return C ? html`<${C} ...${m.props} />` : null;
 }
 
@@ -127,6 +128,10 @@ function Settings() {
       <//>
       <p class="ihint">${t('With two screens, the audience sees the presentation on the other screen while the presenter display stays on yours.')}</p>
       <p class="ihint">${t('With one screen, press X during the show to switch between the slides and the presenter display. In a video call, share only the presentation window: the audience never sees the presenter display or the teleprompter.')}</p>
+      ${state.info.updates &&
+      html`<h4>${t('Updates')}</h4>
+        <${Row}><${Toggle} value=${s.checkUpdates} label=${t('Check for updates when Cadenza starts')} onChange=${(v) => updateSettings({ checkUpdates: v })} /><//>
+        <${Row}><${Button} size="sm" icon="refresh-cw" label=${t('Check Now')} onClick=${() => checkForUpdates({ manual: true })} /><//>`}
     </div>
   <//>`;
 }

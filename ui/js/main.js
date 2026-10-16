@@ -40,10 +40,13 @@ window.addEventListener('unhandledrejection', (e) => report('error', `unhandled 
 
 render(html`<${App} />`, document.getElementById('app'));
 
-boot().catch((e) => {
-  console.error(e);
-  document.getElementById('app').innerHTML = `<pre style="padding:2em;color:#f87171">${t('Cadenza failed to start:')}\n${t(String(e))}</pre>`;
-});
+boot()
+  // A moment after starting, not to compete with opening the window.
+  .then(() => setTimeout(() => import('./updates.js').then((m) => m.checkForUpdates()), 1500))
+  .catch((e) => {
+    console.error(e);
+    document.getElementById('app').innerHTML = `<pre style="padding:2em;color:#f87171">${t('Cadenza failed to start:')}\n${t(String(e))}</pre>`;
+  });
 
 // Render diagrams that have no stored picture yet (new or imported ones).
 let lastVersion = 0;

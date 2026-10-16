@@ -42,6 +42,7 @@ function appMenu() {
     cmd('app.settings'),
     cmd('app.shortcuts'),
     cmd('app.about'),
+    ...(state.info.updates ? [cmd('app.updates')] : []),
     '-',
     cmd('file.close'),
   ];

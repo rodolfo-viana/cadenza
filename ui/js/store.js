@@ -575,6 +575,8 @@ export async function boot() {
       set({ busy: null });
     }
   }
+  // Reopened with its unsaved changes after an update.
+  if (st.pendingRecover) await recover(st.pendingRecover);
 
   invoke('fonts_list')
     .then((fonts) => set({ fonts }))

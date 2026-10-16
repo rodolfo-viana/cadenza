@@ -31,6 +31,10 @@ Useful while developing:
 - `CADENZA_DATA_DIR=/tmp/cadenza-dev cargo run` starts Cadenza with a separate profile: its own
   settings, recent files and recovery data, and API keys kept in a file in that folder instead of your
   system keychain. It also runs alongside your normal Cadenza instead of handing files over to it.
+- Builds from source never update themselves: only copies installed from a release's packages do.
+  To try an update, build two versions' packages with `--debug` and the release config (see
+  [Releases](#releases)), serve the newer one with a `latest.json` like a release's, and start the
+  older one with `CADENZA_UPDATE_URL=http://127.0.0.1:8000/latest.json` (debug builds only).
 
 ## How the project is organized
 
@@ -42,7 +46,7 @@ src-tauri/        Rust app (Tauri 2)
   src/render.rs     slide HTML for the editor, the show and exports
   src/lib.rs        Tauri commands, windows, presenting
   src/…             charts, maps, shapes, themes, Markdown import, export, fonts,
-                    media library, secrets, settings
+                    media library, secrets, settings, updates
   maps/             map chart boundaries (built by tools/gen_maps.py)
   icons/source/     the logo the app icons are made from
 ui/               the interface: HTML, CSS and JavaScript modules (no build step)
@@ -65,7 +69,9 @@ A few principles keep Cadenza predictable. Please follow them:
 3. **No build step for the interface.** Modules are loaded as they are. Third-party code goes in
    `ui/vendor` together with its license.
 4. **Private by default.** Features that use the network contact a service only when the person uses
-   them. API keys go through `secrets.rs` and are never written into presentations.
+   them. The only exception is the check for updates at startup, which reads the latest release's
+   `latest.json` from GitHub and can be turned off. API keys go through `secrets.rs` and are never
+   written into presentations.
 5. **Slides don't depend on the interface language.** A presentation looks the same in every language,
    and the canvas stays left-to-right when the interface is right-to-left.
 
@@ -154,6 +160,14 @@ Maintainers release a version by updating `version` in both `src-tauri/tauri.con
 `src-tauri/Cargo.toml`, committing, and pushing a matching tag (`git tag -a v0.2.0 -m "Cadenza 0.2.0"`
 and `git push origin v0.2.0`). GitHub Actions then builds the Linux and Windows installers and
 attaches them to a draft release to review and publish.
+
+Installed copies update themselves from the latest published release. The workflow builds with
+`src-tauri/tauri.updater.conf.json`, which signs every installer and adds `latest.json` to the
+release (the file installed copies read to find it). Signing needs two repository secrets,
+`TAURI_SIGNING_PRIVATE_KEY` (the private key file's contents) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+The public key in `src-tauri/tauri.conf.json` must match it: installed copies only accept updates
+signed with that key, so keep a backup of the private key and its password. Local builds don't
+sign anything and need neither.
 
 ## License
 

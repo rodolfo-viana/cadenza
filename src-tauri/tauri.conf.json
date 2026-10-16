@@ -70,5 +70,17 @@
         "installMode": "currentUser"
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJGMDhDNEMxMThBOEY4OUIKUldTYitLZ1l3Y1FJTDhlRGlGYm54OTZ0VTZxUGZwcHBPYkphZ2hNZ3g1VlltOXpPKzR3dmVweHEK",
+      "endpoints": [
+        "https://github.com/rodolfo-viana/cadenza/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

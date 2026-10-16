@@ -34,6 +34,10 @@ pub struct Settings {
     pub show_guides: bool,
     /// The teleprompter box of the presenter display.
     pub teleprompter: Teleprompter,
+    /// Look for a newer version when Cadenza starts.
+    pub check_updates: bool,
+    /// A version the person chose to skip: not offered at startup.
+    pub skipped_update: String,
 }
 
 /// The teleprompter: a box in the presenter display that scrolls the current
@@ -106,6 +110,8 @@ impl Default for Settings {
             show_rulers: true,
             show_guides: true,
             teleprompter: Teleprompter::default(),
+            check_updates: true,
+            skipped_update: String::new(),
         }
     }
 }
@@ -226,6 +232,7 @@ mod tests {
         assert_eq!(s.teleprompter.speed, 80.0);
         assert_eq!(s.teleprompter.font_size, Teleprompter::default().font_size);
         assert!(s.presenter_view);
+        assert!(s.check_updates);
     }
 
     #[test]

@@ -52,6 +52,8 @@ with [Tauri](https://tauri.app). It runs on Linux and Windows.
   file, or print to PDF.
 - Import reveal.js-style Markdown.
 - Crash recovery for unsaved work.
+- Updates: when a new version is out, Cadenza offers to download and install it in place of the old
+  one, then restarts and reopens your presentations.
 
 **Languages**
 
@@ -74,12 +76,18 @@ Installers are published on the [Releases](https://github.com/rodolfo-viana/cade
 > 
 > The installers aren't code-signed yet, so the first time you run Cadenza on Windows, SmartScreen may ask you to confirm (**More info > Run anyway**).
 
+Once installed, Cadenza keeps itself up to date: when it starts, it looks for a newer version and
+offers to install it with the same kind of package (on Linux, the `.deb` and `.rpm` updates ask for
+your password). Versions up to 0.3.2 can't do this yet, so install the next one by hand.
+
 Note: *There is no macOS version any longer. Versions 0.2.0 to 0.3.2 had one, but it could not be properly tested on a Mac on regular basis, so it is no longer made.*
 
 ## Privacy
 
 Cadenza works fully offline. Online features — Google Fonts downloads, the Media Library and video
-previews — contact a service only when you use them. API keys are stored in your system's credential
+previews — contact a service only when you use them. The one exception is the check for updates:
+when Cadenza starts, it downloads a small file from GitHub naming the latest version, and sends
+nothing about you or your presentations. Turn it off in **Settings > Updates**. API keys are stored in your system's credential
 store (Secret Service on Linux, Credential Manager on Windows) and are never saved
 inside presentations.
 

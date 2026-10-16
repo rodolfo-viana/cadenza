@@ -27,6 +27,7 @@ pub mod secrets;
 pub mod settings;
 pub mod shapes;
 pub mod themes;
+pub mod updates;
 pub mod util;
 pub mod webfonts;
 
@@ -61,14 +62,22 @@ pub struct AppState {
     settings_path: PathBuf,
     /// Crashed sessions found at startup.
     recoverable: Mutex<Vec<RecoveryInfo>>,
-    /// Files to open in freshly created editor windows.
-    pending_open: Mutex<HashMap<String, PathBuf>>,
+    /// What freshly created editor windows open.
+    pending_open: Mutex<HashMap<String, Pending>>,
     window_counter: AtomicU32,
     secrets: secrets::Secrets,
     /// Media browser helper processes, per editor window.
     browsers: Mutex<HashMap<String, (u64, std::process::Child)>>,
     /// Media of the latest copy, shared by every window.
     clipboard: clipboard::Store,
+    updates: updates::Updates,
+}
+
+/// What a new editor window opens once its page has loaded.
+enum Pending {
+    File(PathBuf),
+    /// A presentation with unsaved changes, from its recovery snapshot.
+    Session(String),
 }
 
 impl AppState {
@@ -120,6 +129,8 @@ struct AppInfo {
     recent: Vec<settings::RecentFile>,
     recoverable: Vec<RecoveryInfo>,
     asset_base: &'static str,
+    /// Whether this copy can update itself.
+    updates: bool,
 }
 
 #[tauri::command]
@@ -136,6 +147,7 @@ fn app_info(state: State<AppState>) -> CmdResult<AppInfo> {
         settings,
         recoverable: state.recoverable.lock().map_err(err)?.clone(),
         asset_base: document::asset_protocol_base(),
+        updates: updates::package().is_some(),
     })
 }
 
@@ -401,8 +413,10 @@ async fn doc_open(window: Window, state: State<'_, AppState>, path: String) -> C
 /// The window's current document (full view), or a file waiting to be opened.
 #[tauri::command]
 fn doc_state(window: Window, state: State<AppState>) -> CmdResult<Value> {
-    if let Some(path) = state.pending_open.lock().map_err(err)?.remove(window.label()) {
-        return Ok(json!({ "pendingOpen": path }));
+    match state.pending_open.lock().map_err(err)?.remove(window.label()) {
+        Some(Pending::File(path)) => return Ok(json!({ "pendingOpen": path })),
+        Some(Pending::Session(id)) => return Ok(json!({ "pendingRecover": id })),
+        None => {}
     }
     let mut docs = state.docs.lock().map_err(err)?;
     match docs.get_mut(window.label()) {
@@ -1311,17 +1325,171 @@ fn present_toggle_fullscreen(window: Window) -> CmdResult<()> {
 }
 
 // ---------------------------------------------------------------------------
+// Updates
+// ---------------------------------------------------------------------------
+
+/// The updater. Debug builds can read the release manifest from
+/// `CADENZA_UPDATE_URL` instead of GitHub, to test updates locally.
+fn updater(app: &AppHandle) -> anyhow::Result<tauri_plugin_updater::Updater> {
+    use tauri_plugin_updater::UpdaterExt;
+    let mut builder = app.updater_builder().timeout(std::time::Duration::from_secs(30));
+    if cfg!(debug_assertions)
+        && let Some(url) = std::env::var("CADENZA_UPDATE_URL").ok().filter(|u| !u.is_empty())
+    {
+        builder = builder.endpoints(vec![url.parse()?])?;
+    }
+    Ok(builder.build()?)
+}
+
+/// Looks for a newer version. The check at startup (`manual: false`) runs
+/// once per launch when the settings allow it, says nothing when it fails
+/// (no connection), and leaves out a version the person chose to skip.
+#[tauri::command]
+async fn update_check(app: AppHandle, state: State<'_, AppState>, manual: bool) -> CmdResult<Option<updates::UpdateInfo>> {
+    if updates::package().is_none() {
+        return if manual {
+            Err("This copy of Cadenza can't update itself.".into())
+        } else {
+            Ok(None)
+        };
+    }
+    let skipped = {
+        let s = state.settings.lock().map_err(err)?;
+        if !manual && (!s.check_updates || state.updates.checked_at_start.swap(true, Ordering::SeqCst)) {
+            return Ok(None);
+        }
+        s.skipped_update.clone()
+    };
+    let found = match updater(&app).map_err(err)?.check().await {
+        Ok(found) => found,
+        Err(e) if manual => return Err(e.to_string()),
+        Err(e) => {
+            eprintln!("Could not check for updates: {e}");
+            return Ok(None);
+        }
+    };
+    let info = found.as_ref().map(updates::UpdateInfo::of);
+    *state.updates.found.lock().map_err(err)? = found;
+    Ok(info.filter(|i| manual || i.version != skipped))
+}
+
+/// Downloads the update found and verifies its signature, reporting progress
+/// to the window that asked (`cz-update-progress`).
+#[tauri::command]
+async fn update_download(window: Window, state: State<'_, AppState>) -> CmdResult<()> {
+    let update = state.updates.found.lock().map_err(err)?.clone().ok_or("No update was found.")?;
+    if state.updates.has_downloaded(&update.version) {
+        return Ok(());
+    }
+    let version = update.version.clone();
+    let app = window.app_handle().clone();
+    let label = window.label().to_string();
+    let task = tauri::async_runtime::spawn(async move {
+        let (mut done, mut sent) = (0u64, 0u64);
+        let progress = move |n: usize, total: Option<u64>| {
+            done += n as u64;
+            // Often enough for a smooth bar, without flooding the window.
+            let step = total.map_or(1 << 20, |t| (t / 200).max(1 << 16));
+            if done - sent >= step || Some(done) == total {
+                sent = done;
+                let _ = app.emit_to(label.as_str(), "cz-update-progress", json!({ "done": done, "total": total }));
+            }
+        };
+        update.download(progress, || {}).await
+    });
+    let abort = task.inner().abort_handle();
+    *state.updates.cancel.lock().map_err(err)? = Some(Box::new(move || abort.abort()));
+    let result = task.await;
+    state.updates.cancel.lock().map_err(err)?.take();
+    let bytes = result.map_err(|_| "Cancelled")?.map_err(err)?;
+    *state.updates.downloaded.lock().map_err(err)? = Some((version, bytes));
+    Ok(())
+}
+
+#[tauri::command]
+fn update_cancel(state: State<AppState>) {
+    if let Some(cancel) = state.updates.cancel.lock().ok().and_then(|mut c| c.take()) {
+        cancel();
+    }
+}
+
+/// What to reopen after restarting, window by window in the order they were
+/// opened. Unsaved changes go into recovery snapshots first, so they survive
+/// even an installation cut short.
+fn reopen_list(state: &AppState) -> Vec<updates::Reopen> {
+    let Ok(mut docs) = state.docs.lock() else { return vec![] };
+    let mut labels: Vec<String> = docs.keys().cloned().collect();
+    labels.sort_by_key(|l| l.strip_prefix("editor-").and_then(|n| n.parse::<u32>().ok()).unwrap_or(u32::MAX));
+    labels
+        .iter()
+        .filter_map(|l| {
+            let doc = docs.get_mut(l)?;
+            if doc.is_dirty() {
+                doc.maybe_write_recovery(true);
+                Some(updates::Reopen::Session { id: doc.id.clone() })
+            } else {
+                doc.path.clone().map(|path| updates::Reopen::File { path })
+            }
+        })
+        .collect()
+}
+
+/// Installs the downloaded update and restarts into it; the presentations
+/// open now reopen afterwards. On Windows the installer takes over: it
+/// closes Cadenza and starts the new version itself.
+#[tauri::command]
+async fn update_install(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()> {
+    let update = state.updates.found.lock().map_err(err)?.clone().ok_or("No update was found.")?;
+    let bytes = match state.updates.downloaded.lock().map_err(err)?.take() {
+        Some((version, bytes)) if version == update.version => bytes,
+        _ => return Err("The update hasn't been downloaded.".into()),
+    };
+    updates::write_reopen(&state.config_dir, &reopen_list(&state)).map_err(err)?;
+    state.updates.installing.store(true, Ordering::SeqCst);
+    // The media browsers run Cadenza's own program, which Windows can't
+    // replace while it runs.
+    for label in app.webview_windows().into_keys().filter(|l| l.starts_with("editor-")) {
+        stop_browser(&app, &label);
+    }
+    let version = update.version.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let result = update.install(&bytes);
+        (result, bytes)
+    })
+    .await;
+    let message = match result {
+        Ok((Ok(()), _)) => {
+            app.request_restart();
+            return Ok(());
+        }
+        Ok((Err(e), bytes)) => {
+            // Kept for another try.
+            *state.updates.downloaded.lock().map_err(err)? = Some((version, bytes));
+            e.to_string()
+        }
+        Err(e) => e.to_string(),
+    };
+    state.updates.installing.store(false, Ordering::SeqCst);
+    updates::forget_reopen(&state.config_dir);
+    Err(message)
+}
+
+// ---------------------------------------------------------------------------
 // Windows
 // ---------------------------------------------------------------------------
 
 fn open_editor_window(app: &AppHandle, file: Option<PathBuf>) -> tauri::Result<()> {
+    open_editor(app, file.map(Pending::File))
+}
+
+fn open_editor(app: &AppHandle, pending: Option<Pending>) -> tauri::Result<()> {
     let state = app.state::<AppState>();
     let n = state.window_counter.fetch_add(1, Ordering::SeqCst);
     let label = format!("editor-{n}");
-    if let Some(f) = file
-        && let Ok(mut p) = state.pending_open.lock()
+    if let Some(p) = pending
+        && let Ok(mut map) = state.pending_open.lock()
     {
-        p.insert(label.clone(), f);
+        map.insert(label.clone(), p);
     }
     sized(window_builder(app, &label, WebviewUrl::App("index.html".into())), app, (1440.0, 900.0))
         .title("Cadenza")
@@ -1510,6 +1678,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let (cache, config) = match data_dir_override() {
                 Some(dir) => (dir.join("cache"), dir.clone()),
@@ -1520,7 +1689,18 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             // Media of open documents is served to the webview from here.
             app.asset_protocol_scope().allow_directory(&sessions_root, true)?;
             embed::allow_dir(&sessions_root);
-            let recoverable = document::list_recoverable(&sessions_root);
+            let mut recoverable = document::list_recoverable(&sessions_root);
+            // After an update: the presentations open before the restart.
+            let mut reopen_files = Vec::new();
+            let mut reopen_sessions = Vec::new();
+            for r in updates::take_reopen(&config) {
+                match r {
+                    updates::Reopen::File { path } if is_presentation(&path) => reopen_files.push(path),
+                    updates::Reopen::Session { id } if recoverable.iter().any(|r| r.session_id == id) => reopen_sessions.push(id),
+                    _ => {}
+                }
+            }
+            recoverable.retain(|r| !reopen_sessions.contains(&r.session_id));
             let settings_path = config.join("settings.json");
             let forget_ai_settings = settings::has_ai_settings(&settings_path);
             app.manage(AppState {
@@ -1535,6 +1715,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                 secrets: secrets::Secrets::new(&config, data_dir_override().is_none()),
                 browsers: Mutex::new(HashMap::new()),
                 clipboard: clipboard::Store::new(cache.join("clipboard")),
+                updates: updates::Updates::default(),
             });
             fonts::warm_up();
             // Credential cleanup has its own completion marker and retries on
@@ -1549,16 +1730,27 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                 if forget_ai_settings && let Ok(s) = state.settings.lock() {
                     let _ = s.save(&state.settings_path);
                 }
+                if cfg!(windows) {
+                    updates::remove_old_installers(&std::env::temp_dir(), &app_handle.package_info().name);
+                }
             });
 
             let cwd = std::env::current_dir().unwrap_or_default();
             let mut files = files_from_args(std::env::args(), &cwd);
             files.extend(STARTUP_FILES.lock().ok().and_then(|mut f| f.take()).unwrap_or_default());
-            if files.is_empty() {
+            for f in reopen_files {
+                if !files.contains(&f) {
+                    files.push(f);
+                }
+            }
+            if files.is_empty() && reopen_sessions.is_empty() {
                 open_editor_window(app.handle(), None)?;
             }
             for f in files {
                 open_editor_window(app.handle(), Some(f))?;
+            }
+            for id in reopen_sessions {
+                open_editor(app.handle(), Some(Pending::Session(id)))?;
             }
             Ok(())
         })
@@ -1574,7 +1766,10 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                     stop_browser(app, &label);
                     let state = app.state::<AppState>();
                     let doc = state.docs.lock().ok().and_then(|mut d| d.remove(&label));
-                    if let Some(doc) = doc {
+                    // Closed for an update: the session reopens after the restart.
+                    if let Some(doc) = doc
+                        && !state.updates.installing.load(Ordering::SeqCst)
+                    {
                         doc.dispose();
                     }
                 } else if label.starts_with("present-") || label.starts_with("presenter-") {
@@ -1642,6 +1837,10 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             ui_log,
             window_new,
             window_focus_document,
+            update_check,
+            update_download,
+            update_cancel,
+            update_install,
         ])
         .build(context)
         .expect("error while running Cadenza")

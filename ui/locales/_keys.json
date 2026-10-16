@@ -813,9 +813,27 @@
   ]
  },
  {
+  "key": "Cadenza is up to date",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
   "key": "Cadenza Presentation",
   "files": [
    "store.js"
+  ]
+ },
+ {
+  "key": "Cadenza restarts to finish. The presentations you have open reopen afterwards, unsaved changes included.",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
+  "key": "Cadenza restarts when it’s done.",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -832,6 +850,12 @@
   ]
  },
  {
+  "key": "Cadenza {version} is available",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
   "key": "Camera",
   "files": [
    "panels.js"
@@ -841,7 +865,8 @@
   "key": "Cancel",
   "files": [
    "dialogs.js",
-   "themebuilder.js"
+   "themebuilder.js",
+   "updates.js"
   ]
  },
  {
@@ -956,6 +981,36 @@
   "key": "Chart from Data…",
   "files": [
    "commands.js"
+  ]
+ },
+ {
+  "key": "Check for updates when Cadenza starts",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Check for Updates…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Check Now",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Check your internet connection and try again.",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
+  "key": "Checking for updates…",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -1087,7 +1142,8 @@
   "files": [
    "dialogs.js",
    "present.js",
-   "ui.js"
+   "ui.js",
+   "updates.js"
   ]
  },
  {
@@ -1233,6 +1289,24 @@
   "key": "Corrupted font in theme",
   "files": [
    "custom_theme.rs"
+  ]
+ },
+ {
+  "key": "Could not check for updates",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
+  "key": "Could not download the update",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
+  "key": "Could not install the update",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -1611,9 +1685,21 @@
   ]
  },
  {
+  "key": "Download and Install",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
   "key": "Download failed — check your internet connection",
   "files": [
    "media.rs"
+  ]
+ },
+ {
+  "key": "Downloading Cadenza {version}…",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -2712,6 +2798,12 @@
   ]
  },
  {
+  "key": "Installing Cadenza {version}…",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
   "key": "Integrations",
   "files": [
    "dialogs.js"
@@ -3407,6 +3499,12 @@
   ]
  },
  {
+  "key": "No update was found.",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
   "key": "None",
   "files": [
    "charts.js",
@@ -3424,6 +3522,12 @@
   "key": "North America",
   "files": [
    "charts.js"
+  ]
+ },
+ {
+  "key": "Not Now",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -3495,7 +3599,8 @@
  {
   "key": "OK",
   "files": [
-   "dialogs.js"
+   "dialogs.js",
+   "updates.js"
   ]
  },
  {
@@ -3601,6 +3706,12 @@
   "key": "Open diamond",
   "files": [
    "charts.js"
+  ]
+ },
+ {
+  "key": "Open Download Page",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -4736,6 +4847,12 @@
   ]
  },
  {
+  "key": "Skip This Version",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
   "key": "Skipped",
   "files": [
    "navigator.js"
@@ -5329,6 +5446,12 @@
   ]
  },
  {
+  "key": "The update hasn't been downloaded.",
+  "files": [
+   "lib.rs"
+  ]
+ },
+ {
   "key": "The website closed unexpectedly (a problem in the system web engine). Your presentation is safe.",
   "files": [
    "main.js"
@@ -5493,6 +5616,12 @@
   "key": "Theme: {name}",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "This copy of Cadenza can't update itself.",
+  "files": [
+   "lib.rs"
   ]
  },
  {
@@ -5758,6 +5887,12 @@
   ]
  },
  {
+  "key": "Updates",
+  "files": [
+   "dialogs.js"
+  ]
+ },
+ {
   "key": "Upper",
   "files": [
    "charts.js"
@@ -5940,9 +6075,21 @@
   ]
  },
  {
+  "key": "What’s new",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
   "key": "Widescreen 16:9 (1280×720)",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Windows may ask for permission to install it.",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -6031,6 +6178,24 @@
   ]
  },
  {
+  "key": "You can download the new version from the website instead.",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
+  "key": "You have the latest version, {version}.",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
+  "key": "You have version {current}.",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
   "key": "Your cameras are listed here by name after you present live video once.",
   "files": [
    "panels.js"
@@ -6047,6 +6212,12 @@
   "files": [
    "inspector.js",
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Your system asks for your password to install it.",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -6108,6 +6279,18 @@
   "key": "zoom::Fit",
   "files": [
    "toolbar.js"
+  ]
+ },
+ {
+  "key": "{done} MB",
+  "files": [
+   "updates.js"
+  ]
+ },
+ {
+  "key": "{done} of {total} MB",
+  "files": [
+   "updates.js"
   ]
  },
  {

@@ -4,6 +4,12 @@ name: Release
 # .msi).
 # Push a version tag (e.g. v0.1.0) to attach them to a draft GitHub release,
 # or run the workflow by hand from the Actions tab to get them as artifacts.
+#
+# The installers are signed for Cadenza's updates, with the private key in
+# the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+# secrets (the public key is in src-tauri/tauri.conf.json). The release also
+# gets latest.json, which installed copies read to find the new version once
+# the draft is published.
 on:
   push:
     tags: ['v*']
@@ -23,6 +29,16 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Check the signing key
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is missing: updates can't be signed (see CONTRIBUTING.md)."
+            exit 1
+          fi
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -59,8 +75,13 @@ jobs:
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: npx --yes @tauri-apps/cli@2.12.1
+          # Signed installers, and latest.json for the updates.
+          args: --config src-tauri/tauri.updater.conf.json
+          updaterJsonPreferNsis: true
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: Cadenza ${{ github.ref_name }}
           releaseBody: ${{ steps.notes.outputs.body }}
@@ -77,3 +98,23 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: ignore
+
+  # Both builds add their installers to latest.json. Should they have
+  # finished at the same moment, one may have overwritten the other's.
+  check-updates:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern latest.json
+          for target in linux-x86_64-deb linux-x86_64-rpm linux-x86_64-appimage windows-x86_64-nsis windows-x86_64-msi; do
+            if ! jq -e --arg t "$target" '.platforms[$t].signature' latest.json > /dev/null; then
+              echo "::error::latest.json has no $target installer: re-run all jobs of this workflow run."
+              exit 1
+            fi
+          done
+          echo "latest.json lists every installer."

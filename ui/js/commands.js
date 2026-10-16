@@ -131,6 +131,8 @@ export const COMMANDS = [
   { id: 'app.settings', group: N_('Help'), label: N_('Settings…'), icon: 'settings', keys: ['Mod+,'], global: true, run: () => S.openModal('settings') },
   { id: 'app.shortcuts', group: N_('Help'), label: N_('Keyboard Shortcuts'), icon: 'keyboard', keys: ['Mod+/', 'F1'], global: true, run: () => S.openModal('shortcuts') },
   { id: 'app.about', group: N_('Help'), label: N_('About Cadenza'), icon: 'info', run: () => S.openModal('about') },
+  { id: 'app.updates', group: N_('Help'), label: N_('Check for Updates…'), icon: 'refresh-cw', hidden: () => !S.state.info.updates,
+    run: () => import('./updates.js').then((m) => m.checkForUpdates({ manual: true })) },
 ];
 
 const format = (cmd) => import('./textformat.js').then((m) => m.formatShortcut(cmd));
