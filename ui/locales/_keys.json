@@ -50,8 +50,7 @@
  {
   "key": "About Cadenza",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -63,8 +62,7 @@
  {
   "key": "Actual Size",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -623,12 +621,6 @@
   ]
  },
  {
-  "key": "Bring All to Front",
-  "files": [
-   "app_menu.rs"
-  ]
- },
- {
   "key": "Bring Forward",
   "files": [
    "commands.js"
@@ -1052,8 +1044,7 @@
  {
   "key": "Close Presentation",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -1125,8 +1116,7 @@
  {
   "key": "Command Palette…",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -1169,8 +1159,7 @@
   "key": "Copy",
   "files": [
    "canvas.js",
-   "navigator.js",
-   "app_menu.rs"
+   "navigator.js"
   ]
  },
  {
@@ -1308,8 +1297,7 @@
  {
   "key": "Cut",
   "files": [
-   "canvas.js",
-   "app_menu.rs"
+   "canvas.js"
   ]
  },
  {
@@ -1673,8 +1661,7 @@
  {
   "key": "Edit",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -1793,12 +1780,6 @@
   ]
  },
  {
-  "key": "Enter Full Screen",
-  "files": [
-   "app_menu.rs"
-  ]
- },
- {
   "key": "Entity Relationship",
   "files": [
    "diagrams.js"
@@ -1841,8 +1822,7 @@
  {
   "key": "Export as PDF / Print…",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -1860,15 +1840,13 @@
  {
   "key": "Export as Single HTML File…",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
   "key": "Export as Website (folder)…",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -1970,8 +1948,7 @@
  {
   "key": "File",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -2369,20 +2346,13 @@
  {
   "key": "Help",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
   "key": "Hexagon",
   "files": [
    "shapes.rs"
-  ]
- },
- {
-  "key": "Hide Cadenza",
-  "files": [
-   "app_menu.rs"
   ]
  },
  {
@@ -2395,12 +2365,6 @@
   "key": "Hide notes",
   "files": [
    "notes.js"
-  ]
- },
- {
-  "key": "Hide Others",
-  "files": [
-   "app_menu.rs"
   ]
  },
  {
@@ -2695,8 +2659,7 @@
   "key": "Keyboard Shortcuts",
   "files": [
    "commands.js",
-   "dialogs.js",
-   "app_menu.rs"
+   "dialogs.js"
   ]
  },
  {
@@ -3039,12 +3002,6 @@
   ]
  },
  {
-  "key": "Minimize",
-  "files": [
-   "app_menu.rs"
-  ]
- },
- {
   "key": "Mirror image",
   "files": [
    "panels.js"
@@ -3176,8 +3133,7 @@
   "key": "New Presentation…",
   "files": [
    "commands.js",
-   "toolbar.js",
-   "app_menu.rs"
+   "toolbar.js"
   ]
  },
  {
@@ -3203,8 +3159,7 @@
  {
   "key": "New Window",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -3516,8 +3471,7 @@
   "key": "Open…",
   "files": [
    "commands.js",
-   "welcome.js",
-   "app_menu.rs"
+   "welcome.js"
   ]
  },
  {
@@ -3640,7 +3594,6 @@
   "files": [
    "canvas.js",
    "navigator.js",
-   "app_menu.rs",
    "ops.rs"
   ]
  },
@@ -3727,8 +3680,7 @@
   "key": "Play",
   "files": [
    "commands.js",
-   "toolbar.js",
-   "app_menu.rs"
+   "toolbar.js"
   ]
  },
  {
@@ -3746,15 +3698,13 @@
  {
   "key": "Play from Beginning",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
   "key": "Play from Current Slide",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -3888,12 +3838,6 @@
   ]
  },
  {
-  "key": "Quit Cadenza",
-  "files": [
-   "app_menu.rs"
-  ]
- },
- {
   "key": "Quote",
   "files": [
    "panels.js",
@@ -3944,8 +3888,7 @@
   "key": "Redo",
   "files": [
    "commands.js",
-   "toolbar.js",
-   "app_menu.rs"
+   "toolbar.js"
   ]
  },
  {
@@ -4190,15 +4133,13 @@
   "files": [
    "commands.js",
    "dialogs.js",
-   "media.js",
-   "app_menu.rs"
+   "media.js"
   ]
  },
  {
   "key": "Save As…",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -4349,8 +4290,7 @@
  {
   "key": "Select All",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -4397,12 +4337,6 @@
   ]
  },
  {
-  "key": "Services",
-  "files": [
-   "app_menu.rs"
-  ]
- },
- {
   "key": "Settings",
   "files": [
    "dialogs.js",
@@ -4412,8 +4346,7 @@
  {
   "key": "Settings…",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -4451,35 +4384,25 @@
  {
   "key": "Show / Hide Guides",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
   "key": "Show / Hide Inspector",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
   "key": "Show / Hide Rulers",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
   "key": "Show / Hide Speaker Notes",
   "files": [
-   "commands.js",
-   "app_menu.rs"
-  ]
- },
- {
-  "key": "Show All",
-  "files": [
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -5496,8 +5419,7 @@
   "key": "Undo",
   "files": [
    "commands.js",
-   "toolbar.js",
-   "app_menu.rs"
+   "toolbar.js"
   ]
  },
  {
@@ -5668,8 +5590,7 @@
  {
   "key": "View",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -5727,12 +5648,6 @@
   "key": "Widescreen 16:9 (1280×720)",
   "files": [
    "inspector.js"
-  ]
- },
- {
-  "key": "Window",
-  "files": [
-   "app_menu.rs"
   ]
  },
  {
@@ -5849,8 +5764,7 @@
  {
   "key": "Zoom In",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
@@ -5862,15 +5776,13 @@
  {
   "key": "Zoom Out",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {
   "key": "Zoom to Fit",
   "files": [
-   "commands.js",
-   "app_menu.rs"
+   "commands.js"
   ]
  },
  {

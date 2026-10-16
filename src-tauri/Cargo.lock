@@ -441,7 +441,6 @@ dependencies = [
  "imagesize",
  "keyring",
  "mime_guess",
- "objc2",
  "pulldown-cmark",
  "serde",
  "serde_json",

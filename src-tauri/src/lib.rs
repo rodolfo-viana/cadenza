@@ -5,8 +5,6 @@
 //! exports and window management. The UI (in `ui/`) runs in the system
 //! webview and talks to it through the commands defined here.
 
-#[cfg(target_os = "macos")]
-mod app_menu;
 pub mod browse;
 pub mod chart;
 pub mod clipboard;
@@ -129,13 +127,7 @@ fn app_info(state: State<AppState>) -> CmdResult<AppInfo> {
     let settings = state.settings.lock().map_err(err)?.clone();
     Ok(AppInfo {
         version: env!("CARGO_PKG_VERSION"),
-        platform: if cfg!(windows) {
-            "windows"
-        } else if cfg!(target_os = "macos") {
-            "macos"
-        } else {
-            "linux"
-        },
+        platform: if cfg!(windows) { "windows" } else { "linux" },
         themes: themes::THEMES,
         layouts: layouts::LAYOUTS,
         shapes: shapes::SHAPES.iter().map(|(id, name)| json!({"id": id, "name": name})).collect(),
@@ -161,18 +153,14 @@ async fn map_regions(map: String, language: String, labels: Vec<String>) -> maps
 
 #[tauri::command]
 fn settings_update(app: AppHandle, state: State<AppState>, patch: Value) -> CmdResult<Settings> {
-    let (updated, language_changed) = {
+    let updated = {
         let mut s = state.settings.lock().map_err(err)?;
-        let language = s.language.clone();
         let mut v = serde_json::to_value(&*s).map_err(err)?;
         ops::merge_patch(&mut v, &patch);
         *s = serde_json::from_value(v).map_err(err)?;
         s.save(&state.settings_path).map_err(err)?;
-        (s.clone(), s.language != language)
+        s.clone()
     };
-    if language_changed {
-        refresh_app_menu(&app);
-    }
     // Other windows (editors, the presenter display) keep a copy.
     let _ = app.emit("cz-settings", &updated);
     Ok(updated)
@@ -1201,8 +1189,6 @@ async fn present_start(app: AppHandle, window: Window, state: State<'_, AppState
     let _ = w.set_fullscreen(true);
     let _ = w.show();
     let _ = w.set_focus();
-    #[cfg(target_os = "macos")]
-    keep_drawing_when_hidden(&w);
 
     if presenter {
         let pl = format!("presenter-{owner}");
@@ -1230,26 +1216,6 @@ async fn present_start(app: AppHandle, window: Window, state: State<'_, AppState
     }
     let _ = app.emit("cz-present-started", json!({ "doc": owner }));
     Ok(())
-}
-
-/// WebKit on macOS stops drawing covered windows. The audience window must keep
-/// drawing behind the presenter display so it can be shared in a video call or
-/// recorded.
-#[cfg(target_os = "macos")]
-fn keep_drawing_when_hidden(w: &tauri::WebviewWindow) {
-    let _ = w.with_webview(|webview| {
-        use objc2::runtime::AnyObject;
-        use objc2::{msg_send, sel};
-        // SAFETY: inner() is the window's WKWebView; the selector is checked first.
-        unsafe {
-            let view = webview.inner() as *mut AnyObject;
-            let sel = sel!(_setWindowOcclusionDetectionEnabled:);
-            let supported: bool = msg_send![view, respondsToSelector: sel];
-            if supported {
-                let _: () = msg_send![view, _setWindowOcclusionDetectionEnabled: false];
-            }
-        }
-    });
 }
 
 /// The other window of a show: the audience window for the presenter display
@@ -1417,8 +1383,8 @@ fn is_presentation(path: &Path) -> bool {
     path.extension().is_some_and(|e| e == package::EXTENSION) && path.exists()
 }
 
-/// Files the system asked to open while Cadenza was starting (macOS sends
-/// them as events, before setup has run); `None` once it has started.
+/// Files another launch asked to open while Cadenza was starting (before
+/// setup has run); `None` once it has started.
 static STARTUP_FILES: Mutex<Option<Vec<PathBuf>>> = Mutex::new(Some(Vec::new()));
 
 /// Opens presentations in new windows, or keeps them for startup.
@@ -1434,24 +1400,8 @@ fn open_files(app: &AppHandle, files: Vec<PathBuf>) {
     }
 }
 
-/// Builds the macOS menu bar in the interface language.
-fn refresh_app_menu(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        let language = app.state::<AppState>().settings.lock().map(|s| s.language.clone()).unwrap_or_default();
-        match app_menu::build(app, &language) {
-            Ok(menu) => {
-                let _ = app.set_menu(menu);
-            }
-            Err(e) => eprintln!("Could not build the menu bar: {e}"),
-        }
-    }
-    #[cfg(not(target_os = "macos"))]
-    let _ = app;
-}
-
-/// Quitting with presentations still open (Quit in the macOS Dock, logging
-/// out): unsaved work is kept for recovery at the next start.
+/// Quitting with presentations still open (logging out, shutting down):
+/// unsaved work is kept for recovery at the next start.
 fn keep_unsaved_work(app: &AppHandle) {
     if let Some(state) = app.try_state::<AppState>()
         && let Ok(mut docs) = state.docs.lock()
@@ -1540,10 +1490,6 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             open_files(app, files);
         }));
     }
-    #[cfg(target_os = "macos")]
-    {
-        builder = builder.enable_macos_default_menu(false).on_menu_event(app_menu::on_event);
-    }
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -1588,8 +1534,6 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                     let _ = s.save(&state.settings_path);
                 }
             });
-
-            refresh_app_menu(app.handle());
 
             let cwd = std::env::current_dir().unwrap_or_default();
             let mut files = files_from_args(std::env::args(), &cwd);
@@ -1683,15 +1627,10 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
         ])
         .build(context)
         .expect("error while running Cadenza")
-        .run(|app, event| match event {
-            // macOS opens files from Finder and the Dock with events.
-            #[cfg(target_os = "macos")]
-            tauri::RunEvent::Opened { urls } => {
-                let files = urls.iter().filter_map(|u| u.to_file_path().ok()).filter(|p| is_presentation(p)).collect();
-                open_files(app, files);
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                keep_unsaved_work(app);
             }
-            tauri::RunEvent::Exit => keep_unsaved_work(app),
-            _ => {}
         });
 }
 

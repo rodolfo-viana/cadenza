@@ -1,6 +1,6 @@
 # Cadenza
 
-![platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-blue?style=flat-square&color=%237c6cff) 
+![platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20Windows-blue?style=flat-square&color=%237c6cff) 
 ![release](https://img.shields.io/github/v/release/rodolfo-viana/cadenza?style=flat-square&label=latest%20release&color=%237c6cff) ![downloads](https://img.shields.io/github/downloads/rodolfo-viana/cadenza/total?style=flat-square&color=%237c6cff)
 
 [![release build](https://img.shields.io/github/actions/workflow/status/rodolfo-viana/cadenza/release.yml?label=release%20build&style=flat-square&color=%237c6cff)](https://github.com/rodolfo-viana/cadenza/actions/workflows/release.yml) [![codeql](https://img.shields.io/github/actions/workflow/status/rodolfo-viana/cadenza/codeql.yml?branch=main&label=codeql&style=flat-square&color=%237c6cff)](https://github.com/rodolfo-viana/cadenza/actions/workflows/codeql.yml) ![license](https://img.shields.io/github/license/rodolfo-viana/cadenza?style=flat-square&color=%237c6cff)
@@ -8,7 +8,7 @@
 
 **Presentations, powered by reveal.js.** Cadenza is a desktop presentation app in the spirit of
 Keynote and PowerPoint, built on the [reveal.js](https://revealjs.com) engine, written in Rust
-with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
+with [Tauri](https://tauri.app). It runs on Linux and Windows.
 
 ![Cadenza editing a slide with a Mermaid diagram](docs/screenshot.png)
 
@@ -22,7 +22,7 @@ with [Tauri](https://tauri.app). It runs on Linux, macOS and Windows.
 - LaTeX math with KaTeX, as equation objects or inline in any text: `$e^{i\pi}+1=0$`.
 - [Mermaid](https://mermaid.js.org) diagrams: flowcharts, sequences, timelines, mind maps and more.
 - Rulers, draggable guides, smart guides and a snapping grid.
-- Undo/redo for everything, a command palette (Ctrl+K, or ⌘K on a Mac) and keyboard shortcuts for all
+- Undo/redo for everything, a command palette (Ctrl+K) and keyboard shortcuts for all
   common actions.
 
 **Design**
@@ -69,22 +69,21 @@ Installers are published on the [Releases](https://github.com/rodolfo-viana/cade
 | Debian, Ubuntu and derivatives | `Cadenza_x.y.z_amd64.deb` | `sudo apt install ./Cadenza_x.y.z_amd64.deb` |
 | Fedora, openSUSE | `Cadenza-x.y.z-1.x86_64.rpm` | `sudo dnf install ./Cadenza-x.y.z-1.x86_64.rpm` (Fedora) or `sudo zypper install ./…` (openSUSE) |
 | Any Linux | `Cadenza_x.y.z_amd64.AppImage` | Make it executable and run it; it includes everything it needs |
-| macOS 12 or newer (Apple Silicon and Intel) | `Cadenza_x.y.z_universal.dmg` | Open it and drag Cadenza to **Applications** |
 | Windows 10 and 11 | `Cadenza_x.y.z_x64-setup.exe` or `.msi` | Installs Microsoft WebView2 if it's missing |
 
 The `.deb` and `.rpm` packages need WebKitGTK 4.1 (Ubuntu 22.04, Debian 12, Fedora 37 or newer).
 
-The installers aren't code-signed yet, so the first time you run Cadenza:
-- **Windows:** SmartScreen may ask you to confirm (**More info ▸ Run anyway**).
-- **macOS:** macOS says it can't verify the app. Open **System Settings ▸ Privacy & Security**, scroll
-  down to the message about Cadenza and click **Open Anyway**. macOS remembers this, so you only do it
-  once per version.
+The installers aren't code-signed yet, so the first time you run Cadenza on Windows, SmartScreen may
+ask you to confirm (**More info ▸ Run anyway**).
+
+There is no macOS version. Versions 0.2.0 to 0.3.2 had one, but it could never be tested on a Mac,
+so it is no longer made.
 
 ## Privacy
 
 Cadenza works fully offline. Online features — Google Fonts downloads, the Media Library and video
 previews — contact a service only when you use them. API keys are stored in your system's credential
-store (Secret Service on Linux, Keychain on macOS, Credential Manager on Windows) and are never saved
+store (Secret Service on Linux, Credential Manager on Windows) and are never saved
 inside presentations.
 
 ## Files
@@ -102,8 +101,7 @@ Debian or Ubuntu:
 sudo apt install build-essential libwebkit2gtk-4.1-dev librsvg2-dev
 ```
 
-On macOS, install Apple's command line tools (`xcode-select --install`). For other systems, see
-Tauri's [prerequisites](https://v2.tauri.app/start/prerequisites/). Then:
+For other systems, see Tauri's [prerequisites](https://v2.tauri.app/start/prerequisites/). Then:
 
 ```sh
 git clone git@github.com:rodolfo-viana/cadenza.git
@@ -122,11 +120,9 @@ root:
 npx @tauri-apps/cli@2 build
 ```
 
-The packages are written to `src-tauri/target/release/bundle/`. On a Mac, add
-`--target universal-apple-darwin` (after `rustup target add aarch64-apple-darwin x86_64-apple-darwin`)
-to build one app for both Apple Silicon and Intel; it is written to
-`src-tauri/target/universal-apple-darwin/release/bundle/`. Pushing a version tag such as `v0.2.0` makes GitHub
-Actions build the Linux, macOS and Windows installers and attach them to a draft release.
+The packages are written to `src-tauri/target/release/bundle/`. Pushing a version tag such as
+`v0.2.0` makes GitHub Actions build the Linux and Windows installers and attach them to a draft
+release.
 
 ## Contributing
 

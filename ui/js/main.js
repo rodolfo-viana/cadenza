@@ -4,7 +4,7 @@ import { html, render } from './lib.js';
 import { App } from './app.js';
 import { invoke, currentWindow, currentWebview } from './api.js';
 import { state, set, boot, toast, confirmDiscard, openPath, stepSlide } from './store.js';
-import { COMMANDS, commandForKey } from './commands.js';
+import { commandForKey } from './commands.js';
 import * as A from './actions.js';
 import { canvasApi, finishPath, cancelPath } from './canvas.js';
 import { beginTextEdit, endAllEditing } from './textedit.js';
@@ -122,14 +122,6 @@ window.addEventListener('keydown', (e) => {
     const next = slide.elements[(i + (e.shiftKey ? -1 : 1) + n) % n];
     set({ selection: [next.id] });
   }
-});
-
-// Commands chosen in the macOS menu bar (app_menu.rs). Like their shortcuts,
-// they wait while a dialog or menu is open.
-listen('cz-command', (e) => {
-  if (state.modal || state.menu) return;
-  const cmd = COMMANDS.find((c) => c.id === e.payload);
-  if (cmd && (!cmd.when || cmd.when())) cmd.run();
 });
 
 // ---------------------------------------------------------------------------

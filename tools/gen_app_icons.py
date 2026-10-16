@@ -3,8 +3,8 @@
 
     python3 tools/gen_app_icons.py
 
-Needs Inkscape (renders the SVGs) and Node (runs the Tauri CLI's `icon`
-command). macOS gets its own artwork, drawn on Apple's icon grid.
+Needs Inkscape (renders the SVG) and Node (runs the Tauri CLI's `icon`
+command).
 """
 
 import pathlib
@@ -19,7 +19,6 @@ TAURI_ICON = ["npx", "--yes", "@tauri-apps/cli@2.12.1", "icon"]
 # Icons the installers use ("bundle.icon" in tauri.conf.json), by source.
 FILES = {
     "cadenza": ["32x32.png", "128x128.png", "128x128@2x.png", "icon.png", "icon.ico"],
-    "cadenza-macos": ["icon.icns"],
 }
 
 
