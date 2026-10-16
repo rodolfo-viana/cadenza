@@ -2,6 +2,33 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## 0.3.2 — 2026-10-15
+
+Fixes for Windows: starting a show or printing no longer freezes Cadenza, and PDFs come out a slide per page. Plus fixes to charts, equations and editing.
+
+### Changes
+
+- On Windows, the print window's Save PDF… writes a PDF with one slide per page, without margins or browser headers. Print… still opens the print dialog.
+- Printouts and PDFs show each video's first frame and the picture of YouTube videos, instead of black or empty boxes.
+- On small screens or with large text scaling, Cadenza's windows open maximized, so nothing hides behind the taskbar.
+
+### Fixes
+
+- On Windows, Play, Print / Export PDF and New Window froze the whole app.
+- Starting a show again, or printing again with the print window still open, failed with an error.
+- On Windows with one screen, the presenter display covered the slides when a show started.
+- After clicking a YouTube or Vimeo video during a show, the arrow keys and Escape stopped working.
+- On Windows, the editor didn't get the keyboard back after the YouTube, Vimeo or GIPHY browser closed.
+- Ctrl+S while typing in a chart's data table left out the cell being typed.
+- Turning a Sankey diagram or a network graph into another chart type failed.
+- Changing the chart type reset the colors picked for its series.
+- A donut chart with a single value was drawn as a full disc instead of a ring.
+- Escape in an inspector field applied what was typed instead of cancelling it.
+- Clicking into a number field didn't select the number, so typing added to it.
+- Text with inline math stayed as LaTeX source after clicking into it and out again without changes.
+- Changing the slide size didn't scale motion paths or the font sizes of parts of a text.
+- The default title of new presentations, the Theme Builder's preview and the name of a customized theme are now in the interface language.
+
 ## 0.3.1 — 2026-10-15
 
 Ten new chart types plus maps of the world, continents and countries, charts that build one series at a time, motion paths, and the presenter's live camera on a slide.
