@@ -2005,6 +2005,12 @@
   ]
  },
  {
+  "key": "Fit box to text",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Fit to Window",
   "files": [
    "toolbar.js"
@@ -2258,12 +2264,6 @@
   "key": "Grow",
   "files": [
    "inspector.js"
-  ]
- },
- {
-  "key": "Grow box to fit text",
-  "files": [
-   "panels.js"
   ]
  },
  {

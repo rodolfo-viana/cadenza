@@ -270,16 +270,21 @@ impl Document {
         let before = self.deck.clone();
         let out = ops::apply(&mut self.deck, op)?;
         if self.deck != before {
-            self.history.record(&before, &out, coalesce);
+            self.history.record(&before, &self.deck, &out, coalesce);
             self.maybe_write_recovery(false);
         }
         Ok(out)
     }
 
     /// Applies a change that is not an editing step of its own (e.g. caching a
-    /// diagram rendering): no undo entry, redo history kept.
+    /// diagram rendering, the measured height of a text box): no undo entry,
+    /// redo history kept. Such derived data leaves a saved document saved.
     pub fn apply_untracked(&mut self, op: Op) -> anyhow::Result<OpOutcome> {
+        let clean = !self.is_dirty();
         let out = ops::apply(&mut self.deck, op)?;
+        if clean {
+            self.saved = self.deck.clone();
+        }
         self.maybe_write_recovery(false);
         Ok(out)
     }
@@ -509,6 +514,32 @@ mod tests {
         assert!(!doc.is_dirty());
         let reopened = Document::open(dir.path(), &file).unwrap();
         assert_eq!(reopened.deck.title, "Hello");
+    }
+
+    #[test]
+    fn derived_changes_leave_a_saved_document_saved() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut doc = new_doc(dir.path());
+        let sid = doc.deck.slides[0].id.clone();
+        let eid = doc.deck.slides[0].elements[0].id.clone();
+        let measured = |h: f64| Op::UpdateElements {
+            slide: sid.clone(),
+            updates: vec![ops::ElementPatch {
+                id: eid.clone(),
+                patch: json!({ "h": h }),
+            }],
+        };
+        doc.apply_untracked(measured(41.0)).unwrap();
+        assert!(!doc.is_dirty() && !doc.view(false, None).can_undo);
+        doc.apply(
+            Op::UpdateDeck {
+                patch: json!({"title": "Hello"}),
+            },
+            None,
+        )
+        .unwrap();
+        doc.apply_untracked(measured(42.0)).unwrap();
+        assert!(doc.is_dirty(), "unsaved edits stay unsaved");
     }
 
     #[test]

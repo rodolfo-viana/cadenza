@@ -137,6 +137,9 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
       onInput=${(e) => setText(e.target.value)}
       onKeyDown=${(e) => {
         if (e.key === 'Enter') {
+          // Committing may put the focus back in the text being edited, with
+          // its selection: the Enter must not land there and replace it.
+          e.preventDefault();
           e.target.blur();
         } else if (e.key === 'Escape') {
           cancel.current = true;
@@ -242,7 +245,10 @@ export function TextField({ value, onChange, placeholder, multiline, rows = 4, m
       }
     },
     onKeyDown: (e) => {
-      if (!multiline && e.key === 'Enter') e.target.blur();
+      if (!multiline && e.key === 'Enter') {
+        e.preventDefault();
+        e.target.blur();
+      }
       if (e.key === 'Escape') {
         if (!multiline) {
           cancel.current = true;
@@ -450,6 +456,7 @@ function ColorPanel({ value, onChange, allowNone, noneLabel }) {
         onInput=${(e) => setHex(e.target.value)}
         onKeyDown=${(e) => {
           if (e.key === 'Enter') {
+            e.preventDefault();
             const c = parseColor(hex.startsWith('#') ? hex : '#' + hex);
             if (c) pick(toCss({ ...c, a: c.a < 1 ? c.a : parsed.a }));
           }

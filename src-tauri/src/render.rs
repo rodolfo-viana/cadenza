@@ -337,17 +337,14 @@ pub fn element(deck: &Deck, el: &Element, ctx: &Ctx) -> String {
     };
     let Some(inner) = inner else { return String::new() };
 
-    // Auto-height text boxes grow with their content: the stored height is
-    // only a minimum, so the editor and every export lay them out alike.
+    // Text boxes that fit their text are exactly as tall as it, in the editor
+    // and in every export alike; the stored height only follows (the editor
+    // measures it).
     let auto = matches!(&el.content, Content::Text(t) if t.text.style.auto_height);
-    let mut style = format!(
-        "left:{}px;top:{}px;width:{}px;{}:{}px;",
-        num(el.x),
-        num(el.y),
-        num(el.w),
-        if auto { "min-height" } else { "height" },
-        num(el.h)
-    );
+    let mut style = format!("left:{}px;top:{}px;width:{}px;", num(el.x), num(el.y), num(el.w));
+    if !auto {
+        let _ = write!(style, "height:{}px;", num(el.h));
+    }
     if el.opacity < 1.0 {
         let _ = write!(style, "opacity:{};", num(el.opacity.clamp(0.0, 1.0)));
     }

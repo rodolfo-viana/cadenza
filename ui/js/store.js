@@ -116,6 +116,17 @@ export function registerFlush(fn) {
   flushers.add(fn);
   return () => flushers.delete(fn);
 }
+
+/**
+ * Set by textedit.js: after an undo or redo, the text being edited shows what
+ * the document now holds. The canvas leaves an edited element as typed, so
+ * it would go on showing what the undo took away.
+ */
+let historySync = null;
+export const registerHistorySync = (fn) => {
+  historySync = fn;
+};
+
 export async function flushEdits() {
   const docId = state.doc?.docId;
   try {
@@ -237,12 +248,16 @@ let chain = Promise.resolve();
 
 /**
  * Applies an operation in Rust. Operations are serialized; `coalesce` merges
- * consecutive operations with the same key into one undo step.
+ * consecutive operations with the same key into one undo step, and
+ * `track: false` makes none (derived data, such as measured heights).
  * Resolves with the outcome, or null when the operation failed.
  */
 export function apply(op, opts = {}) {
-  return enqueue('doc_apply', { op, coalesce: opts.coalesce || null }, opts);
+  return enqueue('doc_apply', { op, coalesce: opts.coalesce || null, track: opts.track ?? null }, opts);
 }
+
+/** Whether a text box is exactly as tall as its text ("Fit box to text"). */
+export const fitsText = (el) => el.content.kind === 'text' && !!el.content.style.autoHeight;
 
 function enqueue(command, args, opts = {}) {
   const docId = opts.docId ?? state.doc?.docId;
@@ -298,6 +313,7 @@ export async function undo() {
   if (!state.doc?.canUndo) return;
   try {
     ingest(await invoke('doc_undo'));
+    historySync?.();
   } catch (e) {
     toast(String(e), 'error');
   }
@@ -308,6 +324,7 @@ export async function redo() {
   if (!state.doc?.canRedo) return;
   try {
     ingest(await invoke('doc_redo'));
+    historySync?.();
   } catch (e) {
     toast(String(e), 'error');
   }

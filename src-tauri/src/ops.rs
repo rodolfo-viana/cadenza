@@ -535,7 +535,7 @@ const MAX_HISTORY: usize = 300;
 const COALESCE_WINDOW: std::time::Duration = std::time::Duration::from_millis(2500);
 
 impl History {
-    pub fn record(&mut self, before: &Deck, out: &OpOutcome, coalesce: Option<&str>) {
+    pub fn record(&mut self, before: &Deck, after: &Deck, out: &OpOutcome, coalesce: Option<&str>) {
         let now = std::time::Instant::now();
         let merge = match (coalesce, &self.last_key) {
             (Some(k), Some((last, at))) => k == last && now.duration_since(*at) < COALESCE_WINDOW,
@@ -544,6 +544,12 @@ impl History {
         self.last_key = coalesce.map(|k| (k.to_string(), now));
         self.redo.clear();
         if merge && !self.undo.is_empty() {
+            // A step that ends where it began (a letter typed and deleted)
+            // would make an undo that changes nothing.
+            if self.undo.last().is_some_and(|e| e.deck == *after) {
+                self.undo.pop();
+                self.last_key = None;
+            }
             return;
         }
         self.undo.push(Entry {
@@ -818,7 +824,7 @@ mod tests {
                 },
             )
             .unwrap();
-            h.record(&before, &out, Some("drag"));
+            h.record(&before, &d, &out, Some("drag"));
         }
         assert_eq!(d.slides[0].elements[0].x, 3.0);
         h.undo(&mut d).unwrap();
@@ -826,6 +832,41 @@ mod tests {
         assert!(h.undo(&mut d).is_none());
         h.redo(&mut d).unwrap();
         assert_eq!(d.slides[0].elements[0].x, 3.0);
+    }
+
+    #[test]
+    fn a_merged_step_back_where_it_began_is_dropped() {
+        let mut d = deck3();
+        let mut h = History::default();
+        let sid = d.slides[0].id.clone();
+        let eid = d.slides[0].elements[0].id.clone();
+        let step = |d: &mut Deck, h: &mut History, x: f64, key: &str| {
+            let before = d.clone();
+            let patch = ElementPatch {
+                id: eid.clone(),
+                patch: json!({ "x": x }),
+            };
+            let out = apply(
+                d,
+                Op::UpdateElements {
+                    slide: sid.clone(),
+                    updates: vec![patch],
+                },
+            )
+            .unwrap();
+            h.record(&before, d, &out, Some(key));
+        };
+        step(&mut d, &mut h, 50.0, "move");
+        let moved = d.clone();
+        step(&mut d, &mut h, 7.0, "text");
+        step(&mut d, &mut h, 50.0, "text");
+        assert_eq!(h.undo.len(), 1, "the typing step undid itself");
+        // Later typing starts a new step instead of joining the move.
+        step(&mut d, &mut h, 9.0, "text");
+        h.undo(&mut d).unwrap();
+        assert_eq!(d, moved);
+        h.undo(&mut d).unwrap();
+        assert_eq!(d.slides[0].elements[0].x, deck3().slides[0].elements[0].x);
     }
 
     #[test]

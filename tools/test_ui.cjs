@@ -711,7 +711,7 @@ async function control(name, props) {
     return out;
   };
   render();
-  const on = (event, e = {}) => attr(event)({ target: field, ...e });
+  const on = (event, e = {}) => attr(event)({ target: field, preventDefault() {}, ...e });
   const focus = () => { document.activeElement = field; on('onFocus'); render(); };
   const type = (text) => { field.value = text; on('onInput'); render(); };
   const flush = () => Promise.all([...flushers].map((fn) => fn()));
@@ -727,8 +727,12 @@ test('Escape leaves a number field without committing what was typed', async () 
   assert.deepEqual(changes, [], 'Escape cancels');
   f.focus();
   f.type('48');
-  f.on('onKeyDown', { key: 'Enter' });
+  let prevented = false;
+  f.on('onKeyDown', { key: 'Enter', preventDefault: () => (prevented = true) });
   assert.deepEqual(changes, [48], 'Enter commits once');
+  // Committing a size can put the focus back in selected text: the Enter
+  // must not go on to replace it.
+  assert.ok(prevented, 'the Enter itself goes nowhere');
 });
 
 test('Escape cancels a one-line text field and keeps what a multiline one got', async () => {

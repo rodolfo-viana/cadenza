@@ -2,7 +2,7 @@
 
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo } from './store.js';
+import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo, fitsText } from './store.js';
 import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField, Cell } from './controls.js';
 import * as A from './actions.js';
 import { exec, setLink, isEditing, beginTextEdit, beginTableEdit, insertInlineMath, textSelected, styleSelection, selectionStyle, selectionFontSize } from './textedit.js';
@@ -116,7 +116,7 @@ export function TextPanel({ els, title = t('Text') }) {
           min=${4}
           max=${800}
           unit="px"
-          onChange=${(v, live) => (isEditing() && textSelected() ? styleSelection('font-size', `${v}px`) : setStyle({ fontSize: v }, 'fontSize', live))}
+          onChange=${(v, live) => (isEditing() && textSelected() ? styleSelection('font-size', `${v}px`, live) : setStyle({ fontSize: v }, 'fontSize', live))}
         />
         <div class="btn-group">
           <${Button} icon="minus" size="sm" title=${t('Smaller')} onMouseDown=${(e) => e.preventDefault()} onClick=${() => resize(1 / 1.12)} />
@@ -130,8 +130,7 @@ export function TextPanel({ els, title = t('Text') }) {
         noneLabel=${t('Theme color')}
         onChange=${(v, live) => {
           if (!isEditing() || !textSelected()) setStyle({ color: v }, 'color', live);
-          else if (v) exec('foreColor', v);
-          else styleSelection('color', '');
+          else styleSelection('color', v, live);
         }}
       />
     <//>
@@ -186,7 +185,8 @@ export function TextPanel({ els, title = t('Text') }) {
         onChange=${(v) => setStyle({ align: v }, 'align')}
       />
     <//>
-    <${Row} label=${t('vertical alignment::Vertical')}>
+    ${!(isText && auto) &&
+    html`<${Row} label=${t('vertical alignment::Vertical')}>
       <${Segmented}
         value=${valign}
         options=${[
@@ -196,7 +196,7 @@ export function TextPanel({ els, title = t('Text') }) {
         ]}
         onChange=${(v) => setStyle({ valign: v }, 'valign')}
       />
-    <//>
+    <//>`}
     <${Row} label=${t('Spacing')}>
       <div class="row-inline">
         <${NumberField} label=${t('line height::Line')} value=${lh || 0} step=${0.05} min=${0} max=${4} title=${t('Line height (0 = automatic)')} onChange=${(v, live) => setStyle({ lineHeight: v }, 'lh', live)} />
@@ -231,7 +231,7 @@ export function TextPanel({ els, title = t('Text') }) {
         onChange=${(v) => setStyle({ shadow: v }, 'tshadow')}
       />
     <//>
-    ${isText && html`<${Row}><${Toggle} value=${auto} label=${t('Grow box to fit text')} onChange=${(v) => setStyle({ autoHeight: v }, 'auto')} /><//>`}
+    ${isText && html`<${Row}><${Toggle} value=${auto} label=${t('Fit box to text')} onChange=${(v) => setStyle({ autoHeight: v }, 'auto')} /><//>`}
   <//>`;
 }
 
@@ -244,7 +244,12 @@ function InlineExtras() {
     </div>
     <div class="row-inline link-row">
       <${Icon} name="link" size=${15} />
-      <input class="textfield" placeholder=${t('Link address…')} value=${url} onInput=${(e) => setUrl(e.target.value)} onKeyDown=${(e) => e.key === 'Enter' && setLink(url)} />
+      <input class="textfield" placeholder=${t('Link address…')} value=${url} onInput=${(e) => setUrl(e.target.value)} onKeyDown=${(e) => {
+          if (e.key !== 'Enter') return;
+          // The link goes on the selected text: the Enter must not replace it.
+          e.preventDefault();
+          setLink(url);
+        }} />
       <${Button} size="sm" label=${t('Link')} onMouseDown=${(e) => e.preventDefault()} onClick=${() => setLink(url)} />
       <${Button} size="sm" icon="unlink" title=${t('Remove link')} onMouseDown=${(e) => e.preventDefault()} onClick=${() => setLink('')} />
     </div>
@@ -884,7 +889,14 @@ export function ArrangePanel({ els }) {
       <${NumberField} label="X" value=${single.x} onChange=${(v, live) => geo('x', v, live)} />
       <${NumberField} label="Y" value=${single.y} onChange=${(v, live) => geo('y', v, live)} />
       <${NumberField} label=${t('W')} value=${single.w} min=${4} onChange=${(v, live) => geo('w', v, live)} />
-      <${NumberField} label=${t('H')} value=${single.h} min=${4} onChange=${(v, live) => geo('h', v, live)} />
+      <${NumberField}
+        label=${t('H')}
+        value=${single.h}
+        min=${4}
+        onChange=${(v, live) =>
+          // A height of its own: the box stops fitting its text.
+          fitsText(single) ? patchAll(els, { h: v, content: { style: { autoHeight: false } } }, live ? 'geo-h' : null) : geo('h', v, live)}
+      />
       <${NumberField} label="°" value=${single.rotation} min=${-360} max=${360} title=${t('Rotation')} onChange=${(v, live) => geo('rotation', v, live)} />
     </div>`}
     <${Row} label=${t('Opacity')}><${Slider} value=${Math.round((opacity ?? 1) * 100)} min=${0} max=${100} unit="%" onChange=${(v, live) => geo('opacity', v / 100, live)} /><//>

@@ -48,6 +48,9 @@
 
 /* ---- Text ---------------------------------------------------------------- */
 
+/* `.cz-text:not(.cz-el)` is the text itself: a text element's wrapper is
+   `.cz-el.cz-text` too, and must not get the spacing of paragraphs. */
+
 .reveal .cz-text-box,
 .reveal .cz-shape-text {
   display: flex;
@@ -58,7 +61,7 @@
 .reveal .cz-v-middle { justify-content: center; }
 .reveal .cz-v-bottom { justify-content: flex-end; }
 
-.reveal .cz-text {
+.reveal .cz-text:not(.cz-el) {
   width: 100%;
   font-family: var(--r-main-font);
   line-height: 1.25;
@@ -68,42 +71,42 @@
   outline: none;
 }
 
-.reveal .cz-text p,
-.reveal .cz-text div {
+.reveal .cz-text:not(.cz-el) p,
+.reveal .cz-text:not(.cz-el) div {
   margin: 0 0 var(--cz-ps, 0.4em);
   line-height: inherit;
 }
 
-.reveal .cz-text ul,
-.reveal .cz-text ol {
+.reveal .cz-text:not(.cz-el) ul,
+.reveal .cz-text:not(.cz-el) ol {
   display: block;
   margin: 0 0 var(--cz-ps, 0.4em);
   padding: 0 0 0 1.25em;
   text-align: inherit;
 }
 
-.reveal .cz-text li {
+.reveal .cz-text:not(.cz-el) li {
   margin: 0 0 calc(var(--cz-ps, 0.4em) * 0.5);
 }
 
-.reveal .cz-text li > ul,
-.reveal .cz-text li > ol {
+.reveal .cz-text:not(.cz-el) li > ul,
+.reveal .cz-text:not(.cz-el) li > ol {
   margin: calc(var(--cz-ps, 0.4em) * 0.5) 0 0;
 }
 
-.reveal .cz-text > :last-child,
-.reveal .cz-text li:last-child {
+.reveal .cz-text:not(.cz-el) > :last-child,
+.reveal .cz-text:not(.cz-el) li:last-child {
   margin-bottom: 0;
 }
 
-.reveal .cz-text a {
+.reveal .cz-text:not(.cz-el) a {
   color: var(--r-link-color);
   text-decoration: underline;
   text-decoration-thickness: 0.06em;
   text-underline-offset: 0.12em;
 }
 
-.reveal .cz-text code {
+.reveal .cz-text:not(.cz-el) code {
   font-family: var(--r-code-font);
   font-size: 0.9em;
   padding: 0.05em 0.3em;
@@ -112,7 +115,7 @@
   text-transform: none;
 }
 
-.reveal .cz-text blockquote {
+.reveal .cz-text:not(.cz-el) blockquote {
   width: auto;
   margin: 0 0 var(--cz-ps, 0.4em);
   padding: 0 0 0 0.8em;
@@ -122,13 +125,13 @@
   font-style: italic;
 }
 
-.reveal .cz-text mark {
+.reveal .cz-text:not(.cz-el) mark {
   color: inherit;
   background: color-mix(in srgb, var(--cz-accent, #fde047) 35%, transparent);
   padding: 0 0.1em;
 }
 
-.reveal .cz-text small {
+.reveal .cz-text:not(.cz-el) small {
   display: inline;
   vertical-align: baseline;
   line-height: inherit;
@@ -390,14 +393,13 @@
 
 /* ---- Auto-height text boxes ---------------------------------------------- */
 
-/* The wrapper's min-height is the stored height; the content can grow it. */
+/* The wrapper has no height of its own: the text sets it. */
 .reveal .cz-el.cz-auto > .cz-rot,
 .reveal .cz-el.cz-auto .cz-frag,
 .reveal .cz-el.cz-auto .cz-link,
 .reveal .cz-el.cz-auto .cz-box {
   position: relative;
   inset: auto;
-  min-height: inherit;
 }
 
 /* ---- Inline math in text ($…$, $$…$$) ------------------------------------------ */

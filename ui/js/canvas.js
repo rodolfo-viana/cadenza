@@ -11,6 +11,7 @@ import {
   apply,
   useStore,
   currentSlide,
+  fitsText,
   settings,
   openMenu,
   select,
@@ -85,6 +86,26 @@ function snapBox(b, others, W, H, thr, edges = { x: [0, 0.5, 1], y: [0, 0.5, 1] 
   return best;
 }
 
+/**
+ * Keeps the measured height of the text boxes that fit their text in the
+ * document (for the inspector, alignment and the box's other uses). It is
+ * derived data: no undo step, and a saved presentation stays saved.
+ */
+let heightTimer = 0;
+function storeHeights(view) {
+  clearTimeout(heightTimer);
+  heightTimer = setTimeout(() => {
+    const s = currentSlide();
+    if (!s || document.body.classList.contains('dragging')) return;
+    const updates = [];
+    for (const el of s.elements) {
+      const h = fitsText(el) ? view.node(el.id)?.offsetHeight : 0;
+      if (h > 0 && Math.abs(h - el.h) >= 1) updates.push({ id: el.id, patch: { h } });
+    }
+    if (updates.length) apply({ op: 'updateElements', slide: s.id, updates }, { track: false, navigate: false });
+  }, 300);
+}
+
 export function Canvas() {
   const st = useStore();
   const doc = st.doc;
@@ -157,14 +178,14 @@ export function Canvas() {
     };
   }, [slide?.id]);
 
-  // Measure auto-height text boxes (their real height can exceed `h`).
+  // Measure the text boxes that fit their text: their text sets their height.
   function measure() {
     const v = viewRef.current;
     const s = currentSlide();
     if (!v || !s) return;
     const next = {};
     for (const el of s.elements) {
-      if (el.content.kind === 'text' && el.content.style.autoHeight) {
+      if (fitsText(el)) {
         const n = v.node(el.id);
         if (n) next[el.id] = n.offsetHeight;
       }
@@ -174,6 +195,7 @@ export function Canvas() {
       if (keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === next[k])) return prev;
       return next;
     });
+    storeHeights(v);
   }
 
   useEffect(() => {
@@ -195,7 +217,7 @@ export function Canvas() {
       x: el.x,
       y: el.y,
       w: el.w,
-      h: el.content.kind === 'text' && el.content.style.autoHeight ? Math.max(el.h, measured[el.id] || 0) : el.h,
+      h: fitsText(el) ? measured[el.id] || el.h : el.h,
       rotation: el.rotation,
     };
 
@@ -213,8 +235,7 @@ export function Canvas() {
     n.style.left = g.x + 'px';
     n.style.top = g.y + 'px';
     n.style.width = g.w + 'px';
-    if (el.content.kind === 'text' && el.content.style.autoHeight) n.style.minHeight = g.h + 'px';
-    else n.style.height = g.h + 'px';
+    if (!fitsText(el)) n.style.height = g.h + 'px';
     const rot = n.querySelector('.cz-rot');
     if (rot) rot.style.transform = g.rotation ? `rotate(${g.rotation}deg)` : '';
   }
@@ -351,8 +372,10 @@ export function Canvas() {
           }
           gl = { x: s.gx, y: s.gy };
         }
-        last = g;
         paint(el.id, g, el);
+        // A box that fits its text gets taller or shorter as its text wraps.
+        if (fitsText(el)) g.h = nodeOf(el.id)?.offsetHeight || g.h;
+        last = g;
         setLive({ [el.id]: g });
         setGuides(gl);
         setTip({ x: g.x, y: g.y - 8 / scale, text: `${Math.round(g.w)} × ${Math.round(g.h)}` });
@@ -606,7 +629,8 @@ export function Canvas() {
   const handlesFor = (el, g) => {
     if (el.locked || editingId === el.id || live) return null;
     const isLine = el.content.kind === 'shape' && el.content.shape === 'line';
-    const hs = isLine ? ['e', 'w'] : HANDLES;
+    // A box that fits its text only gets wider or narrower.
+    const hs = isLine || fitsText(el) ? ['e', 'w'] : HANDLES;
     return html`${hs.map(
       (h) => html`<div
         class=${'handle h-' + h}
