@@ -130,7 +130,10 @@ export class SlideView {
 
   update(html, force = false) {
     const lang = language();
-    if (!force && html === this.html && lang === this.lang) return false;
+    // Elements edited inline are drawn again once their editing ends (also
+    // when it moves straight on to another element).
+    const stale = [...this.root.children].some((n) => n.__czSrc === null && keyOf(n) !== this.editingId);
+    if (!force && !stale && html === this.html && lang === this.lang) return false;
     // Placeholders are translated when a node is inserted: a new interface
     // language re-renders every element.
     if (lang !== this.lang) {

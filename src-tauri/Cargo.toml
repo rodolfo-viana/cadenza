@@ -47,6 +47,13 @@ keyring = "4"
 webkit2gtk = "=2.0.2"
 gtk = "0.18"
 
+# Saving PDFs with WebView2's own printing, and giving the focus back from
+# the media browser (same versions as Tauri's webview layer).
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_UI_WindowsAndMessaging"] }
+windows-core = "0.62"
+
 # Keeps the audience window drawing while it is behind the presenter display.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

@@ -62,6 +62,11 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
   const field = useRef(null);
   const [text, setText] = useState(fmt(value));
   const [focused, setFocused] = useState(false);
+  // Escape leaves the field without committing what was typed.
+  const cancel = useRef(false);
+  // A click into the field selects its number; the click's mouseup would
+  // otherwise put the caret back where the pointer is.
+  const clicked = useRef(false);
   useEffect(() => {
     if (!focused) setText(fmt(value));
   }, [value, focused]);
@@ -112,20 +117,29 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
       inputmode="decimal"
       value=${text}
       disabled=${disabled}
+      onMouseDown=${(e) => {
+        clicked.current = document.activeElement !== e.target;
+      }}
+      onMouseUp=${(e) => {
+        if (clicked.current) e.preventDefault();
+        clicked.current = false;
+      }}
       onFocus=${(e) => {
+        cancel.current = false;
         setFocused(true);
         e.target.select();
       }}
-      onBlur=${() => {
+      onBlur=${(e) => {
         setFocused(false);
-        commit(text);
+        if (!cancel.current) commit(e.target.value);
+        cancel.current = false;
       }}
       onInput=${(e) => setText(e.target.value)}
       onKeyDown=${(e) => {
         if (e.key === 'Enter') {
-          commit(text);
           e.target.blur();
         } else if (e.key === 'Escape') {
+          cancel.current = true;
           setText(fmt(value));
           e.target.blur();
         } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -185,12 +199,17 @@ export function Toggle({ value, onChange, label, hint }) {
   </label>`;
 }
 
-/** Text input that commits on Enter/blur (or live for multiline fields). */
+/**
+ * Text input that commits on Enter/blur (or live for multiline fields).
+ * Escape leaves a one-line field without committing; in a multiline field
+ * (code, LaTeX) it keeps what was typed.
+ */
 export function TextField({ value, onChange, placeholder, multiline, rows = 4, mono, live, spellcheck = false }) {
   const [text, setText] = useState(value ?? '');
   const [focused, setFocused] = useState(false);
   const timer = useRef(null);
   const field = useRef(null);
+  const cancel = useRef(false);
   useEffect(() => {
     if (!focused) setText(value ?? '');
   }, [value, focused]);
@@ -205,10 +224,14 @@ export function TextField({ value, onChange, placeholder, multiline, rows = 4, m
     placeholder,
     spellcheck,
     class: cls('textfield', mono && 'mono'),
-    onFocus: () => setFocused(true),
-    onBlur: () => {
+    onFocus: () => {
+      cancel.current = false;
+      setFocused(true);
+    },
+    onBlur: (e) => {
       setFocused(false);
-      flush(text);
+      if (!cancel.current) flush(e.target.value);
+      cancel.current = false;
     },
     onInput: (e) => {
       setText(e.target.value);
@@ -219,11 +242,14 @@ export function TextField({ value, onChange, placeholder, multiline, rows = 4, m
       }
     },
     onKeyDown: (e) => {
-      if (!multiline && e.key === 'Enter') {
-        flush(text);
+      if (!multiline && e.key === 'Enter') e.target.blur();
+      if (e.key === 'Escape') {
+        if (!multiline) {
+          cancel.current = true;
+          setText(value ?? '');
+        }
         e.target.blur();
       }
-      if (e.key === 'Escape') e.target.blur();
       if (multiline && e.key === 'Tab' && mono) {
         e.preventDefault();
         const field = e.target;
@@ -235,6 +261,36 @@ export function TextField({ value, onChange, placeholder, multiline, rows = 4, m
     },
   };
   return multiline ? html`<textarea rows=${rows} ...${props} />` : html`<input type="text" ...${props} />`;
+}
+
+/**
+ * A cell of a data grid. It commits when its text changes (Enter, leaving
+ * it) and when Save or Close run while it is being typed in; while it has
+ * the focus, other updates leave what is typed alone.
+ */
+export function Cell({ value, onChange, number, class: klass, list }) {
+  const field = useRef(null);
+  const [text, setText] = useState(String(value));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setText(String(value));
+  }, [value, focused]);
+  const commit = (v) => {
+    const next = number ? Number(v) || 0 : v;
+    if (next !== value) return onChange(next);
+  };
+  useFlushWhenFocused(field, commit);
+  return html`<input
+    ref=${field}
+    class=${klass}
+    type=${number ? 'number' : 'text'}
+    list=${list}
+    value=${text}
+    onFocus=${() => setFocused(true)}
+    onBlur=${() => setFocused(false)}
+    onInput=${(e) => setText(e.target.value)}
+    onChange=${(e) => commit(e.target.value)}
+  />`;
 }
 
 // ---------------------------------------------------------------------------

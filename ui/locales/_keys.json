@@ -36,6 +36,12 @@
   ]
  },
  {
+  "key": "A {link} and {bold} words",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
   "key": "About",
   "files": [
    "welcome.js"
@@ -1018,6 +1024,12 @@
   ]
  },
  {
+  "key": "Clear, readable text",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
   "key": "Click on the slide to add points; press Enter or double-click to finish, Esc to cancel. Drag the points to adjust the path.",
   "files": [
    "inspector.js"
@@ -1225,6 +1237,12 @@
   "key": "Could not start the presentation: {error}",
   "files": [
    "present.js"
+  ]
+ },
+ {
+  "key": "Could not write the PDF",
+  "files": [
+   "lib.rs"
   ]
  },
  {
@@ -2328,6 +2346,12 @@
   "files": [
    "inspector.js",
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Headings, text, accents and charts",
+  "files": [
+   "layouts.rs"
   ]
  },
  {
@@ -3840,6 +3864,12 @@
   ]
  },
  {
+  "key": "Print…",
+  "files": [
+   "present.js"
+  ]
+ },
+ {
   "key": "Progress bar",
   "files": [
    "inspector.js"
@@ -4178,6 +4208,12 @@
   ]
  },
  {
+  "key": "Save PDF…",
+  "files": [
+   "present.js"
+  ]
+ },
+ {
   "key": "Save Presentation",
   "files": [
    "store.js"
@@ -4187,6 +4223,12 @@
   "key": "Save Presentation As",
   "files": [
    "store.js"
+  ]
+ },
+ {
+  "key": "Save the slides as a PDF, a slide per page, or print them on paper.",
+  "files": [
+   "present.js"
   ]
  },
  {
@@ -4202,6 +4244,12 @@
   ]
  },
  {
+  "key": "Saved {file}",
+  "files": [
+   "present.js"
+  ]
+ },
+ {
   "key": "Saved “{name}” to My Themes",
   "files": [
    "themebuilder.js"
@@ -4210,6 +4258,7 @@
  {
   "key": "Saving…",
   "files": [
+   "present.js",
    "store.js"
   ]
  },
@@ -4460,7 +4509,8 @@
  {
   "key": "Show in Folder",
   "files": [
-   "actions.js"
+   "actions.js",
+   "present.js"
   ]
  },
  {
@@ -5111,6 +5161,12 @@
   ]
  },
  {
+  "key": "Theme accent colors",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
   "key": "Theme body font",
   "files": [
    "inspector.js"
@@ -5210,6 +5266,24 @@
   "key": "Theme preview",
   "files": [
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Theme Preview",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "theme preview::bold",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
+  "key": "theme preview::link",
+  "files": [
+   "layouts.rs"
   ]
  },
  {
@@ -5480,6 +5554,8 @@
  {
   "key": "Untitled Presentation",
   "files": [
+   "present.js",
+   "presenter.js",
    "store.js"
   ]
  },
@@ -5642,6 +5718,12 @@
   ]
  },
  {
+  "key": "What’s inside",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
   "key": "Widescreen 16:9 (1280×720)",
   "files": [
    "inspector.js"
@@ -5801,6 +5883,12 @@
   "key": "{file}: {error}",
   "files": [
    "actions.js"
+  ]
+ },
+ {
+  "key": "{name} (custom)",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {

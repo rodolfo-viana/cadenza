@@ -374,12 +374,14 @@ pub fn delete(config_dir: &Path, id: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Starting point for "customize this theme": a built-in theme as a def.
+/// Starting point for "customize this theme": a built-in theme as a def,
+/// with the theme's name (the editor marks it as custom in the interface
+/// language).
 pub fn from_builtin(id: &str) -> ThemeDef {
     let t = crate::themes::find(id);
     let mut def = ThemeDef {
         id: String::new(),
-        name: format!("{} (custom)", t.name),
+        name: t.name.into(),
         dark: t.dark,
         text_color: t.text_color.into(),
         heading_color: t.heading_color.into(),

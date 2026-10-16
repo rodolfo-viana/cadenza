@@ -492,12 +492,13 @@ test('a delayed image paste keeps its original slide and supports ordinary inser
   assert.equal(edit.args.op.props.content.src, 'photo.png');
 });
 
-async function teleprompter() {
-  const context = vm.createContext({});
-  const stubs = { 'i18n.js': { t: (s) => s }, 'icon-data.js': { ICONS: {} } };
-  const mod = new vm.SourceTextModule(fs.readFileSync(path.join(root, 'teleprompter.js'), 'utf8'), { context, identifier: 'teleprompter.js' });
+/** One real UI module, with each of its imports stubbed. */
+async function standalone(name, stubs, globals = {}) {
+  const context = vm.createContext(globals);
+  const mod = new vm.SourceTextModule(fs.readFileSync(path.join(root, name), 'utf8'), { context, identifier: name });
   await mod.link((specifier) => {
     const exports = stubs[path.basename(specifier)];
+    if (!exports) throw new Error(`${name} imports ${specifier}, which has no stub`);
     return new vm.SyntheticModule(Object.keys(exports), function () {
       for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
     }, { context });
@@ -505,6 +506,8 @@ async function teleprompter() {
   await mod.evaluate();
   return mod.namespace;
 }
+
+const teleprompter = () => standalone('teleprompter.js', { 'i18n.js': { t: (s) => s }, 'icon-data.js': { ICONS: {} } });
 
 test('the teleprompter box stays inside the presenter display', async () => {
   const P = await teleprompter();
@@ -618,4 +621,197 @@ test('each chart type builds by its own unit and keeps edited data', async () =>
   const mine = Charts.switchChart(edited, 'map');
   assert.equal(mine.map, 'world', 'edited data is kept, on the world map');
   assert.equal(mine.labels, undefined);
+});
+
+test('every chart type can become every other type', async () => {
+  const { Charts } = await ui(async () => ({}));
+  const kinds = Object.keys(Charts.CHART_ICONS);
+  const fresh = () => ({ chart: 'column', stacked: false, links: [], map: '', ...Charts.chartSample('column') });
+  for (const from of kinds) {
+    for (const to of kinds) {
+      if (from === to) continue;
+      const chart = fresh();
+      Object.assign(chart, Charts.switchChart(chart, from));
+      assert.equal({ ...chart, ...Charts.switchChart(chart, to) }.chart, to, `${from} → ${to}`);
+    }
+  }
+  // Untouched data still follows the type after a Sankey diagram.
+  const sankey = fresh();
+  Object.assign(sankey, Charts.switchChart(sankey, 'sankey'));
+  assert.ok(Charts.isSample({ ...sankey, ...Charts.switchChart(sankey, 'treemap') }, 'treemap'));
+});
+
+test('changing the chart type keeps the colors picked for series', async () => {
+  const { Charts } = await ui(async () => ({}));
+  let chart = { chart: 'column', stacked: false, links: [], map: '', ...Charts.chartSample('column') };
+  // One series with a color of its own, one with the theme's.
+  chart.series = chart.series.map((s, k) => ({ ...s, color: k === 0 ? '#ef4444' : '' }));
+  const colors = () => clone(chart.series.map((s) => s.color));
+  const values = clone(chart.series.map((s) => s.values));
+  for (const kind of ['line', 'area']) {
+    chart = { ...chart, ...Charts.switchChart(chart, kind) };
+    assert.deepEqual(colors(), ['#ef4444', ''], kind);
+    assert.deepEqual(clone(chart.series.map((s) => s.values)), values, kind);
+  }
+  chart = { ...chart, ...Charts.switchChart(chart, 'treemap') };
+  assert.deepEqual(colors(), ['#ef4444'], 'the treemap sample has one series');
+  chart = { ...chart, ...Charts.switchChart(chart, 'column') };
+  assert.deepEqual(colors(), ['#ef4444', '']);
+});
+
+/**
+ * controls.js with just enough of Preact's hooks to render a control again
+ * and call its handlers. `field` stands for the control's <input>.
+ */
+async function control(name, props) {
+  const flushers = new Set();
+  const slots = [];
+  let at = 0;
+  const slot = (init) => (at in slots ? slots[at++] : (slots[at++] = init()));
+  const lib = {
+    html: (strings, ...values) => ({ strings, values }),
+    useState(initial) {
+      const s = slot(() => ({ v: typeof initial === 'function' ? initial() : initial }));
+      return [s.v, (v) => { s.v = typeof v === 'function' ? v(s.v) : v; }];
+    },
+    useRef: (current) => slot(() => ({ current })),
+    useMemo: (f) => f(),
+    useLayoutEffect() {},
+    useEffect(fn, deps) {
+      const s = slot(() => ({ deps: null }));
+      if (!s.deps || deps.some((d, k) => d !== s.deps[k])) {
+        s.deps = deps;
+        fn();
+      }
+    },
+  };
+  const document = { activeElement: null };
+  const C = await standalone('controls.js', {
+    'lib.js': lib, 'icons.js': { Icon() {} }, 'store.js': { state: {}, registerFlush: (fn) => (flushers.add(fn), () => flushers.delete(fn)) },
+    'util.js': { clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)), cls: (...a) => a.filter(Boolean).join(' ') },
+    'i18n.js': { t: (s) => s, N_: (s) => s },
+  }, { window: {}, document, setTimeout, clearTimeout });
+  let out;
+  // Attributes are either `name=${…}` or spread from one object (TextField).
+  const attr = (key) => {
+    const i = out.strings.findIndex((s) => s.endsWith(` ${key}=`) || s.endsWith(`\n${key}=`));
+    return i >= 0 ? out.values[i] : out.values.find((v) => v && typeof v === 'object' && key in v)?.[key];
+  };
+  const field = {
+    value: '',
+    select() {},
+    // The browser runs the blur handler at once, the one of the last render.
+    blur: () => { document.activeElement = null; attr('onBlur')({ target: field }); },
+  };
+  const render = (more = {}) => {
+    at = 0;
+    out = C[name]({ ...props, ...more });
+    attr('ref').current = field;
+    field.value = String(attr('value'));
+    return out;
+  };
+  render();
+  const on = (event, e = {}) => attr(event)({ target: field, ...e });
+  const focus = () => { document.activeElement = field; on('onFocus'); render(); };
+  const type = (text) => { field.value = text; on('onInput'); render(); };
+  const flush = () => Promise.all([...flushers].map((fn) => fn()));
+  return { render, on, focus, type, flush, attr };
+}
+
+test('Escape leaves a number field without committing what was typed', async () => {
+  const changes = [];
+  const f = await control('NumberField', { value: 94, min: 4, max: 800, onChange: (v) => changes.push(v) });
+  f.focus();
+  f.type('48');
+  f.on('onKeyDown', { key: 'Escape' });
+  assert.deepEqual(changes, [], 'Escape cancels');
+  f.focus();
+  f.type('48');
+  f.on('onKeyDown', { key: 'Enter' });
+  assert.deepEqual(changes, [48], 'Enter commits once');
+});
+
+test('Escape cancels a one-line text field and keeps what a multiline one got', async () => {
+  for (const multiline of [false, true]) {
+    const changes = [];
+    const f = await control('TextField', { value: 'Old', multiline, onChange: (v) => changes.push(v) });
+    f.focus();
+    f.type('New');
+    f.on('onKeyDown', { key: 'Escape' });
+    assert.deepEqual(changes, multiline ? ['New'] : [], multiline ? 'multiline' : 'one line');
+  }
+  const changes = [];
+  const f = await control('TextField', { value: 'Old', onChange: (v) => changes.push(v) });
+  f.focus();
+  f.type('New');
+  f.on('onKeyDown', { key: 'Enter' });
+  assert.deepEqual(changes, ['New'], 'Enter commits once');
+});
+
+test('saving commits a chart cell that is still being typed in', async () => {
+  const changes = [];
+  const cell = await control('Cell', { value: 12, number: true, onChange: (v) => changes.push(v) });
+  cell.focus();
+  cell.type('99');
+  // Another update while typing (the "Saving…" status) leaves the text alone.
+  cell.render({ value: 12 });
+  assert.equal(cell.attr('value'), '99');
+  await cell.flush();
+  assert.deepEqual(changes, [99]);
+  cell.render({ value: 99 });
+  cell.on('onChange');
+  assert.deepEqual(changes, [99], 'the same value is not committed twice');
+  const label = await control('Cell', { value: 'Q1', onChange: (v) => changes.push(v) });
+  label.focus();
+  label.type('Spring');
+  await label.flush();
+  assert.deepEqual(changes, [99, 'Spring']);
+});
+
+test('inline math is typeset again after editing without changes', async () => {
+  const backend = view();
+  backend.deck.slides[0].elements = ['text-1', 'text-2'].map((id) => ({ id, content: { kind: 'text', html: '<p>$x^2$</p>' } }));
+  const { S, T } = await ui(async (name) => (name === 'recent_list' ? [] : {}));
+  S.openView(clone(backend));
+  // Rust's rendering of the two boxes; each update parses it into new nodes.
+  const typeset = '<span class="cz-math-inline">x²</span>';
+  const src = (id) => `<div data-cz-id="${id}"><div class="cz-text">${typeset}</div></div>`;
+  const html = src('text-1') + src('text-2');
+  const root = {
+    children: [],
+    get firstChild() { return this.children[0] ?? null; },
+    insertBefore(n, before) {
+      const list = this.children.filter((x) => x !== n);
+      list.splice(before ? list.indexOf(before) : list.length, 0, n);
+      this.children = list;
+    },
+    querySelector(sel) { return this.children.find((n) => sel.includes(`"${n.id}"`)) ?? null; },
+  };
+  const node = (id) => {
+    const text = {
+      innerHTML: typeset, classList: { contains: () => false, remove() {} }, querySelector: (sel) => (sel.includes('cz-math') ? {} : null),
+      setAttribute() {}, removeAttribute() {}, focus() {}, contains: () => false, addEventListener() {}, removeEventListener() {},
+    };
+    const n = {
+      id, text, outerHTML: src(id), getAttribute: (k) => (k === 'data-cz-id' ? id : null),
+      querySelector: (sel) => (sel === '.cz-text' ? text : null), querySelectorAll: () => [], remove() {},
+      get nextSibling() { return root.children[root.children.indexOf(n) + 1] ?? null; },
+      replaceWith(other) { root.children[root.children.indexOf(n)] = other; },
+    };
+    return n;
+  };
+  const document = { createElement: () => ({ set innerHTML(_) {}, content: { get children() { return [node('text-1'), node('text-2')]; } } }) };
+  const SV = await standalone('slideview.js', { 'i18n.js': { t: (s) => s, N_: (s) => s, language: () => 'en' } }, { window: {}, document, CSS: { escape: (s) => s } });
+  const slideView = new SV.SlideView(root);
+  slideView.update(html);
+  assert.equal(slideView.update(html), false, 'nothing to draw');
+
+  await T.beginTextEdit(slideView, S.currentSlide().elements[0]);
+  assert.equal(root.children[0].text.innerHTML, '<p>$x^2$</p>', 'the editor shows the LaTeX');
+  await T.endTextEdit();
+  // Editing moves straight on to the other box: no forced update.
+  slideView.editingId = 'text-2';
+  assert.equal(slideView.update(html), true);
+  assert.equal(root.children[0].text.innerHTML, typeset, 'the formula is typeset again');
+  assert.equal(root.children.length, 2);
 });

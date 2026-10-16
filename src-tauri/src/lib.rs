@@ -346,7 +346,9 @@ fn theme_import(state: State<AppState>, path: String) -> CmdResult<custom_theme:
 
 /// CSS and sample slides for the Theme Builder's live preview.
 #[tauri::command]
-fn theme_preview(window: Window, state: State<AppState>, def: custom_theme::ThemeDef) -> CmdResult<Value> {
+fn theme_preview(app: AppHandle, window: Window, state: State<AppState>, def: custom_theme::ThemeDef) -> CmdResult<Value> {
+    let language = state.settings.lock().map(|s| s.language.clone()).unwrap_or_default();
+    let text = translator(&app, &language);
     // With its fonts (as data URIs), so library themes preview correctly
     // even when the open presentation doesn't use their fonts.
     let mut def = full_theme(&state, window.label(), def);
@@ -368,7 +370,7 @@ fn theme_preview(window: Window, state: State<AppState>, def: custom_theme::Them
             deck.web_fonts.push(f);
         }
     }
-    deck.slides = layouts::sample_slides(deck.width, deck.height);
+    deck.slides = layouts::sample_slides(deck.width, deck.height, &text);
     let assets = doc.map(|d| d.assets_dir()).unwrap_or_default();
     let url = move |name: &str| document::file_url(&assets.join(name));
     let ctx = Ctx {
@@ -761,6 +763,8 @@ fn media_browse(app: AppHandle, window: Window, state: State<AppState>, provider
         }
         if let Some(w) = app.get_webview_window(&owner) {
             let _ = w.set_focus();
+            // The window alone: on Windows the keyboard stays out of the page.
+            let _ = AsRef::<tauri::Webview>::as_ref(&w).set_focus();
         }
     });
     Ok(())
@@ -790,8 +794,18 @@ fn translator(app: &AppHandle, lang: &str) -> impl Fn(&str) -> String + use<> {
 }
 
 /// Translates `key` with `text`; also marks it for the catalogs (tools/i18n.py).
-fn tr(text: &dyn Fn(&str) -> String, key: &str) -> String {
-    text(key)
+/// A `context::` prefix (as in the interface's `t()`) is dropped when the
+/// catalog has no entry.
+pub(crate) fn tr(text: &dyn Fn(&str) -> String, key: &str) -> String {
+    let out = text(key);
+    match key.split_once("::") {
+        Some((context, english))
+            if out == key && context.starts_with(|c: char| c.is_ascii_lowercase()) && context.chars().all(|c| c.is_ascii_lowercase() || c == ' ') =>
+        {
+            english.to_string()
+        }
+        _ => out,
+    }
 }
 
 /// Entry point of the `--media-browser` helper process.
@@ -806,9 +820,11 @@ fn run_media_browser(context: tauri::Context<tauri::Wry>, provider: String, lang
         .setup(move |app| {
             let text = translator(app.handle(), &lang);
             let prov = provider.clone();
-            let w = window_builder(app, "media-browser", WebviewUrl::External(start.parse()?))
+            let handle = app.handle().clone();
+            let builder = window_builder(app, "media-browser", WebviewUrl::External(start.parse()?));
+            let w = sized(builder, app.handle(), (1200.0, 840.0))
                 .title(tr(&text, "{name} — pick something to insert into Cadenza").replace("{name}", name))
-                .inner_size(1200.0, 840.0)
+                .center()
                 .initialization_script(browse::bar_script(&provider, &text))
                 .on_navigation(move |url| {
                     if url.host_str() != Some(browse::PICK_HOST) {
@@ -821,14 +837,35 @@ fn run_media_browser(context: tauri::Context<tauri::Wry>, provider: String, lang
                         println!("{json}");
                     }
                     let _ = std::io::stdout().flush();
-                    std::process::exit(0);
+                    // Closing the window properly: a process ending while
+                    // WebView2 is busy can crash the web engine the editor
+                    // shares with it.
+                    handle.exit(0);
+                    false
                 })
                 .build()?;
             harden_browser(&w, safe);
             Ok(())
         })
-        .run(context)
-        .expect("error while running the media browser");
+        .build(context)
+        .expect("error while running the media browser")
+        .run(|_, event| {
+            if let tauri::RunEvent::Exit = event {
+                return_focus();
+            }
+        });
+}
+
+/// Lets the editor come back to the front when the media browser closes
+/// (picked, cancelled or closed). Windows only lets the process the user last
+/// clicked in bring a window forward, and that is this one.
+fn return_focus() {
+    #[cfg(windows)]
+    // SAFETY: a plain Win32 call without pointers.
+    unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::{ASFW_ANY, AllowSetForegroundWindow};
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
+    }
 }
 
 /// The media browser only needs to show pages: no autoplay, no DRM, camera
@@ -901,16 +938,17 @@ async fn export_html(app: AppHandle, window: Window, state: State<'_, AppState>,
 
 /// Opens a window that lays the deck out for printing and shows the
 /// system print dialog (choose "Print to File"/"Save as PDF").
+///
+/// Commands that open windows are async: a synchronous command runs inside
+/// the calling page's IPC handler, and on Windows building a WebView2 window
+/// there deadlocks the whole app (see `WebviewWindowBuilder::new`).
 #[tauri::command]
-fn export_pdf(app: AppHandle, window: Window) -> CmdResult<()> {
+async fn export_pdf(app: AppHandle, window: Window) -> CmdResult<()> {
     let label = format!("print-{}", window.label());
-    if let Some(w) = app.get_webview_window(&label) {
-        let _ = w.close();
-    }
+    close_and_wait(&app, &[&label]).await;
     let url = format!("present.html?doc={}&print-pdf", util::encode_uri_component(window.label()));
-    window_builder(&app, &label, WebviewUrl::App(url.into()))
+    sized(window_builder(&app, &label, WebviewUrl::App(url.into())), &app, (1100.0, 800.0))
         .title("Cadenza — Print / Export PDF")
-        .inner_size(1100.0, 800.0)
         .build()
         .map_err(err)?;
     Ok(())
@@ -962,6 +1000,80 @@ fn print_slides(webview: tauri::Webview, width: f64, height: f64) -> bool {
         let _ = (webview, width, height);
         false
     }
+}
+
+/// Writes the print window's slides to a PDF file, with pages the size of a
+/// slide and no margins, headers or footers (Windows). The print dialog lays
+/// slides out on the default printer's paper, with the browser's headers, and
+/// Windows' own PDF printer only knows paper sizes.
+#[tauri::command]
+async fn print_to_pdf(webview: tauri::Webview, path: String, width: f64, height: f64) -> CmdResult<()> {
+    #[cfg(windows)]
+    {
+        let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+        let failed = tx.clone();
+        webview
+            .with_webview(move |wv| {
+                if let Err(e) = start_pdf(&wv, &path, width, height, tx) {
+                    let _ = failed.send(Err(e));
+                }
+            })
+            .map_err(err)?;
+        tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or_else(|_| Err("Could not write the PDF".into())))
+            .await
+            .map_err(err)?
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (webview, path, width, height);
+        Err("Could not write the PDF".into())
+    }
+}
+
+/// Starts WebView2's PDF printing; `done` gets the outcome.
+#[cfg(windows)]
+fn start_pdf(
+    wv: &tauri::webview::PlatformWebview,
+    path: &str,
+    width: f64,
+    height: f64,
+    done: std::sync::mpsc::Sender<Result<(), String>>,
+) -> Result<(), String> {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        COREWEBVIEW2_PRINT_ORIENTATION_PORTRAIT, ICoreWebView2_7, ICoreWebView2Environment6, ICoreWebView2PrintSettings,
+    };
+    use windows_core::{HSTRING, Interface};
+    // SAFETY: WebView2 COM calls on the window's own thread (with_webview).
+    unsafe {
+        let view: ICoreWebView2_7 = wv.controller().CoreWebView2().and_then(|v| v.cast()).map_err(err)?;
+        let env: ICoreWebView2Environment6 = wv.environment().cast().map_err(err)?;
+        let settings = env.CreatePrintSettings().map_err(err)?;
+        // CSS pixels are 1/96 inch.
+        settings.SetPageWidth(width / 96.0).map_err(err)?;
+        settings.SetPageHeight(height / 96.0).map_err(err)?;
+        settings.SetOrientation(COREWEBVIEW2_PRINT_ORIENTATION_PORTRAIT).map_err(err)?;
+        for set in [
+            ICoreWebView2PrintSettings::SetMarginTop,
+            ICoreWebView2PrintSettings::SetMarginBottom,
+            ICoreWebView2PrintSettings::SetMarginLeft,
+            ICoreWebView2PrintSettings::SetMarginRight,
+        ] {
+            set(&settings, 0.0).map_err(err)?;
+        }
+        settings.SetScaleFactor(1.0).map_err(err)?;
+        settings.SetShouldPrintBackgrounds(true).map_err(err)?;
+        settings.SetShouldPrintHeaderAndFooter(false).map_err(err)?;
+        let handler = webview2_com::PrintToPdfCompletedHandler::create(Box::new(move |result, ok| {
+            let _ = done.send(if result.is_ok() && ok {
+                Ok(())
+            } else {
+                Err("Could not write the PDF".into())
+            });
+            Ok(())
+        }));
+        view.PrintToPdf(&HSTRING::from(path), &settings, &handler).map_err(err)?;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -1046,8 +1158,9 @@ fn present_data(window: Window, state: State<AppState>) -> CmdResult<PresentData
     })
 }
 
+/// Async, like every command that opens windows (see `export_pdf`).
 #[tauri::command]
-fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_slide: Option<String>, presenter: Option<bool>) -> CmdResult<()> {
+async fn present_start(app: AppHandle, window: Window, state: State<'_, AppState>, from_slide: Option<String>, presenter: Option<bool>) -> CmdResult<()> {
     let owner = window.label().to_string();
     // The teleprompter lives in the presenter display.
     let presenter = presenter.unwrap_or_else(|| state.settings.lock().map(|s| s.presenter_view || s.teleprompter.enabled).unwrap_or(true));
@@ -1059,7 +1172,7 @@ fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_sl
         }
         from_slide.as_deref().and_then(|id| render::slide_indices(&doc.deck, id)).unwrap_or((0, 0))
     };
-    close_presentation(&app, &owner);
+    close_and_wait(&app, &[&format!("present-{owner}"), &format!("presenter-{owner}")]).await;
 
     let monitors = window.available_monitors().map_err(err)?;
     let current = window.current_monitor().map_err(err)?.or_else(|| monitors.first().cloned());
@@ -1108,8 +1221,11 @@ fn present_start(app: AppHandle, window: Window, state: State<AppState>, from_sl
         // Keep keyboard focus on the screen the presenter is looking at. With
         // one screen the slides stay in front (the screen may be mirrored to a
         // projector); X brings the presenter display forward (present_swap).
+        // Windows brings a window it shows to the front, hence the focus.
         if monitors.len() > 1 {
             let _ = p.set_focus();
+        } else {
+            let _ = w.set_focus();
         }
     }
     let _ = app.emit("cz-present-started", json!({ "doc": owner }));
@@ -1164,6 +1280,21 @@ fn present_swap(app: AppHandle, window: Window) -> CmdResult<()> {
     Ok(())
 }
 
+/// Closes windows and waits (up to two seconds) until they are gone, so new
+/// ones can take their labels: closing goes through the event loop.
+async fn close_and_wait(app: &AppHandle, labels: &[&str]) {
+    let open = || labels.iter().filter_map(|l| app.get_webview_window(l)).collect::<Vec<_>>();
+    for w in open() {
+        let _ = w.close();
+    }
+    for _ in 0..80 {
+        if open().is_empty() {
+            return;
+        }
+        let _ = tauri::async_runtime::spawn_blocking(|| std::thread::sleep(std::time::Duration::from_millis(25))).await;
+    }
+}
+
 fn close_presentation(app: &AppHandle, owner: &str) {
     for prefix in ["present-", "presenter-"] {
         if let Some(w) = app.get_webview_window(&format!("{prefix}{owner}")) {
@@ -1210,9 +1341,8 @@ fn open_editor_window(app: &AppHandle, file: Option<PathBuf>) -> tauri::Result<(
     {
         p.insert(label.clone(), f);
     }
-    window_builder(app, &label, WebviewUrl::App("index.html".into()))
+    sized(window_builder(app, &label, WebviewUrl::App("index.html".into())), app, (1440.0, 900.0))
         .title("Cadenza")
-        .inner_size(1440.0, 900.0)
         .min_inner_size(900.0, 560.0)
         .center()
         .build()?;
@@ -1248,8 +1378,9 @@ fn enable_camera(w: &tauri::WebviewWindow) {
 #[cfg(not(target_os = "linux"))]
 fn enable_camera(_w: &tauri::WebviewWindow) {}
 
+/// Async, like every command that opens windows (see `export_pdf`).
 #[tauri::command]
-fn window_new(app: AppHandle, path: Option<String>) -> CmdResult<()> {
+async fn window_new(app: AppHandle, path: Option<String>) -> CmdResult<()> {
     open_editor_window(&app, path.map(PathBuf::from)).map_err(err)
 }
 
@@ -1329,6 +1460,34 @@ fn keep_unsaved_work(app: &AppHandle) {
             doc.maybe_write_recovery(true);
         }
     }
+}
+
+/// The free part of the screen new windows open on (without taskbar or
+/// dock), in logical pixels: the screen of the focused window, else the main
+/// one.
+fn work_area<R: tauri::Runtime>(app: &AppHandle<R>) -> Option<(f64, f64)> {
+    let focused = app.webview_windows().into_values().find(|w| w.is_focused().unwrap_or(false));
+    let monitor = focused
+        .and_then(|w| w.current_monitor().ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten())?;
+    let area = monitor.work_area();
+    let scale = monitor.scale_factor();
+    Some((area.size.width as f64 / scale, area.size.height as f64 / scale))
+}
+
+/// A new window `w`×`h` big, or maximized on a screen too small for that:
+/// its bottom would hide behind the taskbar (small laptops, large text
+/// scaling). Un-maximized, it then fits the screen.
+fn sized<'a, R: tauri::Runtime, M: Manager<R>>(
+    builder: WebviewWindowBuilder<'a, R, M>,
+    app: &AppHandle<R>,
+    (w, h): (f64, f64),
+) -> WebviewWindowBuilder<'a, R, M> {
+    // Room for the title bar and the window's border.
+    let Some((free_w, free_h)) = work_area(app).map(|(fw, fh)| (fw - 16.0, fh - 48.0)) else {
+        return builder.inner_size(w, h);
+    };
+    builder.inner_size(w.min(free_w), h.min(free_h)).maximized(w > free_w || h > free_h)
 }
 
 /// `CADENZA_DATA_DIR` gives Cadenza an isolated profile (settings and
@@ -1512,6 +1671,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             export_html,
             export_pdf,
             print_slides,
+            print_to_pdf,
             present_data,
             present_start,
             present_stop,

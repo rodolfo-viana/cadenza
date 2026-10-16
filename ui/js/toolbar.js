@@ -2,7 +2,7 @@
 
 import { html, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, set, useStore, settings, updateSettings, undo, redo, play, updateDeck } from './store.js';
+import { state, set, useStore, settings, updateSettings, undo, redo, play, updateDeck, deckTitle } from './store.js';
 import { ToolButton, showMenuAt } from './ui.js';
 import { item, COMMANDS } from './commands.js';
 import * as A from './actions.js';
@@ -148,22 +148,22 @@ export function Toolbar() {
         ${editingTitle
           ? html`<input
               class="title-input"
-              value=${doc.deck.title}
+              value=${deckTitle()}
               ref=${(el) => el && !el.dataset.f && ((el.dataset.f = 1), el.focus(), el.select())}
               onBlur=${(e) => {
                 setEditingTitle(false);
-                if (e.target.value.trim() && e.target.value !== doc.deck.title) updateDeck({ title: e.target.value.trim() });
+                if (e.target.value.trim() && e.target.value !== deckTitle()) updateDeck({ title: e.target.value.trim() });
               }}
               onKeyDown=${(e) => {
                 if (e.key === 'Enter') e.target.blur();
                 if (e.key === 'Escape') {
-                  e.target.value = doc.deck.title;
+                  e.target.value = deckTitle();
                   e.target.blur();
                 }
               }}
             />`
           : html`<button type="button" class="title-btn" title=${doc.path || t('Not saved yet — click to rename')} onClick=${() => setEditingTitle(true)}>
-              <span class="title-text">${doc.deck.title || t('Untitled')}</span>
+              <span class="title-text">${deckTitle() || t('Untitled')}</span>
               <span class=${cls('save-state', doc.dirty && 'dirty')}>${doc.dirty ? t('Edited') : doc.path ? fileName(doc.path) : t('Not saved')}</span>
             </button>`}
       </div>

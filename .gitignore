@@ -5,3 +5,4 @@
 # Python caches (tools/)
 __pycache__/
 *.pyc
+/Cadenza-evidencias

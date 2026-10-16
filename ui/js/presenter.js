@@ -21,6 +21,8 @@
   var tpSlide = null;
   // Interface translation (replaced by i18n.js once the language is known).
   var t = function (s, v) { return v ? s.replace(/\{(\w+)\}/g, function (m, k) { return k in v ? v[k] : m; }) : s; };
+  // New presentations are titled in English by Rust.
+  var deckTitle = function (d) { return (d.title === 'Untitled Presentation' ? t('Untitled Presentation') : d.title) || t('Presentation'); };
 
   function translatePage() {
     document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
@@ -183,7 +185,7 @@
       return m.setLanguage(d.language).then(function () {
         t = m.t;
         translatePage();
-        document.title = t('Presenter — {title}', { title: d.title || t('Presentation') });
+        document.title = t('Presenter — {title}', { title: deckTitle(d) });
         tick();
         applyState(lastState);
         return import('./teleprompter.js');
@@ -198,7 +200,7 @@
     }).catch(function (e) {
       tauri.core.invoke('ui_log', { level: 'error', message: 'teleprompter: ' + e }).catch(function () {});
     });
-    document.title = t('Presenter — {title}', { title: d.title || t('Presentation') });
+    document.title = t('Presenter — {title}', { title: deckTitle(d) });
     bootFrame('current');
     bootFrame('next');
     tauri.event.listen('cz-present-state', function (e) {

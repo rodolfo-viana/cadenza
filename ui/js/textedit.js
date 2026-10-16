@@ -43,6 +43,9 @@ export async function beginTextEdit(view, el, point = null, { selectAll = false 
   const node = wrapper?.querySelector('.cz-text');
   if (!node) return;
   view.editingId = el.id;
+  // The editor changes what the box shows (math as LaTeX, no placeholder):
+  // it is drawn again when editing ends, even if nothing was changed.
+  wrapper.__czSrc = null;
   const wasEmpty = node.classList.contains('cz-empty');
   if (wasEmpty) {
     node.innerHTML = '<p><br></p>';
@@ -337,6 +340,8 @@ export async function beginTableEdit(view, el, point = null) {
   const table = wrapper?.querySelector('table');
   if (!table) return;
   view.editingId = el.id;
+  // Drawn again when editing ends: cells show their math as LaTeX meanwhile.
+  wrapper.__czSrc = null;
   const cells = [...table.querySelectorAll('td, th')];
   for (const c of cells) {
     // Show the LaTeX source of typeset math while editing.

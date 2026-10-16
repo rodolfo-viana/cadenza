@@ -299,27 +299,33 @@ pub fn new_element(kind: &str, variant: &str, width: u32, height: u32) -> Elemen
     el
 }
 
-/// Sample slides used to preview themes.
-pub fn sample_slides(width: u32, height: u32) -> Vec<Slide> {
+/// Sample slides used to preview themes, in the interface language (`text`).
+pub fn sample_slides(width: u32, height: u32, text: &dyn Fn(&str) -> String) -> Vec<Slide> {
     let html = |el: &mut Element, h: &str| {
         if let Some(t) = el.content.text_mut() {
             t.html = h.into();
         }
     };
+    let p = |s: String| format!("<p>{}</p>", crate::util::esc(&s));
     let mut title = new_slide("title", width, height);
-    html(&mut title.elements[0], "<p>Theme Preview</p>");
-    html(&mut title.elements[1], "<p>Headings, text, accents and charts</p>");
+    html(&mut title.elements[0], &p(crate::tr(&text, "Theme Preview")));
+    html(&mut title.elements[1], &p(crate::tr(&text, "Headings, text, accents and charts")));
 
     let f = Frame {
         w: width as f64,
         h: height as f64,
     };
     let mut content = new_slide("two-column", width, height);
-    html(&mut content.elements[0], "<p>What’s inside</p>");
-    html(
-        &mut content.elements[1],
-        "<ul><li>Clear, readable text</li><li>A <a href=\"#\">link</a> and <b>bold</b> words</li><li>Theme accent colors</li></ul>",
-    );
+    html(&mut content.elements[0], &p(crate::tr(&text, "What’s inside")));
+    let esc = |s: String| crate::util::esc(&s);
+    let link = format!("<a href=\"#\">{}</a>", esc(crate::tr(&text, "theme preview::link")));
+    let bold = format!("<b>{}</b>", esc(crate::tr(&text, "theme preview::bold")));
+    let words = esc(crate::tr(&text, "A {link} and {bold} words"))
+        .replace("{link}", &link)
+        .replace("{bold}", &bold);
+    let first = esc(crate::tr(&text, "Clear, readable text"));
+    let last = esc(crate::tr(&text, "Theme accent colors"));
+    html(&mut content.elements[1], &format!("<ul><li>{first}</li><li>{words}</li><li>{last}</li></ul>"));
     content.elements.truncate(2);
     content.elements[1].w = (f.w * 0.42).round();
     let mut chart = new_element("chart", "column", width, height);

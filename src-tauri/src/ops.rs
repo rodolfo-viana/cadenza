@@ -9,6 +9,7 @@ use serde_json::{Map, Value};
 
 use crate::layouts;
 use crate::model::*;
+use crate::sanitize;
 pub use crate::sanitize::element as sanitize_element;
 use crate::util::new_id;
 
@@ -373,6 +374,11 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                     el.h *= s;
                     el.x = cx - el.w / 2.0;
                     el.y = cy - el.h / 2.0;
+                    // Motion paths lead to the same places on the slide.
+                    for p in &mut el.build.path {
+                        p[0] *= sx;
+                        p[1] *= sy;
+                    }
                     scale_fonts(&mut el.content, s);
                 }
             }
@@ -400,14 +406,21 @@ fn capitalize(s: &str) -> String {
     c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
 }
 
+/// Font sizes follow the slide size, including the sizes of parts of a text.
 fn scale_fonts(content: &mut Content, s: f64) {
     if let Some(t) = content.text_mut() {
         t.style.font_size = (t.style.font_size * s).round().max(4.0);
+        t.html = sanitize::scale_font_sizes(&t.html, s);
     }
     match content {
         Content::Code(c) => c.font_size = (c.font_size * s).round().max(4.0),
         Content::Math(m) => m.font_size = (m.font_size * s).round().max(4.0),
-        Content::Table(t) => t.font_size = (t.font_size * s).round().max(4.0),
+        Content::Table(t) => {
+            t.font_size = (t.font_size * s).round().max(4.0);
+            for cell in t.rows.iter_mut().flatten() {
+                *cell = sanitize::scale_font_sizes(cell, s);
+            }
+        }
         Content::Chart(c) => c.font_size = (c.font_size * s).round().max(4.0),
         _ => {}
     }
@@ -825,5 +838,33 @@ mod tests {
                 assert!(e.x >= -1.0 && e.x + e.w <= 1025.0);
             }
         }
+    }
+
+    #[test]
+    fn resizing_scales_parts_of_texts_and_motion_paths() {
+        let mut d = deck3();
+        let mut text = RichText {
+            html: r#"<p>Big <span style="color: #f00; font-size: 80px">part</span> and font-size: 80px as words</p>"#.into(),
+            ..Default::default()
+        };
+        text.style.font_size = 40.0;
+        let el = &mut d.slides[0].elements[0];
+        el.content = Content::Text(TextContent { text });
+        el.build.path = vec![[0.0, 0.0], [200.0, -100.0]];
+        d.slides[0].elements[1].content = Content::Table(TableContent {
+            rows: vec![vec![r#"<span style="font-size:30px">x</span>"#.into()]],
+            font_size: 24.0,
+            ..Default::default()
+        });
+        apply(&mut d, Op::ResizeDeck { width: 640, height: 360 }).unwrap();
+        let els = &d.slides[0].elements;
+        let Content::Text(t) = &els[0].content else { panic!() };
+        assert_eq!(t.text.style.font_size, 20.0);
+        assert!(t.text.html.contains("font-size:40px\">part"), "{}", t.text.html);
+        assert!(t.text.html.contains("and font-size: 80px as words"), "text stays as written: {}", t.text.html);
+        assert_eq!(els[0].build.path, vec![[0.0, 0.0], [100.0, -50.0]]);
+        let Content::Table(table) = &els[1].content else { panic!() };
+        assert_eq!(table.font_size, 12.0);
+        assert!(table.rows[0][0].contains("font-size:15px"), "{}", table.rows[0][0]);
     }
 }

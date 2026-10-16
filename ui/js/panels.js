@@ -3,7 +3,7 @@
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
 import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo } from './store.js';
-import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField } from './controls.js';
+import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField, Cell } from './controls.js';
 import * as A from './actions.js';
 import { exec, setLink, isEditing, beginTextEdit, beginTableEdit, insertInlineMath, textSelected, styleSelection, selectionStyle, selectionFontSize } from './textedit.js';
 import { formatActive, formatBox, toggleBoxes } from './textformat.js';
@@ -804,9 +804,9 @@ export function ChartPanel({ els }) {
         <tbody>
           ${links.map(
             (l, i) => html`<tr>
-              <td><input class="cell label" value=${l.from} onChange=${(e) => setLink(i, { from: e.target.value })} /></td>
-              <td><input class="cell label" value=${l.to} onChange=${(e) => setLink(i, { to: e.target.value })} /></td>
-              <td><input class="cell num" type="number" value=${l.value} onChange=${(e) => setLink(i, { value: Number(e.target.value) || 0 })} /></td>
+              <td><${Cell} class="cell label" value=${l.from} onChange=${(v) => setLink(i, { from: v })} /></td>
+              <td><${Cell} class="cell label" value=${l.to} onChange=${(v) => setLink(i, { to: v })} /></td>
+              <td><${Cell} class="cell num" number value=${l.value} onChange=${(v) => setLink(i, { value: v })} /></td>
               <td><button class="cell-x" title=${t('Remove row')} onClick=${() => delLink(i)}>×</button></td>
             </tr>`,
           )}
@@ -822,7 +822,7 @@ export function ChartPanel({ els }) {
             <th></th>
             ${shownSeries.map(
               (s, k) => html`<th>
-                <input class="cell head" value=${s.name} onChange=${(e) => set_({ series: ch.series.map((x, j) => (j === k ? { ...x, name: e.target.value } : x)) }, 'sname')} />
+                <${Cell} class="cell head" value=${s.name} onChange=${(v) => set_({ series: ch.series.map((x, j) => (j === k ? { ...x, name: v } : x)) }, 'sname')} />
                 ${!fixed && ch.series.length > 1 && html`<button class="cell-x" title=${t('Remove series')} onClick=${() => delSeries(k)}>×</button>`}
               </th>`,
             )}
@@ -832,10 +832,10 @@ export function ChartPanel({ els }) {
         <tbody>
           ${ch.labels.map(
             (l, i) => html`<tr>
-              <td><input class="cell label" list=${isMap ? 'cz-map-regions' : undefined} value=${l} onChange=${(e) => setLabel(i, e.target.value)} /></td>
+              <td><${Cell} class="cell label" list=${isMap ? 'cz-map-regions' : undefined} value=${l} onChange=${(v) => setLabel(i, v)} /></td>
               ${shownSeries.map(
                 (s, k) => html`<td>
-                  <input class="cell num" type="number" value=${s.values[i] ?? 0} onChange=${(e) => setCell(k, i, Number(e.target.value) || 0)} />
+                  <${Cell} class="cell num" number value=${s.values[i] ?? 0} onChange=${(v) => setCell(k, i, v)} />
                 </td>`,
               )}
               <td><button class="cell-x" title=${t('Remove row')} onClick=${() => delRow(i)}>×</button></td>

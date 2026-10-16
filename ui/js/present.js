@@ -99,7 +99,8 @@
   /** Boots reveal.js with presentation data from Rust. */
   function boot(data, opts) {
     opts = opts || {};
-    document.title = data.title || t('Presentation');
+    // New presentations are titled in English by Rust.
+    document.title = (data.title === 'Untitled Presentation' ? t('Untitled Presentation') : data.title) || t('Presentation');
     if (data.themeCss) document.getElementById('cz-theme').href = data.themeCss;
     else document.getElementById('cz-theme').removeAttribute('href');
     document.getElementById('cz-deck-css').textContent = data.deckCss;
@@ -195,14 +196,25 @@
 
   function bootPrint() {
     var size = null;
+    var title = '';
     tauri.core.invoke('present_data').then(function (data) {
       size = { width: data.width, height: data.height };
+      title = data.title;
       return loadLanguage(data.language).then(function () { return boot(data); });
+    }).then(function () {
+      return Promise.all([stillVideos(), stillEmbeds()]);
     }).then(function () {
       var bar = document.createElement('div');
       bar.className = 'cz-print-bar';
-      bar.innerHTML = '<span>' + t('Choose “Print to File” (PDF) or “Save as PDF” in the dialog.') + '</span>' +
-        '<button id="cz-print">' + t('Print / Save PDF…') + '</button><button class="secondary" id="cz-close">' + t('Close') + '</button>';
+      // Windows' print dialog puts slides on the printer's paper, with the
+      // browser's headers: Cadenza saves PDFs itself there, a slide per page.
+      var windows = /Windows/.test(navigator.userAgent);
+      bar.innerHTML = windows
+        ? '<span id="cz-print-msg">' + t('Save the slides as a PDF, a slide per page, or print them on paper.') + '</span>' +
+          '<button id="cz-pdf">' + t('Save PDF…') + '</button><button class="secondary" id="cz-print">' + t('Print…') + '</button>' +
+          '<button class="secondary" id="cz-close">' + t('Close') + '</button>'
+        : '<span>' + t('Choose “Print to File” (PDF) or “Save as PDF” in the dialog.') + '</span>' +
+          '<button id="cz-print">' + t('Print / Save PDF…') + '</button><button class="secondary" id="cz-close">' + t('Close') + '</button>';
       document.body.appendChild(bar);
       // Linux prints through Cadenza, which sets pages the size of a slide.
       var print = function () {
@@ -212,6 +224,10 @@
       };
       document.getElementById('cz-print').onclick = print;
       document.getElementById('cz-close').onclick = function () { tauri.window.getCurrentWindow().close(); };
+      if (windows) {
+        document.getElementById('cz-pdf').onclick = function () { savePdf(size, title); };
+        return;
+      }
       var printed = false;
       var go = function () {
         if (printed) return;
@@ -220,6 +236,102 @@
       };
       Reveal.on('pdf-ready', go);
       setTimeout(go, 2500);
+    });
+  }
+
+  /**
+   * Printouts don't show video frames (they came out black): each video
+   * becomes a picture of its first frame. Waits at most a few seconds.
+   */
+  function stillVideos() {
+    var videos = [].slice.call(document.querySelectorAll('.reveal video'));
+    return Promise.all(videos.map(function (v) {
+      return new Promise(function (resolve) {
+        var finish = function () {
+          clearTimeout(timer);
+          resolve();
+        };
+        var timer = setTimeout(finish, 5000);
+        var draw = function () {
+          try {
+            var c = document.createElement('canvas');
+            c.width = v.videoWidth;
+            c.height = v.videoHeight;
+            c.getContext('2d').drawImage(v, 0, 0);
+            var cs = getComputedStyle(v);
+            ['position', 'top', 'left', 'width', 'height', 'object-fit', 'object-position', 'max-width', 'max-height'].forEach(function (p) {
+              c.style.setProperty(p, cs.getPropertyValue(p));
+            });
+            c.className = v.className;
+            v.pause();
+            v.replaceWith(c);
+          } catch (e) {
+            /* keep the video */
+          }
+          finish();
+        };
+        v.muted = true;
+        v.addEventListener('seeked', draw, { once: true });
+        v.addEventListener('error', finish, { once: true });
+        var seek = function () { v.currentTime = Math.min(0.1, (v.duration || 1) / 2); };
+        if (v.readyState >= 1) seek();
+        else {
+          v.addEventListener('loadedmetadata', seek, { once: true });
+          v.preload = 'auto';
+          if (!v.getAttribute('src') && v.dataset.src) v.src = v.dataset.src;
+          v.load();
+        }
+      });
+    }));
+  }
+
+  /** YouTube players print empty: they show the video's picture instead. */
+  function stillEmbeds() {
+    var frames = [].slice.call(document.querySelectorAll('.reveal .cz-video-box iframe'));
+    return Promise.all(frames.map(function (f) {
+      var m = /youtube\.com\/embed\/(?:\?v=)?([\w-]{6,})/.exec(f.getAttribute('data-src') || f.getAttribute('src') || '');
+      if (!m) return null;
+      return new Promise(function (resolve) {
+        var img = new Image();
+        var timer = setTimeout(resolve, 5000);
+        img.alt = '';
+        img.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover';
+        img.onload = function () {
+          clearTimeout(timer);
+          resolve();
+        };
+        img.onerror = function () {
+          img.remove();
+          clearTimeout(timer);
+          resolve();
+        };
+        img.src = 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg';
+        f.replaceWith(img);
+      });
+    }));
+  }
+
+  /** Asks where to save, then writes the PDF (Windows). */
+  function savePdf(size, title) {
+    var msg = document.getElementById('cz-print-msg');
+    // New presentations are titled in English by Rust.
+    var name = (title === 'Untitled Presentation' ? t('Untitled Presentation') : title) || t('Presentation');
+    name = name.replace(/[\\/:*?"<>|]+/g, '-').trim() || t('Presentation');
+    tauri.dialog.save({ title: t('Save PDF…'), defaultPath: name + '.pdf', filters: [{ name: 'PDF', extensions: ['pdf'] }] }).then(function (path) {
+      if (!path) return;
+      if (!/\.pdf$/i.test(path)) path += '.pdf';
+      msg.textContent = t('Saving…');
+      return tauri.core.invoke('print_to_pdf', { path: path, width: size.width, height: size.height }).then(function () {
+        msg.textContent = t('Saved {file}', { file: path.split(/[\\/]/).pop() });
+        var show = document.getElementById('cz-show') || document.createElement('button');
+        show.id = 'cz-show';
+        show.className = 'secondary';
+        show.textContent = t('Show in Folder');
+        show.onclick = function () { tauri.opener.revealItemInDir(path).catch(function () {}); };
+        msg.after(show);
+      });
+    }).catch(function (e) {
+      msg.textContent = t(String(e));
     });
   }
 

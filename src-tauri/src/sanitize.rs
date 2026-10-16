@@ -9,60 +9,63 @@ use ammonia::{Builder, UrlRelative};
 
 fn builder() -> &'static Builder<'static> {
     static B: OnceLock<Builder<'static>> = OnceLock::new();
-    B.get_or_init(|| {
-        let tags: HashSet<&str> = [
-            "p",
-            "br",
-            "div",
-            "span",
-            "b",
-            "strong",
-            "i",
-            "em",
-            "u",
-            "s",
-            "strike",
-            "del",
-            "sub",
-            "sup",
-            "a",
-            "ul",
-            "ol",
-            "li",
-            "code",
-            "mark",
-            "small",
-            "blockquote",
-        ]
-        .into_iter()
-        .collect();
-        let styles: HashSet<&str> = [
-            "color",
-            "background-color",
-            "font-size",
-            "font-weight",
-            "font-style",
-            "font-family",
-            "text-decoration",
-            "text-decoration-line",
-            "text-align",
-            "letter-spacing",
-            "vertical-align",
-        ]
-        .into_iter()
-        .collect();
-        let mut b = Builder::default();
-        b.tags(tags)
-            .clean_content_tags(["script", "style"].into_iter().collect())
-            .generic_attributes(["style"].into_iter().collect())
-            .add_tag_attributes("a", ["href", "target"])
-            .add_tag_attributes("ol", ["start", "type"])
-            .filter_style_properties(styles)
-            .url_schemes(["http", "https", "mailto"].into_iter().collect())
-            .url_relative(UrlRelative::PassThrough)
-            .link_rel(Some("noopener noreferrer"));
-        b
-    })
+    B.get_or_init(configured)
+}
+
+/// What rich text may contain.
+fn configured() -> Builder<'static> {
+    let tags: HashSet<&str> = [
+        "p",
+        "br",
+        "div",
+        "span",
+        "b",
+        "strong",
+        "i",
+        "em",
+        "u",
+        "s",
+        "strike",
+        "del",
+        "sub",
+        "sup",
+        "a",
+        "ul",
+        "ol",
+        "li",
+        "code",
+        "mark",
+        "small",
+        "blockquote",
+    ]
+    .into_iter()
+    .collect();
+    let styles: HashSet<&str> = [
+        "color",
+        "background-color",
+        "font-size",
+        "font-weight",
+        "font-style",
+        "font-family",
+        "text-decoration",
+        "text-decoration-line",
+        "text-align",
+        "letter-spacing",
+        "vertical-align",
+    ]
+    .into_iter()
+    .collect();
+    let mut b = Builder::default();
+    b.tags(tags)
+        .clean_content_tags(["script", "style"].into_iter().collect())
+        .generic_attributes(["style"].into_iter().collect())
+        .add_tag_attributes("a", ["href", "target"])
+        .add_tag_attributes("ol", ["start", "type"])
+        .filter_style_properties(styles)
+        .url_schemes(["http", "https", "mailto"].into_iter().collect())
+        .url_relative(UrlRelative::PassThrough)
+        .link_rel(Some("noopener noreferrer"));
+    b
 }
 
 /// Cleans rich text HTML for storage and rendering.
@@ -74,6 +77,37 @@ pub fn rich_text(html: &str) -> String {
         return String::new();
     }
     cleaned
+}
+
+/// Scales the pixel font sizes that parts of a text have of their own
+/// (`<span style="font-size: 40px">`), as when the slide size changes.
+/// Words in the text itself are left as they are.
+pub fn scale_font_sizes(html: &str, s: f64) -> String {
+    if !html.contains("font-size") {
+        return html.to_string();
+    }
+    let mut b = configured();
+    b.attribute_filter(move |_, attr, value| {
+        if attr != "style" || !value.contains("font-size") {
+            return Some(value.into());
+        }
+        let scaled: Vec<String> = value
+            .split(';')
+            .map(|decl| {
+                let px = decl
+                    .split_once(':')
+                    .filter(|(name, _)| name.trim().eq_ignore_ascii_case("font-size"))
+                    .and_then(|(_, v)| v.trim().strip_suffix("px")?.trim().parse::<f64>().ok())
+                    .filter(|v| v.is_finite());
+                match px {
+                    Some(v) => format!("font-size:{}px", (v * s).round().max(4.0)),
+                    None => decl.to_string(),
+                }
+            })
+            .collect();
+        Some(scaled.join(";").into())
+    });
+    b.clean(html).to_string()
 }
 
 /// `rich_text` for rendering, which runs for every slide after each edit.

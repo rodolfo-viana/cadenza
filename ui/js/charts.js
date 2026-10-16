@@ -138,7 +138,9 @@ export const isSample = (c, kind) => sameData(c, chartSample(kind));
 
 const sameLinks = (a = [], b = []) => a.length === b.length && a.every((l, i) => l.from === b[i].from && l.to === b[i].to && l.value === b[i].value);
 
+// Sankey and network samples have links instead of a table.
 const sameData = (a, b) =>
+  !!b.labels &&
   a.labels.length === b.labels.length &&
   a.labels.every((l, i) => l === b.labels[i]) &&
   a.series.length === b.series.length &&
@@ -146,7 +148,8 @@ const sameData = (a, b) =>
 
 /**
  * What changes when a chart becomes `kind`: data nobody edited yet (a
- * type's sample) becomes the sample of the new type; edited data stays.
+ * type's sample) becomes the sample of the new type; edited data stays. So
+ * do the colors picked for series, also when the sample is replaced.
  */
 export function switchChart(c, kind) {
   const patch = { chart: kind, stacked: false };
@@ -157,7 +160,9 @@ export function switchChart(c, kind) {
     return patch;
   }
   if (sameData(c, chartSample(chartKind(c))) || sameData(c, chartSample('column')) || sameData(c, chartSample('map'))) {
-    Object.assign(patch, chartSample(kind));
+    const sample = chartSample(kind);
+    sample.series = sample.series.map((s, k) => ({ ...s, color: c.series[k]?.color || s.color }));
+    Object.assign(patch, sample);
   } else if (kind === 'map' && !c.map) {
     patch.map = 'world';
   } else if (kind === 'candlestick' && c.series.length < 4) {

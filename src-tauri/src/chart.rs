@@ -530,7 +530,28 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
         slice += 1;
         let sweep = v / total * std::f64::consts::TAU;
         let color = slice_color(i);
-        if (sweep - std::f64::consts::TAU).abs() < 1e-9 {
+        if (sweep - std::f64::consts::TAU).abs() < 1e-9 && hole > 0.0 {
+            // A donut's only slice: a full ring, the hole cut out.
+            let circle = |rr: f64| {
+                format!(
+                    "M{} {}A{r} {r} 0 1 1 {} {}A{r} {r} 0 1 1 {} {}Z",
+                    num(cx - rr),
+                    num(cy),
+                    num(cx + rr),
+                    num(cy),
+                    num(cx - rr),
+                    num(cy),
+                    r = num(rr)
+                )
+            };
+            let _ = write!(
+                svg,
+                r#"<path d="{}{}" fill-rule="evenodd" style="fill:{}"/>"#,
+                circle(r),
+                circle(hole),
+                esc(&color)
+            );
+        } else if (sweep - std::f64::consts::TAU).abs() < 1e-9 {
             let _ = write!(
                 svg,
                 r#"<circle cx="{}" cy="{}" r="{}" style="fill:{}"/>"#,
@@ -1775,6 +1796,25 @@ mod tests {
             let (layout, _) = parliament_layout(total as u32);
             assert!(layout.windows(2).all(|p| p[0].0 >= p[1].0), "seats run from left to right");
         }
+    }
+
+    #[test]
+    fn a_donut_with_one_slice_keeps_its_hole() {
+        let one = |chart: &str| ChartContent {
+            chart: chart.into(),
+            labels: vec!["A".into(), "B".into(), "C".into()],
+            series: vec![series(&[100.0, 0.0, 0.0])],
+            show_legend: false,
+            ..Default::default()
+        };
+        let donut = chart_svg(&one("donut"), 800.0, 450.0, None);
+        assert!(!donut.contains("<circle"), "{donut}");
+        assert_eq!(donut.matches("fill-rule=\"evenodd\"").count(), 1, "one ring");
+        // The ring is the outer circle and the hole, drawn as two subpaths.
+        let d = donut.split("<path d=\"").nth(1).and_then(|p| p.split('"').next()).unwrap_or_default();
+        assert_eq!(d.matches('M').count(), 2, "{d}");
+        let pie = chart_svg(&one("pie"), 800.0, 450.0, None);
+        assert_eq!(pie.matches("<circle").count(), 1, "a pie's only slice is a full disc");
     }
 
     #[test]

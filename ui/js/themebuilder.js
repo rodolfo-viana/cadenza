@@ -47,7 +47,11 @@ export async function openThemeBuilder(start = null) {
   let def = start;
   if (!def) {
     const d = deck();
-    def = d?.customTheme && d.customTheme.id === d.theme ? d.customTheme : await invoke('theme_from_builtin', { id: d?.theme || 'cadenza-midnight' });
+    if (d?.customTheme && d.customTheme.id === d.theme) def = d.customTheme;
+    else {
+      def = await invoke('theme_from_builtin', { id: d?.theme || 'cadenza-midnight' });
+      def.name = t('{name} (custom)', { name: def.name });
+    }
   }
   set({ modal: { type: 'themeBuilder', props: { def: JSON.parse(JSON.stringify(def)) } }, menu: null });
 }
