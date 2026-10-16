@@ -5,7 +5,7 @@ Thanks for helping! Bug reports, translations, documentation and code are all we
 ## Ways to help
 
 - **Report a bug.** Open an issue with what you did, what you expected and what happened, plus your
-  operating system and Cadenza version (**Menu ▸ About Cadenza**). A small `.cadenza` file that shows
+  operating system and Cadenza version (**Menu > About Cadenza**). A small `.cadenza` file that shows
   the problem helps a lot.
 - **Suggest a feature.** Open an issue first for anything larger than a small fix, so we can agree on
   the approach before you spend time on it.
