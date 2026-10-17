@@ -85,18 +85,20 @@ fn migrate(value: serde_json::Value) -> anyhow::Result<Deck> {
     Ok(serde_json::from_value(value)?)
 }
 
-/// Media the deck uses that is missing from its assets folder. Saving
-/// refuses rather than write a file that silently lacks it.
+/// Media the deck uses that is missing from its assets folder. Saving and
+/// exporting refuse rather than write a file that silently lacks it.
 #[derive(Debug, PartialEq)]
 pub struct MissingMedia {
     /// 1-based numbers of the slides that use missing media.
     pub slides: Vec<usize>,
     /// Embedded fonts whose files are missing.
     pub fonts: Vec<String>,
+    /// Found by an export rather than a save; the message says so.
+    pub export: bool,
 }
 
 impl MissingMedia {
-    fn find(deck: &Deck, assets_dir: &Path) -> Option<Self> {
+    pub(crate) fn find(deck: &Deck, assets_dir: &Path) -> Option<Self> {
         let missing = |name: &str| !assets_dir.join(name).is_file();
         let slides: Vec<usize> = deck
             .slides
@@ -111,7 +113,7 @@ impl MissingMedia {
             .filter(|f| f.asset_refs().iter().any(|n| missing(n)))
             .map(|f| f.family.clone())
             .collect();
-        (!slides.is_empty() || !fonts.is_empty()).then_some(Self { slides, fonts })
+        (!slides.is_empty() || !fonts.is_empty()).then_some(Self { slides, fonts, export: false })
     }
 
     /// The explanation shown to the user, translated with `text`.
@@ -119,23 +121,33 @@ impl MissingMedia {
         let mut parts = Vec::new();
         if !self.slides.is_empty() {
             let list = self.slides.iter().map(usize::to_string).collect::<Vec<_>>().join(", ");
-            parts.push(
+            let template = if self.export {
+                crate::tr(
+                    &text,
+                    "Cannot export: media is missing on these slides: {slides}. Replace or delete it, then export again.",
+                )
+            } else {
                 crate::tr(
                     &text,
                     "Cannot save: media is missing on these slides: {slides}. Replace or delete it, then save again.",
                 )
-                .replace("{slides}", &list),
-            );
+            };
+            parts.push(template.replace("{slides}", &list));
         }
         if !self.fonts.is_empty() {
             let list = self.fonts.join(", ");
-            parts.push(
+            let template = if self.export {
+                crate::tr(
+                    &text,
+                    "Cannot export: the files of these embedded fonts are missing: {fonts}. Remove them under Document > Typography, then export again.",
+                )
+            } else {
                 crate::tr(
                     &text,
                     "Cannot save: the files of these embedded fonts are missing: {fonts}. Remove them under Document > Typography, then save again.",
                 )
-                .replace("{fonts}", &list),
-            );
+            };
+            parts.push(template.replace("{fonts}", &list));
         }
         parts.join("\n\n")
     }

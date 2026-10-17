@@ -486,18 +486,23 @@ async fn doc_save(window: Window, state: State<'_, AppState>, path: Option<Strin
     };
     let target = presentation_path(target);
     let view = state.with_doc(&label, |doc| {
-        doc.save(&target).map_err(|e| match e.downcast_ref::<package::MissingMedia>() {
-            // It names slides and fonts, so it is translated here.
-            Some(missing) => {
-                let lang = state.settings.lock().map(|s| s.language.clone()).unwrap_or_default();
-                anyhow::anyhow!(missing.message(&translator(window.app_handle(), &lang)))
-            }
-            None => e,
-        })?;
+        doc.save(&target).map_err(|e| localize_missing_media(window.app_handle(), &state, e))?;
         Ok(doc.view(false, None))
     })?;
     state.remember_recent(&target);
     Ok(view)
+}
+
+/// [`package::MissingMedia`] in the interface language: it names slides and
+/// fonts, so it is translated here. Other errors pass through.
+fn localize_missing_media(app: &AppHandle, state: &AppState, e: anyhow::Error) -> anyhow::Error {
+    match e.downcast_ref::<package::MissingMedia>() {
+        Some(missing) => {
+            let lang = state.settings.lock().map(|s| s.language.clone()).unwrap_or_default();
+            anyhow::anyhow!(missing.message(&translator(app, &lang)))
+        }
+        None => e,
+    }
 }
 
 /// Where a presentation is saved: with its extension, once ("talk.cadenza"
@@ -1005,16 +1010,17 @@ async fn export_html(app: AppHandle, window: Window, state: State<'_, AppState>,
     };
     let target = PathBuf::from(&path);
     let reader = ui_reader(&app);
+    let fail = |e| err(localize_missing_media(&app, &state, e));
     if single {
         let file = if target.extension().is_none() {
             target.with_extension("html")
         } else {
             target
         };
-        export::export_single(&deck, &assets, &file, &reader).map_err(err)?;
+        export::export_single(&deck, &assets, &file, &reader).map_err(fail)?;
         Ok(file.to_string_lossy().to_string())
     } else {
-        let index = export::export_folder(&deck, &assets, &target, &reader).map_err(err)?;
+        let index = export::export_folder(&deck, &assets, &target, &reader).map_err(fail)?;
         Ok(index.to_string_lossy().to_string())
     }
 }
