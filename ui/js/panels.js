@@ -2,7 +2,7 @@
 
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo, fitsText, openModal } from './store.js';
+import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo, fitsText, fitsMath, openModal } from './store.js';
 import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField, Cell } from './controls.js';
 import * as A from './actions.js';
 import { exec, setLink, isEditing, beginTextEdit, beginTableEdit, insertInlineMath, textSelected, styleSelection, selectionStyle, selectionFontSize } from './textedit.js';
@@ -593,6 +593,7 @@ export function MathPanel({ els }) {
     <${Hint}>${t('Write LaTeX — rendered with KaTeX. Example:')} <code>\\int_0^1 x^2\\,dx = \\tfrac13</code></${Hint}>
     <${Row} label=${t('Size')}><${NumberField} value=${c('fontSize')} min=${6} max=${400} unit="px" onChange=${(v, live) => set_({ fontSize: v }, 'fs', live)} /><//>
     <${Row} label=${t('Color')}><${ColorField} value=${c('color') ?? ''} noneLabel=${t('Theme text color')} onChange=${(v, live) => set_({ color: v }, 'color', live)} /><//>
+    <${Row}><${Toggle} value=${!!c('fit')} label=${t('Fit box to equation')} onChange=${(v) => set_({ fit: v }, 'fit')} /><//>
     <${Row} label=${t('Align')}>
       <${Segmented}
         value=${c('align')}
@@ -992,14 +993,25 @@ export function ArrangePanel({ els }) {
     html`<div class="geo-grid">
       <${NumberField} label="X" value=${single.x} onChange=${(v, live) => geo('x', v, live)} />
       <${NumberField} label="Y" value=${single.y} onChange=${(v, live) => geo('y', v, live)} />
-      <${NumberField} label=${t('W')} value=${single.w} min=${4} onChange=${(v, live) => geo('w', v, live)} />
+      <${NumberField}
+        label=${t('W')}
+        value=${single.w}
+        min=${4}
+        onChange=${(v, live) =>
+          // A size of its own: the box stops fitting its equation.
+          fitsMath(single) ? patchAll(els, { w: v, content: { fit: false } }, live ? 'geo-w' : null) : geo('w', v, live)}
+      />
       <${NumberField}
         label=${t('H')}
         value=${single.h}
         min=${4}
         onChange=${(v, live) =>
-          // A height of its own: the box stops fitting its text.
-          fitsText(single) ? patchAll(els, { h: v, content: { style: { autoHeight: false } } }, live ? 'geo-h' : null) : geo('h', v, live)}
+          // A height of its own: the box stops fitting its text or equation.
+          fitsText(single)
+            ? patchAll(els, { h: v, content: { style: { autoHeight: false } } }, live ? 'geo-h' : null)
+            : fitsMath(single)
+              ? patchAll(els, { h: v, content: { fit: false } }, live ? 'geo-h' : null)
+              : geo('h', v, live)}
       />
       <${NumberField} label="°" value=${single.rotation} min=${-360} max=${360} title=${t('Rotation')} onChange=${(v, live) => geo('rotation', v, live)} />
     </div>`}

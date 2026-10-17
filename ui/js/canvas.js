@@ -12,6 +12,7 @@ import {
   useStore,
   currentSlide,
   fitsText,
+  fitsMath,
   settings,
   openMenu,
   select,
@@ -87,23 +88,59 @@ function snapBox(b, others, W, H, thr, edges = { x: [0, 0.5, 1], y: [0, 0.5, 1] 
 }
 
 /**
- * Keeps the measured height of the text boxes that fit their text in the
- * document (for the inspector, alignment and the box's other uses). It is
- * derived data: no undo step, and a saved presentation stays saved.
+ * Keeps the measured size of the boxes that follow their content in the
+ * document (for the inspector, alignment, shows and exports): text boxes
+ * that fit their text, equations that fit their formula, and tables grown
+ * to hold their rows. It is derived data: no undo step, and a saved
+ * presentation stays saved.
  */
-let heightTimer = 0;
-function storeHeights(view) {
-  clearTimeout(heightTimer);
-  heightTimer = setTimeout(() => {
+let fitTimer = 0;
+function storeFits(view) {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(() => {
     const s = currentSlide();
     if (!s || document.body.classList.contains('dragging')) return;
     const updates = [];
     for (const el of s.elements) {
-      const h = fitsText(el) ? view.node(el.id)?.offsetHeight : 0;
-      if (h > 0 && Math.abs(h - el.h) >= 1) updates.push({ id: el.id, patch: { h } });
+      const node = view.node(el.id);
+      if (!node) continue;
+      if (fitsText(el)) {
+        const h = node.offsetHeight;
+        if (h > 0 && Math.abs(h - el.h) >= 1) updates.push({ id: el.id, patch: { h } });
+      } else if (fitsMath(el)) {
+        const g = fittedMath(el, node);
+        if (g) updates.push({ id: el.id, patch: g });
+      } else if (el.content.kind === 'table') {
+        // A table never shrinks below its rows: the box grows instead.
+        const h = node.querySelector('table.cz-table')?.offsetHeight || 0;
+        if (h - el.h >= 1) updates.push({ id: el.id, patch: { h } });
+      }
     }
     if (updates.length) apply({ op: 'updateElements', slide: s.id, updates }, { track: false, navigate: false });
   }, 300);
+}
+
+/**
+ * The geometry of an equation box that fits its formula (null when it
+ * already does). The side its alignment names stays put, the middle for a
+ * centered one, also when the box is rotated.
+ */
+function fittedMath(el, node) {
+  const box = node.querySelector('.cz-math-box');
+  const math = box?.querySelector('.cz-math');
+  if (!math?.firstChild) return null;
+  const cs = getComputedStyle(box);
+  const px = (...props) => props.reduce((sum, p) => sum + (parseFloat(cs[p]) || 0), 0);
+  const w = Math.ceil(math.scrollWidth + px('paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'));
+  const h = Math.ceil(math.scrollHeight + px('paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'));
+  if (!w || !h || (Math.abs(w - el.w) < 1 && Math.abs(h - el.h) < 1)) return null;
+  const side = { left: -1, right: 1 }[el.content.align] || 0;
+  const shift = (side * (el.w - w)) / 2;
+  const a = ((el.rotation || 0) * Math.PI) / 180;
+  const cx = el.x + el.w / 2 + shift * Math.cos(a);
+  const cy = el.y + el.h / 2 + shift * Math.sin(a);
+  const half = (v) => Math.round(v * 2) / 2;
+  return { x: half(cx - w / 2), y: half(cy - h / 2), w, h };
 }
 
 export function Canvas() {
@@ -195,7 +232,7 @@ export function Canvas() {
       if (keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === next[k])) return prev;
       return next;
     });
-    storeHeights(v);
+    storeFits(v);
   }
 
   useEffect(() => {
@@ -259,10 +296,17 @@ export function Canvas() {
     return slide.elements.filter((e) => !excludeIds.includes(e.id)).map((e) => bounds(geom(e)));
   }
 
-  async function commit(changes, coalesce) {
+  async function commit(changes, coalesce, extra = {}) {
     const updates = Object.entries(changes).map(([id, g]) => ({
       id,
-      patch: { x: Math.round(g.x * 2) / 2, y: Math.round(g.y * 2) / 2, w: Math.round(g.w * 2) / 2, h: Math.round(g.h * 2) / 2, rotation: Math.round(g.rotation * 10) / 10 },
+      patch: {
+        x: Math.round(g.x * 2) / 2,
+        y: Math.round(g.y * 2) / 2,
+        w: Math.round(g.w * 2) / 2,
+        h: Math.round(g.h * 2) / 2,
+        rotation: Math.round(g.rotation * 10) / 10,
+        ...extra[id],
+      },
     }));
     await apply({ op: 'updateElements', slide: slide.id, updates }, { coalesce });
     setLive(null);
@@ -334,6 +378,10 @@ export function Canvas() {
     const kind = el.content.kind;
     // Pictures keep their proportions on corner handles (Shift toggles).
     const naturalAspect = kind === 'image' || kind === 'video';
+    // An equation that fits its box scales with it.
+    const scales = fitsMath(el);
+    const mathBox = scales ? nodeOf(el.id)?.querySelector('.cz-math-box') : null;
+    const fontSize = (w) => Math.round(el.content.fontSize * (w / g0.w) * 10) / 10;
     const rest = others([el.id]);
     const snapOn = settings().snap !== false && !g0.rotation;
     let last = null;
@@ -345,7 +393,7 @@ export function Canvas() {
         const dy = ly - ay;
         let w = hx ? Math.max(MIN, hx * dx) : g0.w;
         let h = hy ? Math.max(MIN, hy * dy) : g0.h;
-        const keep = hx && hy ? naturalAspect !== ev.shiftKey : ev.shiftKey;
+        const keep = scales || (hx && hy ? naturalAspect !== ev.shiftKey : ev.shiftKey);
         if (keep) {
           const ratio = g0.w / g0.h;
           if (hx && hy) {
@@ -373,6 +421,7 @@ export function Canvas() {
           gl = { x: s.gx, y: s.gy };
         }
         paint(el.id, g, el);
+        if (mathBox) mathBox.style.fontSize = fontSize(g.w) + 'px';
         // A box that fits its text gets taller or shorter as its text wraps.
         if (fitsText(el)) g.h = nodeOf(el.id)?.offsetHeight || g.h;
         last = g;
@@ -383,7 +432,7 @@ export function Canvas() {
       () => {
         setGuides(null);
         setTip(null);
-        if (last) commit({ [el.id]: last });
+        if (last) commit({ [el.id]: last }, undefined, scales ? { [el.id]: { content: { fontSize: fontSize(last.w) } } } : {});
         else setLive(null);
       },
     );
@@ -629,8 +678,9 @@ export function Canvas() {
   const handlesFor = (el, g) => {
     if (el.locked || editingId === el.id || live) return null;
     const isLine = el.content.kind === 'shape' && el.content.shape === 'line';
-    // A box that fits its text only gets wider or narrower.
-    const hs = isLine || fitsText(el) ? ['e', 'w'] : HANDLES;
+    // A box that fits its text only gets wider or narrower; one that fits
+    // its equation scales from a corner.
+    const hs = isLine || fitsText(el) ? ['e', 'w'] : fitsMath(el) ? ['nw', 'ne', 'se', 'sw'] : HANDLES;
     return html`${hs.map(
       (h) => html`<div
         class=${'handle h-' + h}

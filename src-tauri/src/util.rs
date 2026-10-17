@@ -259,6 +259,18 @@ fn windows_1252(b: u8) -> char {
     if (0x80..0xA0).contains(&b) { HIGH[(b - 0x80) as usize] } else { b as char }
 }
 
+/// RGBA pixels as a PNG file.
+pub fn encode_png(rgba: &[u8], width: u32, height: u32) -> anyhow::Result<Vec<u8>> {
+    let mut out = Vec::new();
+    let mut encoder = png::Encoder::new(&mut out, width, height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header()?;
+    writer.write_image_data(rgba)?;
+    writer.finish()?;
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,5 +346,13 @@ mod tests {
         assert!(!is_valid_asset_name("../etc/passwd"));
         assert!(!is_valid_asset_name("a/b.png"));
         assert!(!is_valid_asset_name(".hidden"));
+    }
+
+    #[test]
+    fn clipboard_pixels_become_a_png() {
+        let rgba = [255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 255, 255, 255, 255, 0];
+        let png = encode_png(&rgba, 2, 2).unwrap();
+        assert_eq!(imagesize::blob_size(&png).map(|s| (s.width, s.height)).unwrap(), (2, 2));
+        assert!(encode_png(&rgba, 3, 3).is_err());
     }
 }

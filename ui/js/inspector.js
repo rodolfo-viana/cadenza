@@ -199,7 +199,7 @@ function SlideFormat() {
     <${Section} title=${t('Insert')} id="insert-quick">
       <div class="quick-insert">
         ${[
-          ['type', t('Text'), () => A.insert('text', 'body')],
+          ['type', t('Text'), () => A.insertText('body')],
           ['square', t('Shape'), () => A.insert('shape', 'rect')],
           ['image', t('Image'), A.insertImage],
           ['table', t('Table'), () => A.insert('table')],

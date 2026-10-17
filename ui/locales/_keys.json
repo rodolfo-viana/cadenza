@@ -2172,6 +2172,12 @@
   ]
  },
  {
+  "key": "Fit box to equation",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Fit box to text",
   "files": [
    "panels.js"

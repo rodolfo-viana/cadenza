@@ -484,11 +484,7 @@ async fn doc_save(window: Window, state: State<'_, AppState>, path: Option<Strin
             None => return Err("NEEDS_PATH".into()),
         }
     };
-    let target = if target.extension().is_none() {
-        target.with_extension(package::EXTENSION)
-    } else {
-        target
-    };
+    let target = presentation_path(target);
     let view = state.with_doc(&label, |doc| {
         doc.save(&target).map_err(|e| match e.downcast_ref::<package::MissingMedia>() {
             // It names slides and fonts, so it is translated here.
@@ -502,6 +498,19 @@ async fn doc_save(window: Window, state: State<'_, AppState>, path: Option<Strin
     })?;
     state.remember_recent(&target);
     Ok(view)
+}
+
+/// Where a presentation is saved: with its extension, once ("talk.cadenza"
+/// typed into a save dialog that keeps its own ".cadenza" gives
+/// "talk.cadenza.cadenza").
+fn presentation_path(path: PathBuf) -> PathBuf {
+    let double = format!(".{0}.{0}", package::EXTENSION);
+    match path.file_name().and_then(|n| n.to_str()) {
+        None => path,
+        Some(name) if name.len() > double.len() && name.to_lowercase().ends_with(&double) => path.with_extension(""),
+        Some(_) if path.extension().is_none() => path.with_extension(package::EXTENSION),
+        Some(_) => path,
+    }
 }
 
 /// Writes a crash-recovery snapshot if there are unsaved changes.
@@ -584,6 +593,23 @@ fn asset_import_bytes(window: Window, state: State<AppState>, request: tauri::ip
         .and_then(|v| v.to_str().ok())
         .ok_or("No presentation is open")?;
     state.with_doc_id(window.label(), doc_id, |doc| doc.import_bytes(bytes, &ext))
+}
+
+/// Imports the image on the system clipboard as a PNG, if there is one.
+/// WebKitGTK gives pasted images to the page in no paste event, so pasting
+/// asks here when the event brings neither text nor files.
+#[tauri::command]
+async fn asset_import_clipboard_image(window: Window, state: State<'_, AppState>, doc_id: String) -> CmdResult<Option<AssetInfo>> {
+    let app = window.app_handle().clone();
+    let pixels = tauri::async_runtime::spawn_blocking(move || {
+        let image = app.clipboard().read_image().ok()?;
+        Some((image.rgba().to_vec(), image.width(), image.height()))
+    })
+    .await
+    .map_err(err)?;
+    let Some((rgba, width, height)) = pixels else { return Ok(None) };
+    let png = util::encode_png(&rgba, width, height).map_err(err)?;
+    state.with_doc_id(window.label(), &doc_id, |doc| doc.import_bytes(&png, "png")).map(Some)
 }
 
 /// Imports a Markdown file, either replacing the deck or appending slides.
@@ -1807,6 +1833,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             clipboard_paste,
             asset_import_file,
             asset_import_bytes,
+            asset_import_clipboard_image,
             font_install,
             themes_user,
             theme_from_builtin,
@@ -1869,6 +1896,16 @@ mod tests {
         assert_eq!(swap_label("present-editor-1").as_deref(), Some("presenter-editor-1"));
         assert_eq!(swap_label("editor-1"), None);
         assert_eq!(swap_label("print-editor-1"), None);
+    }
+
+    #[test]
+    fn presentations_are_saved_with_one_extension() {
+        let p = |s: &str| presentation_path(PathBuf::from(s));
+        assert_eq!(p("/t/talk"), PathBuf::from("/t/talk.cadenza"));
+        assert_eq!(p("/t/talk.cadenza"), PathBuf::from("/t/talk.cadenza"));
+        assert_eq!(p("/t/talk.cadenza.cadenza"), PathBuf::from("/t/talk.cadenza"));
+        assert_eq!(p("/t/talk.v2"), PathBuf::from("/t/talk.v2"));
+        assert_eq!(p("/t/.cadenza.cadenza"), PathBuf::from("/t/.cadenza.cadenza"));
     }
 
     #[test]

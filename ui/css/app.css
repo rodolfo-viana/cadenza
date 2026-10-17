@@ -876,7 +876,8 @@ input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 
 .menu {
   position: fixed;
-  z-index: 3000;
+  /* Above dialogs too: some open menus (the Theme Builder's Export). */
+  z-index: 3300;
   min-width: 230px;
   max-height: calc(100vh - 16px);
   overflow-y: auto;

@@ -853,7 +853,14 @@ pub struct MathContent {
     pub font_size: f64,
     /// Empty = theme text color.
     pub color: String,
+    /// Where the formula sits in its box; for a box that fits it, the side
+    /// that stays put when the formula changes size.
     pub align: String,
+    /// The box takes the size of the formula (the editor measures it), and
+    /// resizing it scales the formula. Equations made before this kept their
+    /// boxes.
+    #[serde(default)]
+    pub fit: bool,
 }
 
 impl Default for MathContent {
@@ -863,6 +870,7 @@ impl Default for MathContent {
             font_size: 48.0,
             color: String::new(),
             align: "center".into(),
+            fit: true,
         }
     }
 }
@@ -1083,6 +1091,13 @@ mod tests {
         assert_eq!(json["content"]["kind"], "text");
         assert!(json["content"]["style"].is_object());
         assert!(json["content"]["html"].is_string());
+    }
+
+    #[test]
+    fn new_equations_fit_their_boxes_and_older_ones_keep_them() {
+        assert!(MathContent::default().fit);
+        let old: Element = serde_json::from_str(r#"{"content":{"kind":"math","latex":"x","fontSize":40}}"#).unwrap();
+        assert!(matches!(old.content, Content::Math(ref m) if !m.fit && m.align == "center"));
     }
 
     #[test]

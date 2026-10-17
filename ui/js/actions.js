@@ -21,6 +21,7 @@ import {
   goToSlide,
   ingestView,
   deckTitle,
+  undo,
 } from './store.js';
 import { t, N_ } from './i18n.js';
 import { chartSteps } from './charts.js';
@@ -38,6 +39,28 @@ export async function insert(kind, variant = '', props = null, target = { docId:
   set({ editing: null, editingTable: null });
   const out = await apply({ op: 'addElement', slide: target.slideId, kind, variant, props }, { docId: target.docId });
   return out?.created?.[0] || null;
+}
+
+/** Inserts a text box with the caret in it, ready for typing. */
+export async function insertText(variant = 'body') {
+  const id = await insert('text', variant);
+  if (!id) return null;
+  const added = state.doc.undoLabel;
+  // Left empty, the box goes away again (it would be invisible on the
+  // slide): its insertion is undone, if nothing else was done since.
+  const ended = () => {
+    if (state.editing === id) return;
+    window.removeEventListener('cz-edit-ended', ended);
+    const el = currentSlide()?.elements.find((e) => e.id === id);
+    if (el && !el.content.html.replace(/<[^>]*>|&nbsp;|\s|\u200b/g, '') && state.doc?.undoLabel === added) undo();
+  };
+  window.addEventListener('cz-edit-ended', ended);
+  const [{ canvasApi }, { beginTextEdit }] = await Promise.all([import('./canvas.js'), import('./textedit.js')]);
+  // The canvas draws the new box on its next render.
+  for (let i = 0; i < 30 && !canvasApi.view?.node(id); i++) await new Promise((r) => requestAnimationFrame(r));
+  const el = currentSlide()?.elements.find((e) => e.id === id);
+  if (el && canvasApi.view?.node(id)) await beginTextEdit(canvasApi.view, el);
+  return id;
 }
 
 function fitInto(w, h, maxW, maxH) {
@@ -367,14 +390,19 @@ async function pasteData(files, text, target, docId) {
     }
     return;
   }
-  if (text && text.trim()) {
-    const txt = text.trim();
-    if (/^https?:\/\/\S+$/i.test(txt) && /youtube\.com|youtu\.be|vimeo\.com/i.test(txt)) {
-      await insert('video', '', { name: N_('Video'), content: { kind: 'video', src: txt, autoplay: false } }, { docId, slideId: target });
-      return;
-    }
-    await insert('text', 'body', { content: { kind: 'text', html: textToHtml(txt) } }, { docId, slideId: target });
+  // Invisible characters alone are no text to paste.
+  const txt = (text || '').replace(/[\u200b\ufeff]/g, '').trim();
+  if (!txt) {
+    // WebKitGTK passes no pasted images to the page: read the clipboard.
+    const asset = await invoke('asset_import_clipboard_image', { docId }).catch(() => null);
+    if (asset && state.doc?.docId === docId) await insertAsset(asset, null, 0, {}, { docId, slideId: target });
+    return;
   }
+  if (/^https?:\/\/\S+$/i.test(txt) && /youtube\.com|youtu\.be|vimeo\.com/i.test(txt)) {
+    await insert('video', '', { name: N_('Video'), content: { kind: 'video', src: txt, autoplay: false } }, { docId, slideId: target });
+    return;
+  }
+  await insert('text', 'body', { content: { kind: 'text', html: textToHtml(txt) } }, { docId, slideId: target });
 }
 
 // ---------------------------------------------------------------------------
@@ -425,6 +453,7 @@ export async function exportHtml(single) {
   if (!path) return;
   try {
     set({ busy: t('Exporting…') });
+    await import('./diagrams.js').then((m) => m.ensureDiagrams());
     const out = await invoke('export_html', { path, single });
     toast(single ? t('Exported HTML file') : t('Exported website folder'), 'success', {
       action: { label: t('Show in Folder'), run: () => opener.revealItemInDir(out) },
@@ -441,6 +470,7 @@ export async function exportPdf() {
   if (!state.doc) return;
   if (!(await flushEdits())) return;
   try {
+    await import('./diagrams.js').then((m) => m.ensureDiagrams());
     await invoke('export_pdf');
   } catch (e) {
     toast(String(e), 'error');

@@ -119,9 +119,17 @@ const failed = new Map(); // element id → source that failed to render
 /**
  * Renders diagrams that have no stored SVG yet (new diagrams, imported
  * Markdown, files from other tools). These updates are cached data, not
- * edits, so they do not create undo steps.
+ * edits, so they do not create undo steps. Passes run one after another,
+ * so the promise of one also covers the renders that were under way when it
+ * was asked for (shows and exports wait for it).
  */
-export async function ensureDiagrams() {
+let passes = Promise.resolve();
+export function ensureDiagrams() {
+  passes = passes.then(renderMissing, renderMissing);
+  return passes;
+}
+
+async function renderMissing() {
   const deck = state.doc?.deck;
   if (!deck) return;
   for (const slide of deck.slides) {

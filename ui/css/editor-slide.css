@@ -36,6 +36,9 @@
 .cz-editor-reveal .cz-bg-video {
   width: 100%;
   height: 100%;
+  /* Themes keep media within 95% of the slide. */
+  max-width: none;
+  max-height: none;
   object-fit: cover;
 }
 

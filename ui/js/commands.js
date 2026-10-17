@@ -48,8 +48,8 @@ export const COMMANDS = [
   { id: 'text.underline', group: N_('Text'), label: N_('Underline'), icon: 'underline', keys: ['Mod+U'], global: true, when: hasDoc, run: () => format('underline') },
 
   // Insert
-  { id: 'insert.text', group: N_('Insert'), label: N_('Text Box'), icon: 'type', keys: ['Mod+Shift+T'], when: hasDoc, run: () => A.insert('text', 'body') },
-  { id: 'insert.title', group: N_('Insert'), label: N_('Title'), icon: 'heading', when: hasDoc, run: () => A.insert('text', 'title') },
+  { id: 'insert.text', group: N_('Insert'), label: N_('Text Box'), icon: 'type', keys: ['Mod+Shift+T'], when: hasDoc, run: () => A.insertText('body') },
+  { id: 'insert.title', group: N_('Insert'), label: N_('Title'), icon: 'heading', when: hasDoc, run: () => A.insertText('title') },
   { id: 'insert.shape', group: N_('Insert'), label: N_('Rectangle'), icon: 'square', when: hasDoc, run: () => A.insert('shape', 'rect') },
   { id: 'insert.ellipse', group: N_('Insert'), label: N_('Oval'), icon: 'circle', when: hasDoc, run: () => A.insert('shape', 'ellipse') },
   { id: 'insert.line', group: N_('Insert'), label: N_('Arrow Line'), icon: 'arrow-right', when: hasDoc, run: () => A.insert('shape', 'line') },

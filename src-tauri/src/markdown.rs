@@ -261,6 +261,26 @@ pub fn to_slides(md: &[MdSlide], width: u32, height: u32, resolve_image: &mut dy
                 ..Default::default()
             });
         }
+        // Code and diagrams come without a text box: text that goes with
+        // them sits between the title and them, as tall as its lines.
+        if m.code.is_some() && has_body {
+            let (w, h) = (width as f64, height as f64);
+            let font = (32.0 * (w / 1280.0).min(h / 720.0)).round();
+            let top = if m.title.is_some() { (h * 0.25).round() } else { (h * 0.08).round() };
+            let lines = m.body_html.matches("<li").count() + m.body_html.matches("<p").count();
+            let body_h = (lines.max(1) as f64 * font * 1.5 + font * 0.5).min(h * 0.4).round();
+            let mut body = layouts::text("body", "", font, "left");
+            (body.x, body.y, body.w, body.h) = ((w * 0.07).round(), top, (w * 0.86).round(), body_h);
+            set_text(&mut body, &m.body_html);
+            for e in slide.elements.iter_mut() {
+                if matches!(e.content, Content::Code(_) | Content::Diagram(_)) {
+                    let bottom = e.y + e.h;
+                    e.y = top + body_h + (h * 0.03).round();
+                    e.h = (bottom - e.y).max((h * 0.2).round());
+                }
+            }
+            slide.elements.push(body);
+        }
         // Remove empty placeholders that the Markdown did not fill, except
         // the main ones a user would expect to type into.
         slide.elements.retain(|e| match &e.content {
@@ -313,6 +333,28 @@ mod tests {
             _ => None,
         });
         assert_eq!(img.as_deref(), Some("x-cat.png"));
+    }
+
+    #[test]
+    fn text_with_code_or_a_diagram_is_kept() {
+        let md =
+            parse("## Code\n\n- One\n- Two\n\n```python\nprint(1)\n```\n\n---\n\n## Flow\n\nWhy it matters.\n\n```mermaid\nflowchart LR\n  A --> B\n```\n");
+        let slides = to_slides(&md, 1280, 720, &mut |_| None);
+        for (slide, text) in slides.iter().zip(["One", "Why it matters."]) {
+            let body = slide
+                .elements
+                .iter()
+                .find(|e| e.content.text().is_some_and(|t| t.style.role == "body"))
+                .expect("a text box");
+            assert!(body.content.text().unwrap().html.contains(text));
+            let other = slide
+                .elements
+                .iter()
+                .find(|e| matches!(e.content, Content::Code(_) | Content::Diagram(_)))
+                .unwrap();
+            assert!(other.y >= body.y + body.h, "{} overlaps the text", other.name);
+            assert!(other.y + other.h <= 720.0);
+        }
     }
 
     #[test]

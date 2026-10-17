@@ -258,6 +258,7 @@ export function apply(op, opts = {}) {
 
 /** Whether a text box is exactly as tall as its text ("Fit box to text"). */
 export const fitsText = (el) => el.content.kind === 'text' && !!el.content.style.autoHeight;
+export const fitsMath = (el) => el.content.kind === 'math' && !!el.content.fit;
 
 function enqueue(command, args, opts = {}) {
   const docId = opts.docId ?? state.doc?.docId;
@@ -312,7 +313,8 @@ export async function undo() {
   if (!(await flushEdits())) return;
   if (!state.doc?.canUndo) return;
   try {
-    ingest(await invoke('doc_undo'));
+    const before = state.doc.deck;
+    if (ingest(await invoke('doc_undo'))) selectChanged(before);
     historySync?.();
   } catch (e) {
     toast(String(e), 'error');
@@ -323,11 +325,25 @@ export async function redo() {
   if (!(await flushEdits())) return;
   if (!state.doc?.canRedo) return;
   try {
-    ingest(await invoke('doc_redo'));
+    const before = state.doc.deck;
+    if (ingest(await invoke('doc_redo'))) selectChanged(before);
     historySync?.();
   } catch (e) {
     toast(String(e), 'error');
   }
+}
+
+/**
+ * After an undo or redo, selects the elements of the slide in view that it
+ * brought back or changed (a deleted element comes back selected, ready to
+ * be copied or moved). Not while a text is being edited.
+ */
+function selectChanged(before) {
+  const old = before.slides.find((s) => s.id === state.slideId);
+  if (!old || state.editing) return;
+  const was = new Map(old.elements.map((e) => [e.id, JSON.stringify(e)]));
+  const ids = (currentSlide()?.elements || []).filter((e) => was.get(e.id) !== JSON.stringify(e)).map((e) => e.id);
+  if (ids.length) set({ selection: ids });
 }
 
 export const seal = () => state.doc && invoke('doc_seal').catch(() => {});
@@ -504,6 +520,8 @@ export async function play(fromCurrent = false) {
   if (!(await flushEdits())) return;
   set({ editing: null, menu: null });
   try {
+    // A diagram drawn a moment ago has its picture by then.
+    await import('./diagrams.js').then((m) => m.ensureDiagrams());
     await invoke('present_start', { fromSlide: fromCurrent ? state.slideId : null, presenter: null });
   } catch (e) {
     toast(String(e), 'error');

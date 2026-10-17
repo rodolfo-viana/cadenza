@@ -368,9 +368,7 @@ function restyle(s, prop, value, cmd, marker, found) {
 /** A style of the selected text where it differs from its box ('' if not). */
 export function selectionStyle(prop) {
   if (!textSelected()) return '';
-  let e = session.range.startContainer;
-  if (e.nodeType !== Node.ELEMENT_NODE) e = e.parentElement;
-  for (; e && e !== session.node; e = e.parentElement) {
+  for (let e = selectionStart(session.range); e && e !== session.node; e = e.parentElement) {
     const v = e.style?.getPropertyValue(prop);
     if (v) return v;
   }
@@ -380,9 +378,29 @@ export function selectionStyle(prop) {
 /** The font size of the selected text, in px. */
 export function selectionFontSize() {
   if (!textSelected()) return 0;
-  let e = session.range.startContainer;
-  if (e.nodeType !== Node.ELEMENT_NODE) e = e.parentElement;
-  return parseFloat(getComputedStyle(e).fontSize) || 0;
+  return parseFloat(getComputedStyle(selectionStart(session.range)).fontSize) || 0;
+}
+
+/**
+ * The element holding the first selected character. A selection made with
+ * the keyboard often starts at the very end of the text before it, which can
+ * lie outside the styled span the selected text is in.
+ */
+function selectionStart(range) {
+  let n = range.startContainer;
+  if (n.nodeType === Node.TEXT_NODE && range.startOffset >= n.length) {
+    const walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT);
+    walker.currentNode = n;
+    for (let t = walker.nextNode(); t && range.intersectsNode(t); t = walker.nextNode()) {
+      if (t.length) {
+        n = t;
+        break;
+      }
+    }
+  } else if (n.nodeType === Node.ELEMENT_NODE && n.childNodes[range.startOffset]) {
+    n = n.childNodes[range.startOffset];
+  }
+  return n.nodeType === Node.ELEMENT_NODE ? n : n.parentElement;
 }
 
 export function queryState(cmd) {

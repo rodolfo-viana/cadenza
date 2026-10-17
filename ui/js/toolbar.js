@@ -82,12 +82,12 @@ function mediaMenu() {
 
 function textMenu() {
   return [
-    { label: t('Title'), icon: 'heading', run: () => A.insert('text', 'title') },
-    { label: t('Subtitle'), icon: 'type', run: () => A.insert('text', 'subtitle') },
-    { label: t('Heading'), icon: 'heading', run: () => A.insert('text', 'heading') },
-    { label: t('Body Text'), icon: 'pilcrow', run: () => A.insert('text', 'body') },
-    { label: t('Caption'), icon: 'type', run: () => A.insert('text', 'caption') },
-    { label: t('Quote'), icon: 'quote', run: () => A.insert('text', 'quote') },
+    { label: t('Title'), icon: 'heading', run: () => A.insertText('title') },
+    { label: t('Subtitle'), icon: 'type', run: () => A.insertText('subtitle') },
+    { label: t('Heading'), icon: 'heading', run: () => A.insertText('heading') },
+    { label: t('Body Text'), icon: 'pilcrow', run: () => A.insertText('body') },
+    { label: t('Caption'), icon: 'type', run: () => A.insertText('caption') },
+    { label: t('Quote'), icon: 'quote', run: () => A.insertText('quote') },
   ];
 }
 

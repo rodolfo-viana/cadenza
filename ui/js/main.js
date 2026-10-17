@@ -169,11 +169,15 @@ const fromCatcher = (e) => e.target === catcher || catcher.contains(e.target);
 document.addEventListener('copy', (e) => {
   if (!state.doc || (!fromCatcher(e) && isTyping(e.target))) return;
   handled = true;
+  // With nothing selected, the clipboard keeps what it has (instead of the
+  // catcher's invisible placeholder).
+  if (fromCatcher(e)) e.preventDefault();
   A.onCopy(e, false);
 });
 document.addEventListener('cut', (e) => {
   if (!state.doc || (!fromCatcher(e) && isTyping(e.target))) return;
   handled = true;
+  if (fromCatcher(e)) e.preventDefault();
   A.onCopy(e, true);
 });
 document.addEventListener('paste', (e) => {

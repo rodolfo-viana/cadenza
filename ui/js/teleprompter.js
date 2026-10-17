@@ -245,6 +245,11 @@ export function createTeleprompter({ settings, invoke, onVisibilityChange = () =
       closePanel();
     } else {
       layout();
+      // Opened during a slide: it starts as it would on a new slide.
+      if (s.autoStart && !playing && pos === 0 && !root.classList.contains('empty')) {
+        clearTimeout(startTimer);
+        startTimer = setTimeout(play, START_DELAY);
+      }
     }
     if (s.enabled !== visible) {
       s.enabled = visible;
