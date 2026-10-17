@@ -13,6 +13,7 @@ chart palettes and theme-aware defaults).
 
 import pathlib
 import re
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "ui/vendor/reveal/theme/simple.css"
@@ -68,6 +69,14 @@ THEMES = {
 }
 
 
+def replace_rule(pattern: str, rule: str, css: str) -> str:
+    """Replaces the template's one rule matching `pattern` (any spacing)."""
+    css, n = re.subn(pattern, lambda _: rule, css)
+    if n != 1:
+        sys.exit(f"{TEMPLATE.relative_to(ROOT)}: expected one rule matching {pattern}, found {n}; nothing written")
+    return css
+
+
 def build(name: str, t: dict, template: str) -> str:
     css = re.sub(r"@import[^;]+;", "", template)
     root = (
@@ -85,12 +94,11 @@ def build(name: str, t: dict, template: str) -> str:
         f"--r-selection-background-color:{t['selection']};--r-selection-color:#fff;"
         "--r-overlay-element-bg-color:240, 240, 240;--r-overlay-element-fg-color:0, 0, 0}"
     )
-    css = re.sub(r":root\{[^}]*\}", root, css, count=1)
-    css = re.sub(
-        r"\.reveal-viewport\{[^}]*\}",
+    css = replace_rule(r":root\s*\{[^}]*\}", root, css)
+    css = replace_rule(
+        r"\.reveal-viewport\s*\{[^}]*\}",
         f".reveal-viewport{{background:{t['background']};background-color:{t['bg']}}}",
         css,
-        count=1,
     )
     # Light themes fix text on dark backgrounds and vice versa.
     css = re.sub(r"section\.has-(dark|light)-background[^{]*\{[^}]*\}\s*$", "", css.strip())
@@ -112,9 +120,11 @@ def build(name: str, t: dict, template: str) -> str:
 
 def main() -> None:
     template = TEMPLATE.read_text(encoding="utf-8")
+    # Every theme is built before any is written.
+    built = {name: build(name, t, template) for name, t in THEMES.items()}
     OUT.mkdir(parents=True, exist_ok=True)
-    for name, t in THEMES.items():
-        (OUT / f"{name}.css").write_text(build(name, t, template), encoding="utf-8")
+    for name, css in built.items():
+        (OUT / f"{name}.css").write_text(css, encoding="utf-8")
         print("wrote", OUT / f"{name}.css")
 
 

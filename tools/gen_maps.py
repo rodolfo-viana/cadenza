@@ -21,6 +21,7 @@ File format (read by src-tauri/src/maps.rs), integers as LEB128 varints:
     then zigzag deltas of longitude and latitude in 1/10000 degree.
 """
 
+import collections
 import json
 import math
 import pathlib
@@ -41,6 +42,8 @@ CONTINENTS = {
     "Oceania": "oceania",
     "Antarctica": "antarctica",
 }
+# What Natural Earth puts in a code field that has no code.
+NO_CODE = (None, "-99")
 
 
 def varint(n: int) -> bytes:
@@ -67,7 +70,9 @@ def simplify(src: pathlib.Path, out: pathlib.Path, interval: float, where: str |
     if where:
         cmd += ["-filter", where]
     cmd += ["-simplify", f"interval={interval}", "keep-shapes", "-o", "format=geojson", "precision=0.0001", str(out)]
-    subprocess.run(cmd, check=True, capture_output=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        sys.exit(f"mapshaper failed on {src} (exit {r.returncode}):\n{r.stderr.strip()}")
 
 
 def polygons(geom) -> list:
@@ -137,11 +142,28 @@ def encode_region(rid: str, parent: str, name: str, alts: list, langs: dict, pol
     return bytes(out) + encode_shape(polys)
 
 
-def write(path: pathlib.Path, regions: list) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    data = b"CZMAP1" + varint(len(regions)) + b"".join(regions)
-    path.write_bytes(data)
-    print(f"{path.relative_to(ROOT)}: {len(regions)} regions, {len(data) / 1024:.0f} KiB")
+def write(files: dict[pathlib.Path, list]) -> None:
+    """Writes every file beside its destination first and renames them into
+    place only once all are written, so that a failure never leaves new
+    countries beside old states."""
+    staged = {path: path.with_name(path.name + ".tmp") for path in files}
+    try:
+        for path, regions in files.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            staged[path].write_bytes(b"CZMAP1" + varint(len(regions)) + b"".join(regions))
+    except BaseException:
+        for tmp in staged.values():
+            tmp.unlink(missing_ok=True)
+        raise
+    for path, regions in files.items():
+        staged[path].replace(path)
+        print(f"{path.relative_to(ROOT)}: {len(regions)} regions, {path.stat().st_size / 1024:.0f} KiB")
+
+
+def check_unique(what: str, keys: list) -> None:
+    dupes = [k for k, n in collections.Counter(keys).items() if n > 1]
+    if dupes:
+        sys.exit(f"{what}: {len(dupes)} ids are not unique, nothing written: {dupes[:20]}")
 
 
 def extent_km(polys: list) -> float:
@@ -196,23 +218,31 @@ def main_extent_km(polys: list) -> float:
 
 
 def main() -> None:
+    if len(sys.argv) != 3:
+        sys.exit("usage: gen_maps.py <countries.geojson> <states.geojson>")
     countries_src, states_src = map(pathlib.Path, sys.argv[1:3])
-    tmp = pathlib.Path(tempfile.mkdtemp())
+    with tempfile.TemporaryDirectory(prefix="czmaps-") as tmp:
+        countries, states = build(countries_src, states_src, pathlib.Path(tmp))
+    write({ROOT / "src-tauri/maps/countries.bin": countries, ROOT / "src-tauri/maps/states.bin": states})
 
+
+def build(countries_src: pathlib.Path, states_src: pathlib.Path, tmp: pathlib.Path) -> tuple[list, list]:
+    """Encodes the country and state regions, without writing them."""
     # Countries: the world and continent maps.
     simplify(countries_src, tmp / "countries.json", 4000)
-    regions = []
+    regions, country_ids = [], []
     for f in json.loads((tmp / "countries.json").read_text())["features"]:
         p = f["properties"]
         rid = p["ADM0_A3"]
-        alts = [p.get("NAME"), p.get("NAME_LONG"), p.get("NAME_ALT"), p.get("NAME_CIAWF"), p.get("NAME_SORT"), p.get("ISO_A3")]
-        alts += [p.get(k) for k in ("ISO_A2", "ISO_A2_EH", "ISO_A3_EH") if p.get(k) not in (None, "-99")]
+        country_ids.append(rid)
+        alts = [p.get("NAME"), p.get("NAME_LONG"), p.get("NAME_ALT"), p.get("NAME_CIAWF"), p.get("NAME_SORT")]
+        alts += [p.get(k) for k in ("ISO_A3", "ISO_A2", "ISO_A2_EH", "ISO_A3_EH") if p.get(k) not in NO_CODE]
         langs = {lang: p.get(f"NAME_{lang.upper()}") for lang in LANGS}
         continent = CONTINENTS.get(p.get("CONTINENT"), "")
         # A pixel of a continent map is about 8 km.
         shape = drop_islets(polygons(f["geometry"]), 150)
         regions.append(encode_region(rid, continent, clean(p.get("NAME_EN") or p["NAME"]), alts, langs, shape))
-    write(ROOT / "src-tauri/maps/countries.bin", regions)
+    check_unique("countries", country_ids)
 
     # States and provinces: country maps, simplified per size of country.
     raw = json.loads(states_src.read_text())["features"]
@@ -243,7 +273,8 @@ def main() -> None:
             local = clean(p.get("name"))
             if local and name != local and name in local:
                 name = local
-            alts = [p.get("name"), p.get("name_local"), p.get("gn_name"), p.get("woe_name"), p.get("postal"), p.get("iso_3166_2")]
+            alts = [p.get("name"), p.get("name_local"), p.get("gn_name"), p.get("woe_name")]
+            alts += [p.get(k) for k in ("postal", "iso_3166_2") if p.get(k) not in NO_CODE]
             alts += (p.get("name_alt") or "").split("|")
             langs = {lang: p.get(f"name_{lang}") for lang in LANGS}
             # Islands smaller than about 1/150 of the country squared, or
@@ -252,7 +283,9 @@ def main() -> None:
             shape = drop_islets(shape, min((sizes[p["adm0_a3"]] / 150) ** 2, (extent_km(shape) / 40) ** 2))
             records.append({"country": p["adm0_a3"], "id": rid, "adm1": p.get("adm1_code"), "name": name, "alts": alts, "langs": langs, "shape": shape})
         print(f"  {interval} m: {len(countries)} countries")
-    write(ROOT / "src-tauri/maps/states.bin", [encode_region(r["id"], r["country"], r["name"], r["alts"], r["langs"], r["shape"]) for r in unique_codes(records)])
+    states = unique_codes(records)
+    check_unique("states", [(r["country"], r["id"]) for r in states])
+    return regions, [encode_region(r["id"], r["country"], r["name"], r["alts"], r["langs"], r["shape"]) for r in states]
 
 
 def unique_codes(records: list) -> list:

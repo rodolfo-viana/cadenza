@@ -10,7 +10,11 @@ let bad = 0;
 for (const f of files) {
   const out = path.join(tmp, f.replace(/\.js$/, '.mjs'));
   fs.copyFileSync(path.join(dir, f), out);
-  try { cp.execFileSync(process.execPath, ['--check', out], { stdio: 'pipe' }); } catch (e) { console.log(`SYNTAX ${f}: ${String(e.stderr).split('\n').slice(0, 5).join('\n')}`); bad++; }
+  try { cp.execFileSync(process.execPath, ['--check', out], { stdio: 'pipe' }); } catch (e) {
+    // No exit status: node never ran (or was killed), which says nothing about the file.
+    if (e.status == null) { console.error(`cannot run node --check on ${f}: ${e.code || e.signal || e.message}`); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(2); }
+    console.log(`SYNTAX ${f}: ${String(e.stderr).split('\n').slice(0, 5).join('\n')}`); bad++;
+  }
 }
 const exportsOf = {};
 for (const f of files) {
@@ -19,7 +23,6 @@ for (const f of files) {
   for (const m of src.matchAll(/export\s*\{([^}]*)\}/g)) for (const part of m[1].split(',')) { const p = part.trim(); if (p) { const as = p.split(/\s+as\s+/); names.add((as[1] || as[0]).trim()); } }
   exportsOf[f] = names;
 }
-const libSrc = fs.readFileSync(path.join(dir, 'lib.js'), 'utf8');
 exportsOf['__vendor'] = new Set(['h', 'html', 'render', 'Component', 'createContext', 'useState', 'useReducer', 'useEffect', 'useLayoutEffect', 'useRef', 'useImperativeHandle', 'useMemo', 'useCallback', 'useContext']);
 for (const f of files) {
   const src = fs.readFileSync(path.join(dir, f), 'utf8');

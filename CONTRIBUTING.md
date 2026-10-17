@@ -154,12 +154,17 @@ into every language, but please say so in the description. To add a language, ad
   python3 tools/i18n.py check
   ```
 
+  GitHub Actions runs them on every push to main and every pull request (`.github/workflows/checks.yml`),
+  where any Clippy warning fails.
+
 ## Releases
 
 Maintainers release a version by updating `version` in both `src-tauri/tauri.conf.json` and
 `src-tauri/Cargo.toml`, committing, and pushing a matching tag (`git tag -a v0.2.0 -m "Cadenza 0.2.0"`
 and `git push origin v0.2.0`). GitHub Actions then builds the Linux and Windows installers and
-attaches them to a draft release to review and publish.
+attaches them to a draft release to review and publish. Its notes are the version's section of
+`CHANGELOG.md` (`## 0.2.0 — date`); the workflow stops before building if that section is missing or
+the tag and the two versions differ.
 
 Installed copies update themselves from the latest published release. The workflow builds with
 `src-tauri/tauri.updater.conf.json`, which signs every installer and adds `latest.json` to the

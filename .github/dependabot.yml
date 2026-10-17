@@ -1,8 +1,9 @@
 version: 2
 
 # Weekly update PRs for the Rust crates and the GitHub Actions used by the
-# release workflow. The UI's libraries live in ui/vendor and are updated by
-# hand, as is the Tauri CLI version pinned in release.yml.
+# workflows (pinned to commits, with the version in a comment). The UI's
+# libraries live in ui/vendor and are updated by hand, as is the Tauri CLI
+# version pinned in release.yml.
 updates:
   - package-ecosystem: cargo
     directory: /src-tauri
