@@ -1,8 +1,8 @@
 // The top toolbar.
 
-import { html, useState } from './lib.js';
+import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, set, useStore, settings, updateSettings, undo, redo, play, updateDeck, deckTitle, openModal } from './store.js';
+import { state, set, useStore, settings, updateSettings, undo, redo, play, updateDeck, deckTitle, openModal, registerFlush } from './store.js';
 import { ToolButton, showMenuAt } from './ui.js';
 import { item, COMMANDS } from './commands.js';
 import * as A from './actions.js';
@@ -132,6 +132,42 @@ function playMenu() {
   ];
 }
 
+/**
+ * Renames the presentation. What is typed is a draft of its own: other
+ * updates (a toast, Save's busy state) leave it alone, and Save, Close and
+ * Play commit it first. Enter or leaving the field commits; Escape cancels.
+ */
+function TitleField({ onDone }) {
+  const [text, setText] = useState(deckTitle);
+  const draft = useRef(text);
+  const cancel = useRef(false);
+  const commit = () => {
+    const v = draft.current.trim();
+    return v && v !== deckTitle() ? updateDeck({ title: v }) : undefined;
+  };
+  useEffect(() => registerFlush(commit), []);
+  return html`<input
+    class="title-input"
+    value=${text}
+    ref=${(el) => el && !el.dataset.f && ((el.dataset.f = 1), el.focus(), el.select())}
+    onInput=${(e) => {
+      draft.current = e.target.value;
+      setText(e.target.value);
+    }}
+    onBlur=${() => {
+      if (!cancel.current) commit();
+      onDone();
+    }}
+    onKeyDown=${(e) => {
+      if (e.key === 'Enter') e.target.blur();
+      if (e.key === 'Escape') {
+        cancel.current = true;
+        e.target.blur();
+      }
+    }}
+  />`;
+}
+
 export function Toolbar() {
   const st = useStore();
   const doc = st.doc;
@@ -151,22 +187,7 @@ export function Toolbar() {
       <button type="button" class="tb-menu" title=${t('Menu')} onClick=${menu(appMenu)}><${Icon} name="menu" size=${19} /></button>
       <div class="doc-title">
         ${editingTitle
-          ? html`<input
-              class="title-input"
-              value=${deckTitle()}
-              ref=${(el) => el && !el.dataset.f && ((el.dataset.f = 1), el.focus(), el.select())}
-              onBlur=${(e) => {
-                setEditingTitle(false);
-                if (e.target.value.trim() && e.target.value !== deckTitle()) updateDeck({ title: e.target.value.trim() });
-              }}
-              onKeyDown=${(e) => {
-                if (e.key === 'Enter') e.target.blur();
-                if (e.key === 'Escape') {
-                  e.target.value = deckTitle();
-                  e.target.blur();
-                }
-              }}
-            />`
+          ? html`<${TitleField} onDone=${() => setEditingTitle(false)} />`
           : html`<button type="button" class="title-btn" title=${doc.path || t('Not saved yet — click to rename')} onClick=${() => setEditingTitle(true)}>
               <span class="title-text">${deckTitle() || t('Untitled')}</span>
               <span class=${cls('save-state', doc.dirty && 'dirty')}>${doc.dirty ? t('Edited') : doc.path ? fileName(doc.path) : t('Not saved')}</span>

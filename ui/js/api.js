@@ -13,6 +13,7 @@ export const events = T.event;
 export const opener = T.opener;
 export const clipboard = T.clipboardManager;
 export const currentWindow = () => T.window.getCurrentWindow();
+export const getAllWindows = () => T.window.getAllWindows();
 export const currentWebview = () => T.webview.getCurrentWebview();
 
 export const FILE_FILTER = [{ name: 'Cadenza Presentation', extensions: ['cadenza'] }];

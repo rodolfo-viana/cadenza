@@ -30,7 +30,7 @@ function view(id = 'document-a', revision = 1) {
   };
 }
 
-async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, quiet = false } = {}) {
+async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, quiet = false, api = {} } = {}) {
   const context = vm.createContext({
     console: quiet ? { ...console, error() {} } : console, queueMicrotask, clearTimeout,
     setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); if (ms >= 1000) timer.unref(); return timer; },
@@ -42,8 +42,9 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
   const stubs = {
     'lib.js': { html() {}, useEffect() {}, useReducer() {}, useRef() {}, useState() {}, ...hooks },
     'api.js': {
-      invoke, clipboard, importBytes, dialog: {}, opener: {}, events: { listen() {} },
-      FILE_FILTER: [], IMAGE_EXTS: [], VIDEO_EXTS: [], currentWindow: () => ({ setTitle: async () => {} }),
+      invoke, clipboard, importBytes, dialog: {}, opener: {}, events: { listen() {}, emit() {} },
+      FILE_FILTER: [], IMAGE_EXTS: [], VIDEO_EXTS: [], currentWindow: () => ({ setTitle: async () => {} }), getAllWindows: async () => [],
+      ...api,
     },
     'i18n.js': { t: (s) => s, N_: (s) => s, setLanguage: async () => {}, language: () => 'en' },
     'controls.js': { parseColor: () => null, toCss: (v) => v },
@@ -412,6 +413,98 @@ test('notes of a slide removed elsewhere do not block closing', async () => {
   await S.closeDocument();
   assert.equal(S.state.doc, null);
   assert(!calls.includes('doc_apply'));
+});
+
+test('an edit Rust rejects stops saving and closing until it is fixed or dropped', async () => {
+  const calls = [];
+  const { S } = await ui(async (name) => {
+    calls.push(name);
+    if (name === 'doc_apply') throw 'Element not found';
+    if (name === 'recent_list') return [];
+  }, {}, { quiet: true });
+  S.openView(view());
+  // A focused field's flush forwards its edit, which Rust refuses.
+  const off = S.registerFlush(() => S.updateDeck({ title: 'Typed' }));
+  assert.equal(await S.save(), false);
+  await S.closeDocument();
+  assert(!calls.includes('doc_save') && !calls.includes('doc_close'));
+  off(); // Escape, or the field went away
+  await S.closeDocument();
+  assert(calls.includes('doc_close'));
+});
+
+test('saving waits for an edit that is still being prepared', async () => {
+  const backend = view();
+  const calls = [];
+  const { S } = await ui(async (name, args) => {
+    calls.push(name);
+    if (name === 'doc_apply') {
+      backend.deck.title = args.op.patch.title;
+      backend.revision++;
+      return clone(backend);
+    }
+    if (name === 'doc_save') return { ...clone(backend), revision: ++backend.revision };
+    if (name === 'recent_list') return [];
+  });
+  S.openView(clone(backend));
+  // A diagram's source goes in once Mermaid has drawn it, even if its
+  // field is gone by then.
+  const drawing = deferred();
+  S.trackEdit(drawing.promise.then(() => S.updateDeck({ title: 'Drawn' })));
+  const saving = S.save();
+  await tick();
+  assert(!calls.includes('doc_save'));
+  drawing.resolve();
+  assert.equal(await saving, true);
+  assert.deepEqual(calls.filter((c) => c !== 'recent_list'), ['doc_apply', 'doc_save']);
+});
+
+test('nudges sent before earlier ones are back add up', async () => {
+  const backend = view();
+  backend.deck.slides[0].elements = [{ id: 'box', x: 10, y: 20, content: { kind: 'shape' } }];
+  const replies = [];
+  const { S, A } = await ui(async (name, args) => {
+    if (name !== 'doc_apply') return {};
+    const reply = deferred();
+    replies.push(reply);
+    await reply.promise;
+    Object.assign(backend.deck.slides[0].elements[0], args.op.updates[0].patch);
+    backend.revision++;
+    return clone(backend);
+  });
+  S.openView(clone(backend));
+  S.select(['box']);
+  for (let i = 0; i < 5; i++) A.nudge(1, 0);
+  A.nudge(0, -2);
+  for (let i = 0; i < 6; i++) {
+    while (replies.length <= i) await tick();
+    replies[i].resolve();
+  }
+  await S.flushEdits();
+  const { x, y } = backend.deck.slides[0].elements[0];
+  assert.deepEqual([x, y], [15, 18]);
+});
+
+test('an update waits for edits in every editor window', async () => {
+  for (const answer of [true, false, null]) {
+    const listeners = new Map();
+    const events = {
+      listen: async (name, fn) => (listeners.set(name, fn), () => listeners.delete(name)),
+      emit(name, payload) {
+        // The other editor window commits what is typed there, and answers.
+        if (name === 'cz-flush-all' && answer !== null) {
+          setTimeout(() => listeners.get('cz-flush-done')?.({ payload: { token: payload.token, label: 'editor-2', ok: answer } }));
+        }
+      },
+    };
+    const windows = ['editor-1', 'editor-2', 'present-editor-1'].map((label) => ({ label }));
+    const { S } = await ui(async () => ({}), {}, {
+      api: { events, getAllWindows: async () => windows, currentWindow: () => ({ label: 'editor-1', setTitle: async () => {} }) },
+    });
+    S.openView(view());
+    assert.equal(await S.flushAllWindows(50), answer === true, `answer: ${answer}`);
+    assert(!listeners.has('cz-flush-done'));
+  }
 });
 
 test('out-of-order incremental views refresh missing renderings and ignore stale data', async () => {

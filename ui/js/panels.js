@@ -2,10 +2,10 @@
 
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo, fitsText, fitsMath, openModal } from './store.js';
+import { state, set, apply, updateElements, deck, currentSlide, richOf, richPatch, themeInfo, fitsText, fitsMath, openModal, trackEdit } from './store.js';
 import { Section, Row, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField, Cell } from './controls.js';
 import * as A from './actions.js';
-import { exec, setLink, isEditing, beginTextEdit, beginTableEdit, insertInlineMath, textSelected, styleSelection, selectionStyle, selectionFontSize } from './textedit.js';
+import { exec, setLink, isEditing, isEditingTable, beginTextEdit, beginTableEdit, endTableEdit, insertInlineMath, textSelected, styleSelection, selectionStyle, selectionFontSize } from './textedit.js';
 import { formatActive, formatBox, toggleBoxes } from './textformat.js';
 import { canvasApi } from './canvas.js';
 import { cls } from './util.js';
@@ -618,10 +618,16 @@ export function TablePanel({ els }) {
   const rows = tbl.rows;
   const cols = Math.max(1, ...rows.map((r) => r.length));
   const set_ = (patch, key, live) => patchAll([el], { content: patch }, live ? key : null);
-  const resize = (nr, nc) => {
+  const resize = async (nr, nc) => {
+    // Cells being typed in are committed first, and editing ends: their
+    // commit would otherwise write the old shape back over the new one.
+    if (isEditingTable() && !(await endTableEdit())) return;
+    const cur = currentSlide()?.elements.find((e) => e.id === el.id);
+    if (!cur) return;
+    const rows = cur.content.rows;
     const next = Array.from({ length: Math.max(1, nr) }, (_, r) => Array.from({ length: Math.max(1, nc) }, (_, c) => rows[r]?.[c] ?? ''));
-    const grow = (nr - rows.length) * (el.h / Math.max(1, rows.length));
-    apply({ op: 'updateElements', slide: state.slideId, updates: [{ id: el.id, patch: { content: { rows: next }, h: Math.max(40, el.h + (nr > rows.length ? grow : 0)) } }] });
+    const grow = (nr - rows.length) * (cur.h / Math.max(1, rows.length));
+    apply({ op: 'updateElements', slide: state.slideId, updates: [{ id: el.id, patch: { content: { rows: next }, h: Math.max(40, cur.h + (nr > rows.length ? grow : 0)) } }] });
   };
   return html`<${Section} title=${t('Table')} id="table">
     <${Button} icon="text-cursor-input" label=${t('Edit Cells')} onClick=${() => beginTableEdit(canvasApi.view, el)} />
@@ -1113,20 +1119,41 @@ export function DiagramPanel({ els }) {
   useFocusPrimary(ref);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const update = async (patch, live) => {
-    const next = { ...d, ...patch };
+  // Changes not stored yet: a style picked while the new source is still
+  // being drawn is drawn with that source, and an older drawing that
+  // finishes late is dropped.
+  const pending = useRef({});
+  const latest = useRef(0);
+  const update = (patch, live) => {
+    pending.current = { ...pending.current, ...patch };
+    const changes = pending.current;
+    const run = ++latest.current;
+    const target = { docId: state.doc?.docId, slide: state.slideId, id: el.id };
+    const store = (content) => {
+      if (run === latest.current) pending.current = {};
+      const op = { op: 'updateElements', slide: target.slide, updates: [{ id: target.id, patch: { content } }] };
+      return apply(op, { docId: target.docId, coalesce: live ? `diagram:${target.id}` : null });
+    };
     setBusy(true);
-    try {
-      const svgs = await renderDiagram(next.source, next.style, next.look);
-      setError(null);
-      await patchAll([el], { content: { ...patch, ...svgs } }, live ? 'diagram' : null);
-    } catch (e) {
-      setError(diagramError(e));
-      // Keep what was typed even while it does not parse yet.
-      if ('source' in patch) await patchAll([el], { content: { source: patch.source } }, live ? 'diagram' : null);
-    } finally {
-      setBusy(false);
-    }
+    // Save and Close wait for the drawing and the change it brings.
+    return trackEdit(
+      (async () => {
+        const next = { ...d, ...changes };
+        try {
+          const svgs = await renderDiagram(next.source, next.style, next.look);
+          if (run !== latest.current) return;
+          setError(null);
+          await store({ ...changes, ...svgs });
+        } catch (e) {
+          if (run !== latest.current) return;
+          setError(diagramError(e));
+          // Keep what was typed even while it does not parse yet.
+          if ('source' in changes) await store({ source: changes.source });
+        } finally {
+          if (run === latest.current) setBusy(false);
+        }
+      })(),
+    );
   };
   const fit = () => {
     const a = svgAspect(d.svgLight || d.svgDark);

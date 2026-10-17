@@ -6,7 +6,7 @@
 // `useStore()` and re-render on change.
 
 import { useEffect, useReducer } from './lib.js';
-import { invoke, dialog, events, currentWindow, FILE_FILTER } from './api.js';
+import { invoke, dialog, events, currentWindow, getAllWindows, FILE_FILTER } from './api.js';
 import { t, setLanguage } from './i18n.js';
 import { clone, fileName } from './util.js';
 
@@ -127,18 +127,71 @@ export const registerHistorySync = (fn) => {
   historySync = fn;
 };
 
+/**
+ * Edits on their way to the operation queue (a diagram is drawn before its
+ * source goes in): flushes wait for them, even once their field is gone.
+ */
+const inflight = new Set();
+export function trackEdit(promise) {
+  inflight.add(promise);
+  promise.finally(() => inflight.delete(promise)).catch(() => {});
+  return promise;
+}
+
+/**
+ * Commits pending edits; false if one could not be committed. Save, Close,
+ * Play and updates stop then: what is typed stays in its field, for another
+ * try (or Escape) once the error is read.
+ */
 export async function flushEdits() {
   const docId = state.doc?.docId;
+  const failedBefore = failures;
   try {
     for (const fn of [...flushers]) {
       if ((await fn()) === false || state.doc?.docId !== docId) return false;
     }
+    while (inflight.size) await Promise.allSettled([...inflight]);
     await chain;
-    return state.doc?.docId === docId;
+    return state.doc?.docId === docId && failures === failedBefore;
   } catch (e) {
     toast(String(e), 'error');
     return false;
   }
+}
+
+/**
+ * Commits pending edits in every editor window: an update restarts them all,
+ * reopening what Rust holds. False if a window could not, or did not answer.
+ */
+export async function flushAllWindows(timeout = 10000) {
+  if (!(await flushEdits())) return false;
+  const me = currentWindow().label;
+  const others = (await getAllWindows()).map((w) => w.label).filter((l) => l.startsWith('editor-') && l !== me);
+  if (!others.length) return true;
+  const token = `${me}:${Date.now()}`;
+  const waiting = new Set(others);
+  let ok = true;
+  let off = null;
+  const done = new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeout);
+    events
+      .listen('cz-flush-done', (e) => {
+        if (e.payload?.token !== token) return;
+        ok &&= !!e.payload.ok;
+        waiting.delete(e.payload.label);
+        if (!waiting.size) {
+          clearTimeout(timer);
+          resolve(ok);
+        }
+      })
+      .then((f) => {
+        off = f;
+        events.emit('cz-flush-all', { token, from: me });
+      });
+  });
+  const result = await done;
+  off?.();
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,15 +298,21 @@ function loadView(view) {
 // ---------------------------------------------------------------------------
 
 let chain = Promise.resolve();
+/** Operations that failed (and showed their error), so a flush can tell. */
+let failures = 0;
 
 /**
  * Applies an operation in Rust. Operations are serialized; `coalesce` merges
  * consecutive operations with the same key into one undo step, and
  * `track: false` makes none (derived data, such as measured heights).
- * Resolves with the outcome, or null when the operation failed.
+ * `op` may be a function, called when the operation's turn comes, so it
+ * reads the document as the operations before it left it; it returns null
+ * to skip. Resolves with the outcome, or null when the operation failed or
+ * was skipped.
  */
 export function apply(op, opts = {}) {
-  return enqueue('doc_apply', { op, coalesce: opts.coalesce || null, track: opts.track ?? null }, opts);
+  const args = (o) => o && { op: o, coalesce: opts.coalesce || null, track: opts.track ?? null };
+  return enqueue('doc_apply', typeof op === 'function' ? () => args(op()) : args(op), opts);
 }
 
 /** Whether a text box is exactly as tall as its text ("Fit box to text"). */
@@ -265,11 +324,14 @@ function enqueue(command, args, opts = {}) {
   const run = async () => {
     if (!docId || state.doc?.docId !== docId) return null;
     try {
-      const view = await invoke(command, { ...args, docId });
+      const a = typeof args === 'function' ? args() : args;
+      if (!a) return null;
+      const view = await invoke(command, { ...a, docId });
       if (state.doc?.docId !== docId) return null;
       ingest(view, opts);
       return view.outcome;
     } catch (e) {
+      failures++;
       console.error('operation failed', command, e);
       toast(String(e), 'error');
       return null;
@@ -573,6 +635,13 @@ export async function boot() {
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyUiTheme);
 
   events.listen('cz-settings', (e) => adoptSettings(e.payload));
+  // Another window is about to install an update (see flushAllWindows).
+  events.listen('cz-flush-all', async (e) => {
+    const label = currentWindow().label;
+    if (e.payload?.from === label) return;
+    const ok = await flushEdits();
+    events.emit('cz-flush-done', { token: e.payload?.token, label, ok });
+  });
   events.listen('cz-present-started', () => set({ presenting: true }));
   events.listen('cz-present-ended', (e) => {
     set({ presenting: false });

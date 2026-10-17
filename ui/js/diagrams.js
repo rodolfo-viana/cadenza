@@ -4,8 +4,7 @@
 // variants) and stores the result in the document. Presentations and exports
 // then show the stored SVG, so they never need the (large) Mermaid library.
 
-import { invoke } from './api.js';
-import { state, ingestView } from './store.js';
+import { state, apply } from './store.js';
 import { t, N_ } from './i18n.js';
 
 /** Light/dark Mermaid themes for each Cadenza diagram style. */
@@ -132,6 +131,7 @@ export function ensureDiagrams() {
 async function renderMissing() {
   const deck = state.doc?.deck;
   if (!deck) return;
+  const docId = state.doc.docId;
   for (const slide of deck.slides) {
     for (const el of slide.elements) {
       const c = el.content;
@@ -140,12 +140,16 @@ async function renderMissing() {
       pending.add(el.id);
       try {
         const svgs = await renderDiagram(c.source, c.style, c.look);
-        const view = await invoke('doc_apply', {
-          op: { op: 'updateElements', slide: slide.id, updates: [{ id: el.id, patch: { content: svgs } }] },
-          coalesce: null,
-          track: false,
-        });
-        ingestView(view, { navigate: false });
+        // Stored only if the diagram still has what was drawn: it may have
+        // been edited, deleted or replaced by another presentation meanwhile.
+        await apply(
+          () => {
+            const now = state.doc?.deck.slides.find((s) => s.id === slide.id)?.elements.find((e) => e.id === el.id)?.content;
+            const same = now?.kind === 'diagram' && now.source === c.source && now.style === c.style && now.look === c.look;
+            return same ? { op: 'updateElements', slide: slide.id, updates: [{ id: el.id, patch: { content: svgs } }] } : null;
+          },
+          { docId, track: false, navigate: false },
+        );
       } catch (e) {
         failed.set(el.id, c.source);
         console.warn('diagram render failed', e);

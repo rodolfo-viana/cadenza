@@ -3,7 +3,7 @@
 // it, then restarts. Rust does the work (src-tauri/src/updates.rs).
 
 import { html, useEffect, useRef, useState } from './lib.js';
-import { state, openModal, closeModal, updateSettings, flushEdits } from './store.js';
+import { state, openModal, closeModal, updateSettings, flushAllWindows, toast } from './store.js';
 import { Modal, Button } from './ui.js';
 import { Logo } from './welcome.js';
 import { invoke, opener, currentWindow } from './api.js';
@@ -72,8 +72,13 @@ export function UpdateDialog({ info: found = null }) {
     }
     if (!open.current) return;
     setPhase('installing');
-    // Text being typed is part of what reopens after the restart.
-    await flushEdits().catch(() => {});
+    // Text being typed, in this window or another, is part of what reopens
+    // after the restart: a change that can't be committed stops the update.
+    if (!(await flushAllWindows())) {
+      toast(t('The update was not installed: some changes could not be kept. Check them, then try again.'), 'error');
+      setPhase('available');
+      return;
+    }
     try {
       await invoke('update_install');
     } catch (e) {

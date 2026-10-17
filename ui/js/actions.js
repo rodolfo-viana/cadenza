@@ -227,11 +227,19 @@ export function selectAll() {
 }
 
 export function nudge(dx, dy) {
-  const els = selectedElements().filter((e) => !e.locked);
-  if (!els.length) return;
+  const ids = selectedElements()
+    .filter((e) => !e.locked)
+    .map((e) => e.id);
+  if (!ids.length) return;
+  const slide = state.slideId;
+  // Positions are read when the move's turn comes: key repeats that arrive
+  // before the previous move is back would all start from the same place.
   apply(
-    { op: 'updateElements', slide: state.slideId, updates: els.map((e) => ({ id: e.id, patch: { x: e.x + dx, y: e.y + dy } })) },
-    { coalesce: 'nudge:' + els.map((e) => e.id).join(',') },
+    () => {
+      const els = (deck()?.slides.find((s) => s.id === slide)?.elements || []).filter((e) => ids.includes(e.id));
+      return els.length ? { op: 'updateElements', slide, updates: els.map((e) => ({ id: e.id, patch: { x: e.x + dx, y: e.y + dy } })) } : null;
+    },
+    { coalesce: 'nudge:' + ids.join(',') },
   );
 }
 
