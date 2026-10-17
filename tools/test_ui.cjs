@@ -600,6 +600,26 @@ async function standalone(name, stubs, globals = {}) {
   return mod.namespace;
 }
 
+test('a presentation’s own CSS is kept to the slides in the editor', async () => {
+  const U = await standalone('util.js', { 'i18n.js': { t: (s) => s, language: () => 'en' } }, { navigator: { platform: 'Linux' } });
+  const css = [
+    '@import url("x.css");',
+    '/* a { } */ :root { --r-heading-color: red; }',
+    '@font-face { font-family: "A}"; src: url(a.woff2); }',
+    '.toolbar { display: none !important; }',
+    '@media (min-width: 1px) { .reveal h1 { color: blue; } }',
+    '@keyframes spin { from { rotate: 0deg; } to { rotate: 1turn; } }',
+    'a::after { content: "}"; }',
+  ].join('\n');
+  const out = U.scopeCss(css, '.root');
+  const [outside, inside] = out.split('@scope (.root) {');
+  for (const rule of ['@import', '@font-face', '@keyframes']) assert(outside.includes(rule) && !inside.includes(rule), rule);
+  for (const rule of [':scope { --r-heading-color: red; }', '.toolbar { display: none !important; }', '@media (min-width: 1px) { .reveal h1 { color: blue; } }', 'a::after { content: "}"; }']) {
+    assert(inside.includes(rule), rule);
+  }
+  assert(inside.trimEnd().endsWith('}') && !inside.includes(':root'));
+});
+
 const teleprompter = () => standalone('teleprompter.js', { 'i18n.js': { t: (s) => s }, 'icon-data.js': { ICONS: {} } });
 
 test('the teleprompter box stays inside the presenter display', async () => {

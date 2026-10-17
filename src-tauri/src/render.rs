@@ -1062,6 +1062,28 @@ pub fn needs(deck: &Deck) -> Needs {
 /// CSS appended after the theme: embedded fonts, Cadenza variables, deck
 /// font overrides and the user's CSS.
 pub fn deck_css(deck: &Deck, ctx: &Ctx) -> String {
+    let mut css = theme_css(deck, ctx);
+    let custom = custom_css(deck);
+    if !custom.is_empty() {
+        css.push('\n');
+        css.push_str(&custom);
+    }
+    css
+}
+
+/// The deck's own CSS (Document > Custom CSS), safe inside a `<style>`
+/// element. The editor keeps it to the slides (see store.js).
+pub fn custom_css(deck: &Deck) -> String {
+    if deck.custom_css.trim().is_empty() {
+        String::new()
+    } else {
+        crate::sanitize::style_block(&deck.custom_css)
+    }
+}
+
+/// Fonts, theme variables and typography overrides: `deck_css` without the
+/// custom CSS.
+pub fn theme_css(deck: &Deck, ctx: &Ctx) -> String {
     let mut css = String::new();
     for font in &deck.web_fonts {
         css.push_str(&crate::webfonts::resolve_css(&font.css, &|name: &str| ctx.url(name)));
@@ -1084,10 +1106,6 @@ pub fn deck_css(deck: &Deck, ctx: &Ctx) -> String {
             let _ = write!(css, "--r-main-font:{body};");
         }
         css.push('}');
-    }
-    if !deck.custom_css.trim().is_empty() {
-        css.push('\n');
-        css.push_str(&crate::sanitize::style_block(&deck.custom_css));
     }
     css
 }

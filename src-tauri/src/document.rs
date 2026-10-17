@@ -63,8 +63,10 @@ pub struct DocView {
     /// Stylesheet of the deck's theme (UI-relative path; empty for custom
     /// themes, which are part of `deck_css`).
     pub theme_href: &'static str,
-    /// Cadenza theme variables plus the deck's custom CSS.
+    /// Fonts and Cadenza theme variables.
     pub deck_css: String,
+    /// The deck's custom CSS, which the editor keeps to the slides.
+    pub custom_css: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -253,10 +255,11 @@ impl Document {
             redo_label: self.history.redo_label().map(str::to_string),
             outcome,
             theme_href: self.deck.theme_href().unwrap_or(""),
+            custom_css: render::custom_css(&self.deck),
             deck_css: {
                 let assets = self.assets_dir();
                 let url = move |name: &str| file_url(&assets.join(name));
-                render::deck_css(
+                render::theme_css(
                     &self.deck,
                     &Ctx {
                         mode: Mode::Editor,

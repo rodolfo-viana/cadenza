@@ -8,7 +8,7 @@
 import { useEffect, useReducer } from './lib.js';
 import { invoke, dialog, events, currentWindow, getAllWindows, FILE_FILTER } from './api.js';
 import { t, setLanguage } from './i18n.js';
-import { clone, fileName } from './util.js';
+import { clone, fileName, scopeCss } from './util.js';
 
 export const state = {
   ready: false,
@@ -198,13 +198,23 @@ export async function flushAllWindows(timeout = 10000) {
 // Theme styles for the editor canvas
 // ---------------------------------------------------------------------------
 
+/**
+ * The presentation's own CSS, in the editor: kept to the slides, so that no
+ * rule (from a presentation made by someone else, say) can restyle or hide
+ * the editor itself. Without @scope (older WebKitGTK) it applies as is.
+ */
+function editorCss(css) {
+  return 'CSSScopeRule' in window ? scopeCss(css, ':has(> .cz-editor-reveal)') : css;
+}
+
 function applyDeckStyles(view) {
   const link = document.getElementById('cz-theme');
   // Custom themes have no stylesheet: their CSS is part of deckCss.
   if (link && !view.themeHref) link.removeAttribute('href');
   else if (link && link.getAttribute('href') !== view.themeHref) link.setAttribute('href', view.themeHref);
   const style = document.getElementById('cz-deck-css');
-  if (style && style.textContent !== view.deckCss) style.textContent = view.deckCss;
+  const css = view.deckCss + (view.customCss ? '\n' + editorCss(view.customCss) : '');
+  if (style && style.textContent !== css) style.textContent = css;
   const code = document.getElementById('cz-code-theme');
   const codeHref = `vendor/reveal/plugin/highlight/${view.deck.settings.codeTheme === 'zenburn' ? 'zenburn' : 'monokai'}.css`;
   if (code && code.getAttribute('href') !== codeHref) code.setAttribute('href', codeHref);

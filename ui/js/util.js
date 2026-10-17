@@ -164,3 +164,42 @@ export function timeAgo(ms) {
 }
 
 export const cls = (...xs) => xs.filter(Boolean).join(' ');
+
+/**
+ * Keeps CSS to one part of the page: its rules go inside `@scope (root)`,
+ * where `:root` stands for the scope's root. At-rules that can't be scoped
+ * (@font-face, @keyframes…) stay outside, as they style nothing by
+ * themselves.
+ */
+export function scopeCss(css, root) {
+  const global = [];
+  const scoped = [];
+  const add = (rule) => {
+    if (!rule.trim()) return;
+    const head = rule.replace(/\/\*[\s\S]*?\*\//g, '').trimStart();
+    (/^@(?:-[a-z]+-)?(?:font-face|keyframes|property|counter-style|font-feature-values|import|charset|namespace)\b/i.test(head) ? global : scoped).push(rule);
+  };
+  // Top-level rules end at their closing brace (or `;` for statements),
+  // skipping strings and comments.
+  let depth = 0;
+  let start = 0;
+  let quote = null;
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i];
+    if (quote) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = end < 0 ? css.length : end + 1;
+    } else if (c === '{') depth++;
+    else if ((c === '}' && depth > 0 && --depth === 0) || (c === ';' && depth === 0)) {
+      add(css.slice(start, i + 1));
+      start = i + 1;
+    }
+  }
+  add(css.slice(start));
+  const body = scoped.join('').replace(/:root\b/g, ':scope');
+  return `${global.join('')}\n@scope (${root}) {${body}\n}`;
+}
