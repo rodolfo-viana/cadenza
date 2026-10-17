@@ -24,9 +24,13 @@ pub struct WebFont {
     pub css: String,
 }
 
-/// Subsets worth embedding for presentations in Latin, Greek and Cyrillic
-/// scripts (CJK fonts, which have no such subsets, keep everything).
-const SUBSETS: &[&str] = &["latin", "latin-ext", "greek", "greek-ext", "cyrillic", "cyrillic-ext", "vietnamese"];
+/// Subsets that are not a writing system: arrows, math and other symbols
+/// many Latin fonts carry. Left out to keep fonts small (about a quarter of
+/// Roboto); the system font draws those characters.
+const SYMBOL_SUBSETS: &[&str] = &["math", "symbols"];
+/// Most files one font may embed. Google serves Chinese, Japanese and Korean
+/// fonts as about 120 slices per style, so regular and bold of one take up
+/// to 250 files (variable fonts share them across weights).
 const MAX_FILES: usize = 400;
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
@@ -99,7 +103,7 @@ pub struct Face {
 }
 
 /// Splits Google's CSS into rules, keeping the subset name from the comment
-/// that precedes each one.
+/// that precedes each one (empty for the unnamed slices of CJK fonts).
 pub fn parse_faces(css: &str) -> Vec<Face> {
     let mut faces = Vec::new();
     let mut subset = String::new();
@@ -116,12 +120,14 @@ pub fn parse_faces(css: &str) -> Vec<Face> {
             (_, Some(r)) => {
                 let Some(close) = rest[r..].find('}') else { break };
                 let rule = &rest[r..r + close + 1];
+                // A comment names only the rule right after it.
+                let subset = std::mem::take(&mut subset);
                 if let Some(u) = rule.find("url(") {
                     let after = &rule[u + 4..];
                     if let Some(e) = after.find(')') {
                         let url = after[..e].trim_matches(|c| c == '"' || c == '\'').to_string();
                         faces.push(Face {
-                            subset: subset.clone(),
+                            subset,
                             rule: rule.to_string(),
                             url,
                         });
@@ -135,12 +141,27 @@ pub fn parse_faces(css: &str) -> Vec<Face> {
     faces
 }
 
-/// Chooses which faces to embed.
-pub fn select_faces(faces: Vec<Face>) -> Vec<Face> {
-    let preferred: Vec<Face> = faces.iter().filter(|f| SUBSETS.contains(&f.subset.as_str())).cloned().collect();
-    let mut chosen = if preferred.is_empty() { faces } else { preferred };
-    chosen.truncate(MAX_FILES);
-    chosen
+/// Chooses which faces to embed: every writing system the family covers, as
+/// what slides will say is not known yet (an Arabic family keeps Arabic next
+/// to Latin, a Japanese one all its slices, since a partial set would mix
+/// fonts within a line). Symbol subsets are left out unless there is
+/// nothing else; a font with more than `MAX_FILES` files is refused.
+pub fn select_faces(faces: Vec<Face>) -> anyhow::Result<Vec<Face>> {
+    let scripts: Vec<Face> = faces.iter().filter(|f| !SYMBOL_SUBSETS.contains(&f.subset.as_str())).cloned().collect();
+    let chosen = if scripts.is_empty() { faces } else { scripts };
+    if unique_urls(&chosen).len() > MAX_FILES {
+        bail!("This font has too many files to embed");
+    }
+    Ok(chosen)
+}
+
+/// The files of `faces`, each once: variable fonts serve every weight from
+/// the same file.
+fn unique_urls(faces: &[Face]) -> Vec<&str> {
+    let mut urls: Vec<&str> = faces.iter().map(|f| f.url.as_str()).collect();
+    urls.sort_unstable();
+    urls.dedup();
+    urls
 }
 
 fn agent() -> ureq::Agent {
@@ -166,13 +187,15 @@ pub fn install(family: &str, variants: &str, store: &(dyn Fn(&[u8]) -> anyhow::R
             ))
         })
         .context("Could not reach Google Fonts — check your internet connection")?;
-    let faces = select_faces(parse_faces(&css));
+    let faces = select_faces(parse_faces(&css))?;
     if faces.is_empty() {
         bail!("Google Fonts returned no files for “{family}”");
     }
-    // Download in parallel (a family is typically 8–30 small files).
+    // Download in parallel (a family is typically 8–30 small files, a CJK
+    // one 120–250).
+    let urls = unique_urls(&faces);
     let results: Vec<anyhow::Result<String>> = std::thread::scope(|scope| {
-        let chunks: Vec<&[Face]> = faces.chunks(faces.len().div_ceil(8)).collect();
+        let chunks: Vec<&[&str]> = urls.chunks(urls.len().div_ceil(8)).collect();
         let handles: Vec<_> = chunks
             .into_iter()
             .map(|chunk| {
@@ -180,11 +203,11 @@ pub fn install(family: &str, variants: &str, store: &(dyn Fn(&[u8]) -> anyhow::R
                 scope.spawn(move || {
                     chunk
                         .iter()
-                        .map(|f| -> anyhow::Result<String> {
-                            if !f.url.starts_with("https://fonts.gstatic.com/") {
+                        .map(|url| -> anyhow::Result<String> {
+                            if !url.starts_with("https://fonts.gstatic.com/") {
                                 bail!("unexpected font URL");
                             }
-                            let mut resp = agent.get(&f.url).header("User-Agent", USER_AGENT).call()?;
+                            let mut resp = agent.get(*url).header("User-Agent", USER_AGENT).call()?;
                             let bytes = resp.body_mut().with_config().limit(20 * 1024 * 1024).read_to_vec()?;
                             store(&bytes)
                         })
@@ -194,9 +217,13 @@ pub fn install(family: &str, variants: &str, store: &(dyn Fn(&[u8]) -> anyhow::R
             .collect();
         handles.into_iter().flat_map(|h| h.join().unwrap_or_default()).collect()
     });
+    let mut names = std::collections::HashMap::new();
+    for (url, name) in urls.iter().zip(results) {
+        names.insert(*url, name.with_context(|| format!("Could not download {url}"))?);
+    }
     let mut out = String::new();
-    for (face, name) in faces.iter().zip(results) {
-        let name = name.with_context(|| format!("Could not download {}", face.url))?;
+    for face in &faces {
+        let name = names.get(face.url.as_str()).with_context(|| format!("Could not download {}", face.url))?;
         out.push_str(&face.rule.replace(&face.url, &format!("{ASSET_PREFIX}{name}")));
         out.push('\n');
     }
@@ -264,15 +291,85 @@ mod tests {
         );
     }
 
+    /// Google's CSS for `styles` (weight, file prefix) of a family: per style,
+    /// `slices` unnamed CJK slices, then the named subsets.
+    fn css(styles: &[(u32, &str)], slices: usize, subsets: &[&str]) -> String {
+        let face = |w: u32, url: String| format!("@font-face {{\n  font-weight: {w};\n  src: url({url}) format('woff2');\n}}\n");
+        let mut out = String::new();
+        for (w, file) in styles {
+            for i in 0..slices {
+                out.push_str(&face(*w, format!("https://fonts.gstatic.com/s/f/{file}.{i}.woff2")));
+            }
+            for s in subsets {
+                out.push_str(&format!("/* {s} */\n{}", face(*w, format!("https://fonts.gstatic.com/s/f/{file}-{s}.woff2"))));
+            }
+        }
+        out
+    }
+
+    fn subsets(faces: &[Face]) -> Vec<&str> {
+        faces.iter().map(|f| f.subset.as_str()).collect()
+    }
+
     #[test]
-    fn parses_and_selects_faces() {
+    fn parses_faces() {
         let faces = parse_faces(SAMPLE);
-        assert_eq!(faces.len(), 3);
-        assert_eq!(faces[0].subset, "cyrillic");
+        assert_eq!(subsets(&faces), ["cyrillic", "latin", "[0]"]);
         assert_eq!(faces[1].url, "https://fonts.gstatic.com/s/lora/b.woff2");
-        let chosen = select_faces(faces);
-        assert_eq!(chosen.len(), 2);
-        assert!(chosen.iter().all(|f| f.subset != "[0]"));
+        // A comment names only the next rule: the slices of the bold weight
+        // after the regular one's "latin" are not Latin.
+        let faces = parse_faces(&css(&[(400, "r"), (700, "b")], 2, &["latin"]));
+        assert_eq!(subsets(&faces), ["", "", "latin", "", "", "latin"]);
+    }
+
+    #[test]
+    fn latin_families_keep_the_same_subsets() {
+        let all = [
+            "cyrillic-ext",
+            "cyrillic",
+            "greek-ext",
+            "greek",
+            "math",
+            "symbols",
+            "vietnamese",
+            "latin-ext",
+            "latin",
+        ];
+        let chosen = select_faces(parse_faces(&css(&[(400, "r"), (700, "b")], 0, &all))).unwrap();
+        let latin = ["cyrillic-ext", "cyrillic", "greek-ext", "greek", "vietnamese", "latin-ext", "latin"];
+        assert_eq!(subsets(&chosen), [latin, latin].concat());
+    }
+
+    #[test]
+    fn other_scripts_are_kept_next_to_latin() {
+        let chosen = select_faces(parse_faces(&css(
+            &[(400, "r"), (700, "b")],
+            0,
+            &["arabic", "math", "symbols", "latin-ext", "latin"],
+        )))
+        .unwrap();
+        assert_eq!(subsets(&chosen), ["arabic", "latin-ext", "latin", "arabic", "latin-ext", "latin"]);
+        let chosen = select_faces(parse_faces(&css(&[(400, "r")], 0, &["devanagari", "latin-ext", "latin"]))).unwrap();
+        assert_eq!(subsets(&chosen), ["devanagari", "latin-ext", "latin"]);
+        // A family of symbols only keeps them.
+        let chosen = select_faces(parse_faces(&css(&[(400, "r")], 0, &["symbols"]))).unwrap();
+        assert_eq!(subsets(&chosen), ["symbols"]);
+    }
+
+    #[test]
+    fn cjk_fonts_keep_every_slice_within_a_limit() {
+        let named = ["cyrillic", "vietnamese", "latin-ext", "latin"];
+        // A variable font: both weights use the same 124 files.
+        let chosen = select_faces(parse_faces(&css(&[(400, "v"), (700, "v")], 120, &named))).unwrap();
+        assert_eq!(chosen.len(), 248);
+        assert_eq!(unique_urls(&chosen).len(), 124);
+        // A static one: 248 files.
+        let chosen = select_faces(parse_faces(&css(&[(400, "r"), (700, "b")], 120, &named))).unwrap();
+        assert_eq!(unique_urls(&chosen).len(), 248);
+        // Beyond the limit, the font is refused rather than cut short.
+        let styles = [(400, "r"), (700, "b"), (400, "ri"), (700, "bi")];
+        let err = select_faces(parse_faces(&css(&styles, 120, &named))).unwrap_err();
+        assert_eq!(err.to_string(), "This font has too many files to embed");
     }
 
     #[test]

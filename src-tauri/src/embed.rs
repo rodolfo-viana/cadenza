@@ -13,13 +13,26 @@
 //!   are served, and only with this run's random token.
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
-use std::net::{TcpListener, TcpStream};
+use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
-use std::time::Duration;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
+use std::time::{Duration, Instant};
 
 use crate::util::{decode_percent, encode_url_path};
+
+/// Connections served at once. Web engines open about six per server, and
+/// the app has a few windows.
+const MAX_CONNECTIONS: usize = 64;
+/// Time for a client to send its request line and headers, all of them.
+const HEAD_TIMEOUT: Duration = Duration::from_secs(10);
+/// Limits for a request's head; the webview sends a few short headers.
+const MAX_LINE: u64 = 8 * 1024;
+const MAX_HEADERS: usize = 64;
+// Statuses for the webview, never shown to people.
+const URI_TOO_LONG: &str = "414 URI Too Long";
+const HEADERS_TOO_LARGE: &str = "431 Request Header Fields Too Large";
 
 /// The server's address (`http://127.0.0.1:PORT`), started on first use;
 /// `None` if it could not start (callers then fall back to direct URLs).
@@ -28,16 +41,41 @@ pub fn host() -> Option<&'static str> {
     HOST.get_or_init(|| {
         let listener = TcpListener::bind("127.0.0.1:0").ok()?;
         let port = listener.local_addr().ok()?.port();
-        std::thread::spawn(move || {
-            for stream in listener.incoming().flatten() {
-                std::thread::spawn(move || {
-                    let _ = serve(stream);
-                });
-            }
-        });
+        std::thread::spawn(move || run(listener, MAX_CONNECTIONS));
         Some(format!("http://127.0.0.1:{port}"))
     })
     .as_deref()
+}
+
+/// Serves each connection on a thread of its own, `max` at a time; others
+/// are closed right away.
+fn run(listener: TcpListener, max: usize) {
+    let active = Arc::new(AtomicUsize::new(0));
+    for stream in listener.incoming().flatten() {
+        let Some(slot) = Slot::take(&active, max) else { continue };
+        // On failure the closure, and so the slot, is dropped.
+        let _ = std::thread::Builder::new().spawn(move || {
+            let _slot = slot;
+            let _ = serve(stream, HEAD_TIMEOUT);
+        });
+    }
+}
+
+/// A connection being served; frees its place when dropped.
+struct Slot(Arc<AtomicUsize>);
+
+impl Slot {
+    /// A place among `max`, if one is free.
+    fn take(active: &Arc<AtomicUsize>, max: usize) -> Option<Slot> {
+        let slot = Slot(active.clone());
+        (active.fetch_add(1, Ordering::SeqCst) < max).then_some(slot)
+    }
+}
+
+impl Drop for Slot {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 
 static ROOT: OnceLock<PathBuf> = OnceLock::new();
@@ -57,23 +95,73 @@ pub fn file_url(path: &Path) -> Option<String> {
     Some(format!("{}/files/{}/{}", host()?, token(), encode_url_path(&path.to_string_lossy())))
 }
 
-fn serve(mut stream: TcpStream) -> std::io::Result<()> {
-    stream.set_read_timeout(Some(Duration::from_secs(5)))?;
-    let mut reader = BufReader::new(&stream);
-    let mut request = String::new();
-    reader.read_line(&mut request)?;
-    // Read the headers too: closing with unread input can reset the
-    // connection before the browser gets the reply.
+/// Reads from a client until a deadline, however slowly it sends.
+struct Deadline<'a> {
+    stream: &'a TcpStream,
+    at: Instant,
+}
+
+impl Read for Deadline<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let left = self.at.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(io::ErrorKind::TimedOut.into());
+        }
+        self.stream.set_read_timeout(Some(left))?;
+        self.stream.read(buf)
+    }
+}
+
+/// One line of a request's head; `None` if longer than `MAX_LINE`.
+fn head_line(reader: &mut impl BufRead) -> io::Result<Option<String>> {
+    let mut line = Vec::new();
+    reader.take(MAX_LINE).read_until(b'\n', &mut line)?;
+    if line.len() as u64 == MAX_LINE && !line.ends_with(b"\n") {
+        return Ok(None);
+    }
+    Ok(Some(String::from_utf8_lossy(&line).into_owned()))
+}
+
+/// The request line and `Range` header of a request, or the status that
+/// refuses a head too large.
+fn read_head(reader: &mut impl BufRead) -> io::Result<Result<(String, Option<String>), &'static str>> {
+    let Some(request) = head_line(reader)? else {
+        return Ok(Err(URI_TOO_LONG));
+    };
     let mut range = None;
-    let mut header = String::new();
-    while reader.read_line(&mut header)? > 2 {
+    for _ in 0..=MAX_HEADERS {
+        let Some(header) = head_line(reader)? else { break };
+        if header.len() <= 2 {
+            return Ok(Ok((request, range)));
+        }
         if let Some((name, value)) = header.split_once(':')
             && name.trim().eq_ignore_ascii_case("range")
         {
             range = Some(value.trim().to_string());
         }
-        header.clear();
     }
+    Ok(Err(HEADERS_TOO_LARGE))
+}
+
+/// Writes have no time limit: a paused video's player stops reading for as
+/// long as the pause lasts, and must find its connection when it goes on.
+fn serve(mut stream: TcpStream, head_timeout: Duration) -> io::Result<()> {
+    let mut reader = BufReader::new(Deadline {
+        stream: &stream,
+        at: Instant::now() + head_timeout,
+    });
+    // Read the headers too: closing with unread input can reset the
+    // connection before the browser gets the reply.
+    let (request, range) = match read_head(&mut reader)? {
+        Ok(head) => head,
+        Err(status) => {
+            (&stream).write_all(format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").as_bytes())?;
+            // Same here: what is left of the head is read (within the
+            // deadline) and dropped.
+            stream.shutdown(Shutdown::Write)?;
+            return io::copy(&mut reader.take(64 * 1024), &mut io::sink()).map(drop);
+        }
+    };
     let mut parts = request.split(' ');
     let (method, target) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
     if method != "GET" && method != "HEAD" {
@@ -202,6 +290,66 @@ mod tests {
         let reply = String::from_utf8(get("/youtube.com/embed/abc_123?rel=0", "")).unwrap();
         assert!(reply.starts_with("HTTP/1.1 200 OK"));
         assert!(reply.contains("https://www.youtube.com/embed/abc_123?rel=0"));
+    }
+
+    #[test]
+    fn refuses_heads_too_large() {
+        let status = |path: &str, extra: &str| String::from_utf8(get(path, extra)).unwrap().lines().next().unwrap_or("").to_string();
+        assert_eq!(status(&format!("/{}", "a".repeat(10_000)), ""), "HTTP/1.1 414 URI Too Long");
+        let long = format!("X-A: {}\r\n", "a".repeat(10_000));
+        assert_eq!(status("/youtube.com/embed/abc", &long), "HTTP/1.1 431 Request Header Fields Too Large");
+        // `get` sends a Host header too.
+        let headers = |n: usize| "X-A: 1\r\n".repeat(n - 1);
+        assert_eq!(status("/youtube.com/embed/abc", &headers(MAX_HEADERS)), "HTTP/1.1 200 OK");
+        assert_eq!(
+            status("/youtube.com/embed/abc", &headers(MAX_HEADERS + 1)),
+            "HTTP/1.1 431 Request Header Fields Too Large"
+        );
+    }
+
+    #[test]
+    fn gives_up_on_slow_senders() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (conn, _) = listener.accept().unwrap();
+        let start = Instant::now();
+        let server = std::thread::spawn(move || serve(conn, Duration::from_millis(300)));
+        // A header that never ends, a byte at a time.
+        client.write_all(b"GET /youtube.com/embed/abc HTTP/1.1\r\nX-A: ").unwrap();
+        while !server.is_finished() && start.elapsed() < Duration::from_secs(5) {
+            let _ = client.write_all(b"a");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let err = server.join().unwrap().unwrap_err();
+        assert!(matches!(err.kind(), io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock), "{err}");
+        assert!(start.elapsed() < Duration::from_secs(2), "{:?}", start.elapsed());
+    }
+
+    #[test]
+    fn serves_a_few_connections_at_a_time() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || run(listener, 2));
+        let idle: Vec<TcpStream> = (0..2).map(|_| TcpStream::connect(addr).unwrap()).collect();
+        // A third is closed at once, not left waiting for its request.
+        let mut extra = TcpStream::connect(addr).unwrap();
+        extra.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        assert_eq!(extra.read(&mut [0; 16]).unwrap(), 0);
+        // Closed connections free their places.
+        drop(idle);
+        let start = Instant::now();
+        loop {
+            let mut s = TcpStream::connect(addr).unwrap();
+            s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let _ = s.write_all(b"GET /youtube.com/embed/abc HTTP/1.1\r\n\r\n");
+            let mut reply = Vec::new();
+            let _ = s.read_to_end(&mut reply);
+            if reply.starts_with(b"HTTP/1.1 200 OK") {
+                break;
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "no place freed");
+            std::thread::sleep(Duration::from_millis(20));
+        }
     }
 
     #[test]

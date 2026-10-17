@@ -115,7 +115,10 @@ fn decode(data: &[u8]) -> Vec<Region> {
         }
         fn region(&mut self) -> Option<Region> {
             let (id, parent, name) = (self.text()?, self.text()?, self.text()?);
-            let alts = (0..self.varint()?).map(|_| self.text()).collect::<Option<Vec<_>>>()?;
+            let mut alts = (0..self.varint()?).map(|_| self.text()).collect::<Option<Vec<_>>>()?;
+            // Natural Earth writes "-99" for a missing code; kept as a name,
+            // rows labeled "-99" or "99" would find whichever country has it.
+            alts.retain(|a| fold(a) != "99");
             let mask = self.varint()?;
             let langs = (0..LANGS.len())
                 .filter(|i| mask >> i & 1 == 1)
@@ -754,6 +757,28 @@ mod tests {
         let rows = row_regions(&world.regions, &["Sint Maarten".into(), "Saint Martin".into()]);
         let ids: Vec<&str> = rows.iter().map(|r| world.regions[r.unwrap()].id.as_str()).collect();
         assert_eq!(ids, ["SXM", "MAF"]);
+    }
+
+    #[test]
+    fn missing_codes_name_no_region() {
+        let a = atlas();
+        let mut maps: Vec<String> = vec!["world".into()];
+        maps.extend(CONTINENTS.iter().map(|c| c.0.to_string()));
+        maps.extend(countries("en").into_iter().map(|c| c.0));
+        let labels: Vec<String> = vec!["-99".into(), "99".into()];
+        for map in &maps {
+            assert_eq!(regions(map, "en", &labels).unmatched, labels, "{map}");
+        }
+        // The countries that had "-99" as a code keep their real names and codes.
+        let world = view("world");
+        for id in ["SOL", "NOR", "KOS", "FRA", "CYN", "IOA", "ATC", "KAS"] {
+            let r = a.countries.iter().find(|c| c.id == id).expect(id);
+            let rows = row_regions(&world.regions, &[r.id.clone(), r.name.clone()]);
+            let found: Vec<Option<&str>> = rows.iter().map(|i| i.map(|i| world.regions[i].id.as_str())).collect();
+            assert_eq!(found, [Some(id), Some(id)], "{}", r.name);
+        }
+        let nor = a.countries.iter().find(|c| c.id == "NOR").unwrap();
+        assert!(nor.alts.iter().any(|n| n == "NO"), "{:?}", nor.alts);
     }
 
     #[test]

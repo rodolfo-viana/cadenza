@@ -113,9 +113,9 @@ pub fn resolve(provider: &str, nav: &Url) -> Option<Picked> {
     let page = query_param(nav, "u")?;
     let title = query_param(nav, "t").unwrap_or_default();
     let page_url = Url::parse(&page).ok()?;
-    let host = page_url.host_str().unwrap_or("");
+    let on = |domain: &str| crate::util::on_domain(&page_url, domain);
     match provider {
-        "youtube" if host.ends_with("youtube.com") => {
+        "youtube" if on("youtube.com") => {
             let id = query_param(&page_url, "v").or_else(|| page_url.path().strip_prefix("/shorts/").map(str::to_string))?;
             let id: String = id.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
             (!id.is_empty()).then(|| Picked {
@@ -126,7 +126,7 @@ pub fn resolve(provider: &str, nav: &Url) -> Option<Picked> {
                 page_url: page.clone(),
             })
         }
-        "vimeo" if host.ends_with("vimeo.com") => {
+        "vimeo" if on("vimeo.com") => {
             let id: String = page_url.path().trim_start_matches('/').chars().take_while(|c| c.is_ascii_digit()).collect();
             (!id.is_empty()).then(|| Picked {
                 provider: "vimeo".into(),
@@ -136,7 +136,7 @@ pub fn resolve(provider: &str, nav: &Url) -> Option<Picked> {
                 page_url: page.clone(),
             })
         }
-        "giphy" if host.ends_with("giphy.com") => {
+        "giphy" if on("giphy.com") => {
             // /gifs/some-title-ID or /stickers/some-title-ID
             let last = page_url.path_segments()?.rfind(|s| !s.is_empty())?.to_string();
             let id = last.rsplit('-').next()?.to_string();
@@ -184,6 +184,10 @@ mod tests {
     #[test]
     fn rejects_foreign_or_non_item_pages() {
         assert!(resolve("youtube", &nav("https://evil.example/watch?v=x", "")).is_none());
+        assert!(resolve("youtube", &nav("https://notyoutube.com/watch?v=x", "")).is_none());
+        assert!(resolve("vimeo", &nav("https://evilvimeo.com/22439234", "")).is_none());
+        assert!(resolve("giphy", &nav("https://notgiphy.com/gifs/happy-dance-l0MYt5jPR6QX5pnqM", "")).is_none());
+        assert!(resolve("youtube", &nav("https://m.youtube.com/watch?v=x", "")).is_some());
         assert!(resolve("youtube", &nav("https://www.youtube.com/", "")).is_none());
         assert!(resolve("youtube", &Url::parse("https://cadenza.invalid/cancel").unwrap()).is_none());
     }

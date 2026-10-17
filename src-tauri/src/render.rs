@@ -671,23 +671,37 @@ fn image_element(i: &ImageContent, el: &Element, ctx: &Ctx) -> Option<String> {
     ))
 }
 
-/// Recognizes YouTube and Vimeo page URLs.
+/// Recognizes YouTube and Vimeo page URLs (the scheme may be left out).
 pub fn video_embed(src: &str) -> Option<(&'static str, String)> {
     let s = src.trim();
-    let after = |marker: &str| -> Option<String> {
-        let idx = s.find(marker)? + marker.len();
-        let id: String = s[idx..].chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
-        if id.is_empty() { None } else { Some(id) }
+    let url = if s.contains("://") {
+        tauri::Url::parse(s)
+    } else {
+        tauri::Url::parse(&format!("https://{}", s.trim_start_matches('/')))
+    }
+    .ok()?;
+    let id = |s: &str| -> Option<String> {
+        let id: String = s.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
+        (!id.is_empty()).then_some(id)
     };
-    if s.contains("youtube.com") || s.contains("youtu.be") {
-        let id = after("v=")
-            .or_else(|| after("youtu.be/"))
-            .or_else(|| after("/embed/"))
-            .or_else(|| after("/shorts/"))?;
+    let path: Vec<&str> = url.path_segments().map(|p| p.filter(|s| !s.is_empty()).collect()).unwrap_or_default();
+    let on = |domain: &str| crate::util::on_domain(&url, domain);
+    if on("youtu.be") {
+        return Some(("youtube", id(path.first()?)?));
+    }
+    if on("youtube.com") {
+        let v = url.query_pairs().find(|(k, _)| k == "v").and_then(|(_, v)| id(&v));
+        let id = v.or_else(|| match path.as_slice() {
+            ["embed" | "shorts", rest, ..] => id(rest),
+            _ => None,
+        })?;
         return Some(("youtube", id));
     }
-    if s.contains("vimeo.com") {
-        let id = after("vimeo.com/video/").or_else(|| after("vimeo.com/"))?;
+    if on("vimeo.com") {
+        let id = match path.as_slice() {
+            ["video", rest, ..] | [rest, ..] => id(rest)?,
+            [] => return None,
+        };
         if id.chars().all(|c| c.is_ascii_digit()) {
             return Some(("vimeo", id));
         }
@@ -1303,6 +1317,30 @@ mod tests {
         assert_eq!(video_embed("https://youtu.be/dQw4w9WgXcQ"), Some(("youtube", "dQw4w9WgXcQ".into())));
         assert_eq!(video_embed("https://vimeo.com/76979871"), Some(("vimeo", "76979871".into())));
         assert_eq!(video_embed("https://example.com/v.mp4"), None);
+        let yt = Some(("youtube", "abc_123".to_string()));
+        for src in [
+            "www.youtube.com/watch?v=abc_123",
+            "//youtu.be/abc_123?t=4",
+            "https://m.youtube.com/watch?feature=share&v=abc_123",
+            "https://www.youtube.com/embed/abc_123?rel=0",
+            "https://www.youtube.com/shorts/abc_123",
+        ] {
+            assert_eq!(video_embed(src), yt, "{src}");
+        }
+        assert_eq!(video_embed("https://player.vimeo.com/video/76979871?h=1"), Some(("vimeo", "76979871".into())));
+        // Only the host counts: not lookalikes, nor provider names elsewhere.
+        for src in [
+            "https://notyoutube.com/watch?v=abc_123",
+            "https://youtube.com.example.org/watch?v=abc_123",
+            "https://example.org/watch?v=abc_123&from=youtube.com",
+            "https://example.org/?next=https://youtu.be/abc_123",
+            "https://example.org/vimeo.com/76979871",
+            "https://notvimeo.com/76979871",
+            "https://vimeo.com/channels/staffpicks",
+            "clip.mp4",
+        ] {
+            assert_eq!(video_embed(src), None, "{src}");
+        }
     }
 
     #[test]

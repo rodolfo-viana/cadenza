@@ -84,6 +84,13 @@ pub fn decode_percent(s: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
+/// Whether `url` is on `domain` or one of its subdomains ("www.youtube.com"
+/// is on youtube.com, "notyoutube.com" is not), over http(s).
+pub fn on_domain(url: &tauri::Url, domain: &str) -> bool {
+    let host = url.host_str().unwrap_or("");
+    matches!(url.scheme(), "http" | "https") && (host == domain || host.strip_suffix(domain).is_some_and(|sub| sub.ends_with('.')))
+}
+
 /// An HTTP client that tries a host's IPv4 addresses before its IPv6 ones.
 /// Some hosts publish an IPv6 address that never answers, and ureq tries
 /// addresses one after another, giving the first most of the time allowed:
@@ -346,6 +353,17 @@ mod tests {
         assert_eq!(encode_url_path("C:/Users/x#y?z"), "C:/Users/x%23y%3Fz");
         assert!(decode_percent("%zz").is_none());
         assert!(decode_percent("%4").is_none());
+    }
+
+    #[test]
+    fn checks_domains_at_dot_boundaries() {
+        let on = |u: &str, d: &str| on_domain(&tauri::Url::parse(u).unwrap(), d);
+        assert!(on("https://youtube.com/watch", "youtube.com"));
+        assert!(on("https://m.YouTube.com/watch", "youtube.com"));
+        assert!(!on("https://notyoutube.com/watch", "youtube.com"));
+        assert!(!on("https://youtube.com.evil.example/watch", "youtube.com"));
+        assert!(!on("https://evil.example/?u=youtube.com", "youtube.com"));
+        assert!(!on("ftp://youtube.com/", "youtube.com"));
     }
 
     #[test]

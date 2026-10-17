@@ -551,6 +551,7 @@ fn wikimedia_link(api: &str, title: &str, direct: Option<&str>) -> Option<MediaI
 /// previews (Open Graph), when `page` allows.
 fn image_at(link: &str, page: bool) -> anyhow::Result<MediaItem> {
     use std::io::Read;
+    use ureq::ResponseExt;
     let mut resp = agent()
         .get(link)
         .header("User-Agent", UA)
@@ -562,6 +563,8 @@ fn image_at(link: &str, page: bool) -> anyhow::Result<MediaItem> {
         429 => bail!("Too many requests — please wait a moment and try again."),
         _ => bail!("The link did not open — check that it is complete and public"),
     }
+    // Where the link led, after redirects: what the page's links are relative to.
+    let address = resp.get_uri().to_string();
     let ctype = resp
         .headers()
         .get("content-type")
@@ -594,8 +597,10 @@ fn image_at(link: &str, page: bool) -> anyhow::Result<MediaItem> {
     }
     if page && (ctype.contains("html") || ctype.is_empty()) {
         let html = String::from_utf8_lossy(&head);
-        if let Some((src, title)) = page_image(&html) {
-            let mut item = image_at(&join_url(link, &src), false)?;
+        if let Some((src, title)) = page_image(&html)
+            && let Some(src) = join_url(&address, page_base(&html).as_deref(), &src)
+        {
+            let mut item = image_at(&src, false)?;
             item.page_url = link.to_string();
             if !title.is_empty() {
                 item.title = title;
@@ -632,12 +637,7 @@ fn image_size(head: &[u8]) -> Option<(u32, u32)> {
 /// cards) and the page's title there.
 fn page_image(html: &str) -> Option<(String, String)> {
     let (mut image, mut title) = (None, String::new());
-    let lower = html.to_ascii_lowercase();
-    let mut at = 0;
-    while let Some(i) = lower[at..].find("<meta") {
-        let start = at + i;
-        let end = lower[start..].find('>').map_or(lower.len(), |e| start + e);
-        let attrs = tag_attrs(&html[start + 5..end]);
+    for attrs in tags(html, "meta") {
         let get = |k: &str| attrs.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
         let key = get("property").or(get("name")).unwrap_or("").to_ascii_lowercase();
         let value = html_unescape(get("content").unwrap_or("").trim());
@@ -648,12 +648,26 @@ fn page_image(html: &str) -> Option<(String, String)> {
             "og:title" | "twitter:title" if title.is_empty() => title = value,
             _ => {}
         }
-        if end >= lower.len() {
-            break;
-        }
-        at = end + 1;
     }
     image.map(|i| (i, title))
+}
+
+/// Where a page's `<base href>` moves its relative links, if it does.
+fn page_base(html: &str) -> Option<String> {
+    tags(html, "base").find_map(|attrs| attrs.into_iter().find(|(n, _)| n == "href").map(|(_, v)| html_unescape(v.trim())))
+}
+
+/// The attributes of each `<name …>` tag of a page, in order.
+fn tags<'a>(html: &'a str, name: &str) -> impl Iterator<Item = Vec<(String, String)>> + 'a {
+    let lower = html.to_ascii_lowercase();
+    let open = format!("<{name}");
+    let mut at = 0;
+    std::iter::from_fn(move || {
+        let start = at + lower.get(at..)?.find(&open)?;
+        let end = lower[start..].find('>').map_or(lower.len(), |e| start + e);
+        at = end + 1;
+        Some(tag_attrs(&html[start + open.len()..end]))
+    })
 }
 
 /// Attributes of a tag (`name="value"`, `name='value'` or `name=value`),
@@ -681,23 +695,13 @@ fn tag_attrs(tag: &str) -> Vec<(String, String)> {
     out
 }
 
-/// `href` read from the page at `base`.
-fn join_url(base: &str, href: &str) -> String {
-    let href = href.trim();
-    if href.starts_with("http://") || href.starts_with("https://") {
-        return href.to_string();
-    }
-    let (scheme, rest) = base.split_once("://").unwrap_or(("https", base));
-    if let Some(r) = href.strip_prefix("//") {
-        return format!("{scheme}://{r}");
-    }
-    let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
-    if href.starts_with('/') {
-        return format!("{scheme}://{host}{href}");
-    }
-    let path = rest.split(['?', '#']).next().unwrap_or(rest);
-    let dir = path.rsplit_once('/').map_or(host, |(d, _)| d);
-    format!("{scheme}://{dir}/{href}")
+/// `href` read from the page at `address`, or from the `<base href>` it
+/// names; only web addresses.
+fn join_url(address: &str, base: Option<&str>, href: &str) -> Option<String> {
+    let address = tauri::Url::parse(address).ok()?;
+    let base = base.and_then(|b| address.join(b).ok()).unwrap_or(address);
+    let url = base.join(href.trim()).ok()?;
+    matches!(url.scheme(), "http" | "https").then(|| url.into())
 }
 
 /// Downloads a media file (images/GIFs to embed in the presentation).
@@ -868,10 +872,57 @@ mod tests {
             Some(("//cdn.x.org/a.png".into(), String::new()))
         );
         assert_eq!(page_image("<title>None</title>"), None);
-        assert_eq!(join_url("https://x.org/a/b.html?q", "/t.jpg"), "https://x.org/t.jpg");
-        assert_eq!(join_url("https://x.org/a/b.html?q", "c/t.jpg"), "https://x.org/a/c/t.jpg");
-        assert_eq!(join_url("http://x.org", "//cdn.x.org/a.png"), "http://cdn.x.org/a.png");
-        assert_eq!(join_url("https://x.org/a/", "https://y.org/i.png"), "https://y.org/i.png");
+    }
+
+    #[test]
+    fn page_images_resolve_like_links() {
+        let join = |address: &str, base: Option<&str>, href: &str| join_url(address, base, href);
+        let page = "https://x.org/a/b.html?q";
+        assert_eq!(join(page, None, "/t.jpg").as_deref(), Some("https://x.org/t.jpg"));
+        assert_eq!(join(page, None, " c/t.jpg ").as_deref(), Some("https://x.org/a/c/t.jpg"));
+        assert_eq!(join(page, None, "../t.jpg").as_deref(), Some("https://x.org/t.jpg"));
+        assert_eq!(join(page, None, "?v=2").as_deref(), Some("https://x.org/a/b.html?v=2"));
+        assert_eq!(join("http://x.org", None, "//cdn.x.org/a.png").as_deref(), Some("http://cdn.x.org/a.png"));
+        assert_eq!(join(page, None, "https://y.org/i.png").as_deref(), Some("https://y.org/i.png"));
+        assert_eq!(join(page, None, "javascript:alert(1)"), None);
+        assert_eq!(join(page, None, "data:image/png;base64,AAAA"), None);
+        // A <base href>, itself relative to the page or not.
+        assert_eq!(join(page, Some("/static/"), "t.jpg").as_deref(), Some("https://x.org/static/t.jpg"));
+        assert_eq!(join(page, Some("https://cdn.x.org/s/"), "t.jpg").as_deref(), Some("https://cdn.x.org/s/t.jpg"));
+        let head = r#"<head><base target="_blank"><BASE HREF="https://cdn.x.org/s/"><base href="/other/">"#;
+        assert_eq!(page_base(head).as_deref(), Some("https://cdn.x.org/s/"));
+        assert_eq!(page_base("<meta property=og:image content=a.png>"), None);
+    }
+
+    #[test]
+    fn page_images_are_read_from_where_the_link_leads() {
+        use std::io::{BufRead, BufReader, Write};
+        // A short link redirects to an article whose image is relative to it.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let host = format!("http://{}", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten().take(3) {
+                let mut reader = BufReader::new(&stream);
+                let mut line = String::new();
+                let _ = reader.read_line(&mut line);
+                let mut header = String::new();
+                while reader.read_line(&mut header).unwrap_or(0) > 2 {
+                    header.clear();
+                }
+                let reply = |head: &str, body: &str| format!("HTTP/1.1 {head}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+                let reply = match line.split(' ').nth(1).unwrap_or("") {
+                    "/s" => reply("302 Found\r\nLocation: /news/story.html", ""),
+                    "/news/story.html" => reply("200 OK\r\nContent-Type: text/html", r#"<meta property="og:image" content="img/p.svg">"#),
+                    "/news/img/p.svg" => reply("200 OK\r\nContent-Type: image/svg+xml", r#"<svg width="64" height="32"></svg>"#),
+                    _ => reply("404 Not Found", ""),
+                };
+                let _ = stream.write_all(reply.as_bytes());
+            }
+        });
+        let item = image_at(&format!("{host}/s"), true).unwrap();
+        assert_eq!(item.url, format!("{host}/news/img/p.svg"));
+        assert_eq!((item.width, item.height), (64, 32));
+        assert_eq!(item.page_url, format!("{host}/s"));
     }
 
     #[test]
