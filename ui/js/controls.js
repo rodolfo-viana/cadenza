@@ -565,7 +565,10 @@ const familyOf = (v) => (v || '').split(',')[0].replace(/['"]/g, '').trim();
 export async function installGoogleFont(family, variants) {
   const { invoke } = await import('./api.js');
   const { ingestView } = await import('./store.js');
-  ingestView(await invoke('font_install', { family, variants }), { navigate: false });
+  // For the presentation open now; Rust refuses if it's replaced during the download.
+  const docId = state.doc?.docId;
+  const view = await invoke('font_install', { family, variants, docId });
+  if (state.doc?.docId === docId) ingestView(view, { navigate: false });
 }
 
 export function FontField({ value, onChange, placeholder: ph }) {

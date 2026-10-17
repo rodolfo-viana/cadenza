@@ -125,9 +125,7 @@ impl Settings {
         if let Some(dir) = path.parent() {
             fs::create_dir_all(dir)?;
         }
-        let tmp = path.with_extension("json.tmp");
-        fs::write(&tmp, serde_json::to_vec_pretty(self)?)?;
-        fs::rename(tmp, path)?;
+        crate::util::write_atomic(path, &serde_json::to_vec_pretty(self)?, false)?;
         Ok(())
     }
 

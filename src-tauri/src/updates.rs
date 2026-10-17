@@ -117,9 +117,7 @@ pub enum Reopen {
 
 pub fn write_reopen(config_dir: &Path, list: &[Reopen]) -> anyhow::Result<()> {
     fs::create_dir_all(config_dir)?;
-    let tmp = config_dir.join(".reopen.tmp");
-    fs::write(&tmp, serde_json::to_vec(list)?)?;
-    fs::rename(tmp, config_dir.join(REOPEN_FILE))?;
+    crate::util::write_atomic(&config_dir.join(REOPEN_FILE), &serde_json::to_vec(list)?, false)?;
     Ok(())
 }
 

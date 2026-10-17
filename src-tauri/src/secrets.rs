@@ -75,12 +75,9 @@ impl Secrets {
                 Err(e) => Err(e.into()),
             };
         }
-        fs::write(&self.fallback, serde_json::to_vec_pretty(map)?)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&self.fallback, fs::Permissions::from_mode(0o600));
-        }
+        // Private from creation, and replaced whole: an interrupted write
+        // must not leave the other keys truncated.
+        crate::util::write_atomic(&self.fallback, &serde_json::to_vec_pretty(map)?, true)?;
         Ok(())
     }
 
@@ -105,7 +102,9 @@ impl Secrets {
         }
         let _g = self.lock.lock().map_err(|_| anyhow::anyhow!("lock poisoned"))?;
         let stored = self.entry(name).is_some_and(|e| e.set_password(value).is_ok());
-        let mut map = self.read_fallback();
+        // A file that can't be read is not an empty one: rewriting it would
+        // lose the other keys.
+        let mut map = self.read_fallback_checked()?;
         if stored {
             if map.remove(name).is_some() {
                 self.write_fallback(&map)?;
@@ -122,9 +121,15 @@ impl Secrets {
         Self::valid(name)?;
         let _g = self.lock.lock().map_err(|_| anyhow::anyhow!("lock poisoned"))?;
         if let Some(e) = self.entry(name) {
-            let _ = e.delete_credential();
+            match e.delete_credential() {
+                Ok(()) | Err(keyring::Error::NoEntry) => {}
+                // Without a usable keychain the key can only be in the file;
+                // a key the keychain still gives back was not deleted.
+                Err(error) if e.get_password().is_ok() => return Err(error.into()),
+                Err(_) => {}
+            }
         }
-        let mut map = self.read_fallback();
+        let mut map = self.read_fallback_checked()?;
         if map.remove(name).is_some() {
             self.write_fallback(&map)?;
         }
@@ -269,6 +274,29 @@ mod tests {
         assert_eq!(calls, RETIRED);
     }
 
+    #[test]
+    fn a_damaged_fallback_file_is_not_replaced() {
+        let dir = tempfile::tempdir().unwrap();
+        let secrets = Secrets::new(dir.path(), false);
+        fs::write(&secrets.fallback, b"{\"pexels\": \"p\", trunc").unwrap();
+        assert!(secrets.set("giphy", "g").is_err());
+        assert!(secrets.delete("pexels").is_err());
+        assert_eq!(fs::read(&secrets.fallback).unwrap(), b"{\"pexels\": \"p\", trunc");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_fallback_file_is_private_and_replaced_whole() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let secrets = Secrets::new(dir.path(), false);
+        secrets.set("pexels", "p").unwrap();
+        secrets.set("giphy", "g").unwrap();
+        assert_eq!(fs::metadata(&secrets.fallback).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(secrets.get("pexels").as_deref(), Some("p"));
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1, "no temporary files left");
+    }
+
     #[cfg(unix)]
     #[test]
     fn failed_fallback_write_and_removal_retry_on_next_launch() {
@@ -283,15 +311,10 @@ mod tests {
                 r#"{"openai":"o"}"#
             };
             fs::write(&secrets.fallback, contents).unwrap();
-            // Deny writing the file, or removing it when it would be empty.
-            let (path, readonly, writable) = if keep_media_key {
-                (secrets.fallback.as_path(), 0o400, 0o600)
-            } else {
-                (dir.path(), 0o500, 0o700)
-            };
-            fs::set_permissions(path, fs::Permissions::from_mode(readonly)).unwrap();
+            // Deny replacing the file, or removing it when it would be empty.
+            fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o500)).unwrap();
             let result = secrets.forget_retired();
-            fs::set_permissions(path, fs::Permissions::from_mode(writable)).unwrap();
+            fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
             // Root can bypass these permissions; the other failure tests still apply.
             if result.is_ok() {
                 assert!(!secrets.read_fallback().contains_key("openai"));

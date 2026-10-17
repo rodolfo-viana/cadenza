@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
@@ -23,6 +23,8 @@ use crate::util::{encode_url_path, now_ms};
 
 const RECOVERY_FILE: &str = "recovery.json";
 const RECOVERY_INTERVAL_MS: u64 = 4000;
+/// How long a session whose snapshot can't be read is kept.
+const KEEP_UNREADABLE: std::time::Duration = std::time::Duration::from_secs(30 * 24 * 3600);
 
 pub struct Document {
     pub id: String,
@@ -270,8 +272,8 @@ impl Document {
         let before = self.deck.clone();
         let out = ops::apply(&mut self.deck, op)?;
         if self.deck != before {
-            self.history.record(&before, &self.deck, &out, coalesce);
-            self.maybe_write_recovery(false);
+            self.history.record(before, &self.deck, &out, coalesce);
+            let _ = self.maybe_write_recovery(false);
         }
         Ok(out)
     }
@@ -285,19 +287,19 @@ impl Document {
         if clean {
             self.saved = self.deck.clone();
         }
-        self.maybe_write_recovery(false);
+        let _ = self.maybe_write_recovery(false);
         Ok(out)
     }
 
     pub fn undo(&mut self) -> Option<OpOutcome> {
         let out = self.history.undo(&mut self.deck);
-        self.maybe_write_recovery(false);
+        let _ = self.maybe_write_recovery(false);
         out
     }
 
     pub fn redo(&mut self) -> Option<OpOutcome> {
         let out = self.history.redo(&mut self.deck);
-        self.maybe_write_recovery(false);
+        let _ = self.maybe_write_recovery(false);
         out
     }
 
@@ -311,28 +313,27 @@ impl Document {
         Ok(())
     }
 
-    /// Persists a recovery snapshot (throttled unless `force`).
-    pub fn maybe_write_recovery(&mut self, force: bool) {
+    /// Persists a recovery snapshot (throttled unless `force`). Edits call it
+    /// in passing and leave failures to the next try; checkpoints and updates
+    /// rely on the snapshot, so they check the result.
+    pub fn maybe_write_recovery(&mut self, force: bool) -> anyhow::Result<()> {
         if !self.is_dirty() {
             let _ = fs::remove_file(self.work_dir.join(RECOVERY_FILE));
-            return;
+            return Ok(());
         }
         let now = now_ms();
         if !force && now.saturating_sub(self.last_recovery) < RECOVERY_INTERVAL_MS {
-            return;
+            return Ok(());
         }
-        self.last_recovery = now;
         let rec = RecoveryFile {
             path: self.path.clone(),
             saved_at: now,
             deck: self.deck.clone(),
         };
-        if let Ok(json) = serde_json::to_vec(&rec) {
-            let tmp = self.work_dir.join(".recovery.tmp");
-            if fs::write(&tmp, json).is_ok() {
-                let _ = fs::rename(&tmp, self.work_dir.join(RECOVERY_FILE));
-            }
-        }
+        crate::util::write_atomic(&self.work_dir.join(RECOVERY_FILE), &serde_json::to_vec(&rec)?, false)
+            .context("Cannot keep a copy of the unsaved changes")?;
+        self.last_recovery = now;
+        Ok(())
     }
 
     /// Removes the working directory. Called when the document is closed.
@@ -343,38 +344,36 @@ impl Document {
     // -- assets -------------------------------------------------------------
 
     pub fn import_file(&self, src: &Path) -> anyhow::Result<AssetInfo> {
-        let mut f = fs::File::open(src).with_context(|| format!("Cannot read {}", src.display()))?;
-        let mut bytes = Vec::new();
-        f.read_to_end(&mut bytes)?;
-        let ext = src.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
-        self.import_bytes(&bytes, &ext)
+        let dir = self.assets_dir();
+        Ok(asset_info(&dir, store_asset_file(&dir, src)?))
     }
 
     pub fn import_bytes(&self, bytes: &[u8], ext: &str) -> anyhow::Result<AssetInfo> {
-        let name = store_asset(&self.assets_dir(), bytes, ext)?;
-        let ext = name.rsplit('.').next().unwrap_or("").to_string();
-        let kind = asset_kind(&ext);
-        let (width, height) = if kind == "image" {
-            imagesize::blob_size(bytes).map(|s| (s.width as u32, s.height as u32)).unwrap_or((0, 0))
-        } else {
-            (0, 0)
-        };
-        Ok(AssetInfo {
-            url: self.asset_url(&name),
-            name,
-            kind: kind.into(),
-            width,
-            height,
-        })
+        let dir = self.assets_dir();
+        Ok(asset_info(&dir, store_asset(&dir, bytes, ext)?))
     }
 }
 
-/// Stores bytes in an assets folder under a content-hash name (deduplicated)
-/// and returns that name.
-pub fn store_asset(dir: &Path, bytes: &[u8], ext: &str) -> anyhow::Result<String> {
-    if bytes.is_empty() {
-        anyhow::bail!("The file is empty");
+/// Describes a stored asset: its extension gives the kind, and images are
+/// measured.
+pub fn asset_info(dir: &Path, name: String) -> AssetInfo {
+    let path = dir.join(&name);
+    let kind = asset_kind(name.rsplit('.').next().unwrap_or(""));
+    let (width, height) = if kind == "image" {
+        imagesize::size(&path).map(|s| (s.width as u32, s.height as u32)).unwrap_or((0, 0))
+    } else {
+        (0, 0)
+    };
+    AssetInfo {
+        url: file_url(&path),
+        name,
+        kind: kind.into(),
+        width,
+        height,
     }
+}
+
+fn asset_name(hash: &[u8], ext: &str, head: &[u8]) -> String {
     let ext: String = ext
         .trim_start_matches('.')
         .chars()
@@ -382,16 +381,89 @@ pub fn store_asset(dir: &Path, bytes: &[u8], ext: &str) -> anyhow::Result<String
         .take(8)
         .collect::<String>()
         .to_ascii_lowercase();
-    let ext = if ext.is_empty() { sniff_extension(bytes).to_string() } else { ext };
-    let hash = hex::encode(Sha256::digest(bytes));
-    let name = format!("{}.{}", &hash[..20], ext);
+    let ext = if ext.is_empty() { sniff_extension(head).to_string() } else { ext };
+    format!("{}.{}", &hex::encode(hash)[..20], ext)
+}
+
+/// Moves a complete temporary file to its content-hash name. Content-hash
+/// names make this idempotent: when another writer got there first, its
+/// file has the same bytes.
+fn publish_asset(tmp: &Path, dest: &Path) -> anyhow::Result<()> {
+    if dest.exists() {
+        let _ = fs::remove_file(tmp);
+        return Ok(());
+    }
+    if let Err(e) = fs::rename(tmp, dest) {
+        let _ = fs::remove_file(tmp);
+        if !dest.exists() {
+            return Err(e.into());
+        }
+    }
+    Ok(())
+}
+
+/// Stores bytes in an assets folder under a content-hash name (deduplicated)
+/// and returns that name. The folder must exist: it is gone only when its
+/// presentation was closed, and then nothing should be stored there.
+pub fn store_asset(dir: &Path, bytes: &[u8], ext: &str) -> anyhow::Result<String> {
+    if bytes.is_empty() {
+        anyhow::bail!("The file is empty");
+    }
+    let name = asset_name(&Sha256::digest(bytes), ext, bytes);
     let dest = dir.join(&name);
     if !dest.exists() {
-        fs::create_dir_all(dir)?;
-        let tmp = dir.join(format!(".{name}.{}.part", now_ms()));
-        fs::write(&tmp, bytes)?;
-        fs::rename(&tmp, &dest)?;
+        // Each writer has its own temporary file (fonts are downloaded in parallel).
+        let tmp = crate::util::temp_path(&dest);
+        let mut f = crate::util::create_new(&tmp, false)?;
+        if let Err(e) = f.write_all(bytes) {
+            let _ = fs::remove_file(&tmp);
+            return Err(e.into());
+        }
+        drop(f);
+        publish_asset(&tmp, &dest)?;
     }
+    Ok(name)
+}
+
+/// Copies a file into an assets folder like `store_asset`, a piece at a time
+/// (videos can be larger than memory allows).
+pub fn store_asset_file(dir: &Path, src: &Path) -> anyhow::Result<String> {
+    let mut input = fs::File::open(src).with_context(|| format!("Cannot read {}", src.display()))?;
+    let ext = src.extension().map(|e| e.to_string_lossy().to_string()).unwrap_or_default();
+    let tmp = crate::util::temp_path(&dir.join("import"));
+    let mut out = std::io::BufWriter::new(crate::util::create_new(&tmp, false)?);
+    let copied = (|| -> anyhow::Result<String> {
+        let mut hasher = Sha256::new();
+        let mut head = Vec::new();
+        let mut buf = vec![0u8; 1 << 16];
+        let mut total = 0u64;
+        loop {
+            let n = input.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            if head.len() < 64 {
+                head.extend_from_slice(&buf[..n.min(64)]);
+            }
+            hasher.update(&buf[..n]);
+            out.write_all(&buf[..n])?;
+            total += n as u64;
+        }
+        out.flush()?;
+        if total == 0 {
+            anyhow::bail!("The file is empty");
+        }
+        Ok(asset_name(&hasher.finalize(), &ext, &head))
+    })();
+    drop(out);
+    let name = match copied {
+        Ok(name) => name,
+        Err(e) => {
+            let _ = fs::remove_file(&tmp);
+            return Err(e);
+        }
+    };
+    publish_asset(&tmp, &dir.join(&name))?;
     Ok(name)
 }
 
@@ -427,17 +499,32 @@ pub fn list_recoverable(sessions_root: &Path) -> Vec<RecoveryInfo> {
         let Some(id) = dir.file_name().map(|n| n.to_string_lossy().to_string()) else {
             continue;
         };
-        match fs::read(&file).ok().and_then(|b| serde_json::from_slice::<RecoveryFile>(&b).ok()) {
-            Some(rec) => out.push(RecoveryInfo {
+        let bytes = match fs::read(&file) {
+            Ok(b) => b,
+            // Nothing to recover: clean up.
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let _ = fs::remove_dir_all(&dir);
+                continue;
+            }
+            // Perhaps readable next time.
+            Err(_) => continue,
+        };
+        match serde_json::from_slice::<RecoveryFile>(&bytes) {
+            Ok(rec) => out.push(RecoveryInfo {
                 session_id: id,
                 title: rec.deck.title.clone(),
                 path: rec.path.map(|p| p.to_string_lossy().to_string()),
                 saved_at: rec.saved_at,
                 slides: rec.deck.slides.len(),
             }),
-            // Nothing to recover: clean up.
-            None => {
-                let _ = fs::remove_dir_all(&dir);
+            // A snapshot this version can't read (damaged, or from a newer
+            // Cadenza) is kept with its media for a while, in case a newer
+            // version or a person can still use it.
+            Err(_) => {
+                let age = fs::metadata(&file).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok());
+                if age.is_some_and(|a| a > KEEP_UNREADABLE) {
+                    let _ = fs::remove_dir_all(&dir);
+                }
             }
         }
     }
@@ -561,6 +648,40 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_identical_assets_are_stored_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let writers: Vec<_> = (0..32)
+            .map(|_| {
+                let dir = dir.path().to_path_buf();
+                std::thread::spawn(move || store_asset(&dir, b"the same font", "woff2"))
+            })
+            .collect();
+        let names: Vec<String> = writers.into_iter().map(|w| w.join().unwrap().unwrap()).collect();
+        assert!(names.windows(2).all(|w| w[0] == w[1]));
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1, "one file, no temporary leftovers");
+    }
+
+    #[test]
+    fn files_are_copied_into_assets_by_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let doc = new_doc(dir.path());
+        let src = dir.path().join("clip.MP4");
+        let bytes: Vec<u8> = (0..300_000u32).map(|i| (i % 251) as u8).collect();
+        fs::write(&src, &bytes).unwrap();
+        let a = doc.import_file(&src).unwrap();
+        assert_eq!(a.name, store_asset(&doc.assets_dir(), &bytes, "mp4").unwrap());
+        assert_eq!((a.kind.as_str(), fs::read(doc.assets_dir().join(&a.name)).unwrap()), ("video", bytes));
+        fs::write(&src, b"").unwrap();
+        assert!(doc.import_file(&src).is_err());
+        // A closed presentation's folder is not brought back.
+        let assets = doc.assets_dir();
+        doc.dispose();
+        assert!(store_asset(&assets, b"late", "png").is_err());
+        assert!(!assets.exists());
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1, "only the source file is left");
+    }
+
+    #[test]
     fn crashed_sessions_can_be_recovered() {
         let dir = tempfile::tempdir().unwrap();
         let mut doc = new_doc(dir.path());
@@ -571,7 +692,7 @@ mod tests {
             None,
         )
         .unwrap();
-        doc.maybe_write_recovery(true);
+        doc.maybe_write_recovery(true).unwrap();
         let id = doc.id.clone();
         drop(doc); // simulated crash: no dispose()
         let list = list_recoverable(dir.path());
@@ -582,6 +703,41 @@ mod tests {
         assert_eq!(rec.deck.title, "Unsaved work");
         rec.dispose();
         assert!(list_recoverable(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn unreadable_snapshots_are_kept_not_deleted() {
+        let dir = tempfile::tempdir().unwrap();
+        let doc = new_doc(dir.path());
+        fs::write(doc.assets_dir().join("photo.png"), b"png").unwrap();
+        fs::write(doc.work_dir.join(RECOVERY_FILE), b"{\"deck\": {\"slides\": [").unwrap();
+        assert!(list_recoverable(dir.path()).is_empty());
+        assert!(doc.assets_dir().join("photo.png").exists());
+        // A session without any snapshot has nothing to recover.
+        fs::remove_file(doc.work_dir.join(RECOVERY_FILE)).unwrap();
+        list_recoverable(dir.path());
+        assert!(!doc.work_dir.exists());
+    }
+
+    #[test]
+    fn failed_snapshots_are_reported_and_retried() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut doc = new_doc(dir.path());
+        // The folder is gone (or the disk full): snapshots can't be written,
+        // and editing goes on.
+        fs::remove_dir_all(&doc.work_dir).unwrap();
+        doc.apply(
+            Op::UpdateDeck {
+                patch: json!({"title": "Unsaved"}),
+            },
+            None,
+        )
+        .unwrap();
+        assert!(doc.maybe_write_recovery(true).is_err());
+        fs::create_dir_all(doc.assets_dir()).unwrap();
+        // Failed attempts don't count as a recent snapshot.
+        doc.maybe_write_recovery(false).unwrap();
+        assert_eq!(list_recoverable(dir.path())[0].title, "Unsaved");
     }
 
     #[test]
@@ -608,7 +764,7 @@ mod tests {
         assert!(!opened.is_dirty());
         let mut recovery = new_doc(dir.path());
         recovery.deck = deck;
-        recovery.maybe_write_recovery(true);
+        recovery.maybe_write_recovery(true).unwrap();
         let recovered = Document::recover(dir.path(), &recovery.id).unwrap();
         assert!(recovered.is_dirty());
         for mut doc in [opened, recovered] {

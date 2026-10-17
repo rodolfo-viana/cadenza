@@ -263,19 +263,24 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
       return;
     }
     setInserting(item.id);
+    // Downloads take a while: the picture goes where it was picked.
+    const target = { docId: state.doc?.docId, slideId: state.slideId };
     try {
-      let asset = await invoke('media_import', { url: item.url });
+      let asset = await invoke('media_import', { url: item.url, docId: target.docId });
       // SVG files: the size their link said.
       if (!asset.width && item.width) asset = { ...asset, width: item.width, height: item.height };
       const alt = attribution(item);
       if (replaceId) {
-        await apply({
-          op: 'updateElements',
-          slide: state.slideId,
-          updates: [{ id: replaceId, patch: { content: { src: asset.name, naturalWidth: asset.width, naturalHeight: asset.height, alt } } }],
-        });
+        await apply(
+          {
+            op: 'updateElements',
+            slide: target.slideId,
+            updates: [{ id: replaceId, patch: { content: { src: asset.name, naturalWidth: asset.width, naturalHeight: asset.height, alt } } }],
+          },
+          { docId: target.docId },
+        );
       } else {
-        const id = await A.insertAsset(asset, null, 0, { alt });
+        const id = await A.insertAsset(asset, null, 0, { alt }, target);
         if (credit && id) await addCredit(id, item);
       }
       closeModal();
@@ -445,9 +450,10 @@ export async function insertPicked(p) {
     return;
   }
   set({ busy: t('Adding GIF…') });
+  const target = { docId: state.doc.docId, slideId: state.slideId };
   try {
-    const asset = await invoke('media_import', { url: p.url });
-    await A.insertAsset(asset, null, 0, { alt: p.title || t('GIF via GIPHY') });
+    const asset = await invoke('media_import', { url: p.url, docId: target.docId });
+    await A.insertAsset(asset, null, 0, { alt: p.title || t('GIF via GIPHY') }, target);
   } catch (e) {
     toast(String(e), 'error');
   } finally {

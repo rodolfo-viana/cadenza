@@ -101,11 +101,15 @@ export async function insertAsset(asset, at = null, offset = 0, extra = {}, targ
 }
 
 export async function importPaths(paths, at = null) {
+  // Large files take a while: they go where the import started, even if
+  // another slide is shown by then.
+  const target = { docId: state.doc?.docId, slideId: state.slideId };
+  if (!target.docId) return;
   let i = 0;
   for (const path of paths) {
     try {
-      const asset = await invoke('asset_import_file', { path });
-      await insertAsset(asset, at, i * 24);
+      const asset = await invoke('asset_import_file', { path, docId: target.docId });
+      await insertAsset(asset, at, i * 24, {}, target);
       i++;
     } catch (e) {
       toast(t('{file}: {error}', { file: fileName(path), error: t(String(e)) }), 'error');
@@ -141,17 +145,23 @@ export async function insertWebPage() {
 }
 
 /** Replaces the image of an image element (or fills a placeholder). */
+/** Imports a file; `target` is the presentation and slide the action started on. */
+async function importFor(path) {
+  const target = { docId: state.doc?.docId, slide: state.slideId };
+  return { target, asset: await invoke('asset_import_file', { path, docId: target.docId }) };
+}
+
 export async function replaceImage(el) {
   const path = await dialog.open({ title: t('Choose Image'), multiple: false, filters: [{ name: t('Images'), extensions: IMAGE_EXTS }] });
   if (!path) return;
   try {
-    const a = await invoke('asset_import_file', { path });
+    const { target, asset: a } = await importFor(path);
     const patch = { content: { src: a.name, naturalWidth: a.width, naturalHeight: a.height } };
     if (!el.content.src && a.width && a.height) {
       // Placeholders keep their frame; images fill it.
       patch.content.fit = 'cover';
     }
-    await apply({ op: 'updateElements', slide: state.slideId, updates: [{ id: el.id, patch }] });
+    await apply({ op: 'updateElements', slide: target.slide, updates: [{ id: el.id, patch }] }, { docId: target.docId });
   } catch (e) {
     toast(String(e), 'error');
   }
@@ -161,8 +171,8 @@ export async function replaceVideo(el) {
   const path = await dialog.open({ title: t('Choose Video'), multiple: false, filters: [{ name: t('Videos'), extensions: VIDEO_EXTS }] });
   if (!path) return;
   try {
-    const a = await invoke('asset_import_file', { path });
-    await apply({ op: 'updateElements', slide: state.slideId, updates: [{ id: el.id, patch: { content: { src: a.name } } }] });
+    const { target, asset: a } = await importFor(path);
+    await apply({ op: 'updateElements', slide: target.slide, updates: [{ id: el.id, patch: { content: { src: a.name } } }] }, { docId: target.docId });
   } catch (e) {
     toast(String(e), 'error');
   }
@@ -173,8 +183,8 @@ export async function chooseBackgroundImage(slideIds) {
   const path = await dialog.open({ title: t('Background Image'), multiple: false, filters: [{ name: t('Images'), extensions: IMAGE_EXTS }] });
   if (!path) return;
   try {
-    const a = await invoke('asset_import_file', { path });
-    await updateSlides(slideIds, { background: { kind: 'image', image: a.name } });
+    const { target, asset: a } = await importFor(path);
+    await apply({ op: 'updateSlides', ids: slideIds, patch: { background: { kind: 'image', image: a.name } } }, { docId: target.docId, navigate: false });
   } catch (e) {
     toast(String(e), 'error');
   }
@@ -184,8 +194,8 @@ export async function chooseBackgroundVideo(slideIds) {
   const path = await dialog.open({ title: t('Background Video'), multiple: false, filters: [{ name: t('Videos'), extensions: VIDEO_EXTS }] });
   if (!path) return;
   try {
-    const a = await invoke('asset_import_file', { path });
-    await updateSlides(slideIds, { background: { kind: 'video', video: a.name } });
+    const { target, asset: a } = await importFor(path);
+    await apply({ op: 'updateSlides', ids: slideIds, patch: { background: { kind: 'video', video: a.name } } }, { docId: target.docId, navigate: false });
   } catch (e) {
     toast(String(e), 'error');
   }

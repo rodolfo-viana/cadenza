@@ -9,7 +9,9 @@
 //! ```
 //!
 //! Saving is atomic: the archive is written to a temporary file next to the
-//! target and renamed over it only once complete.
+//! target and renamed over it only once complete. Where a filesystem refuses
+//! that rename, the old file is moved aside first and put back if the new
+//! one can't take its place.
 
 use std::fs::{self, File};
 use std::io::{self, BufReader, BufWriter, Read, Write};
@@ -40,6 +42,9 @@ pub fn read(path: &Path, assets_dir: &Path) -> anyhow::Result<Deck> {
         migrate(value)?
     };
     fs::create_dir_all(assets_dir)?;
+    // Only the media the deck uses: anything else in the archive would take
+    // disk space (and time) for nothing.
+    let wanted = deck.retained_assets();
     for i in 0..zip.len() {
         let mut entry = zip.by_index(i)?;
         if entry.is_dir() {
@@ -47,17 +52,21 @@ pub fn read(path: &Path, assets_dir: &Path) -> anyhow::Result<Deck> {
         }
         let name = entry.name()?.to_string();
         let Some(asset) = name.strip_prefix("assets/") else { continue };
-        if !is_valid_asset_name(asset) {
+        if !is_valid_asset_name(asset) || !wanted.contains(asset) {
             continue;
         }
         let dest = assets_dir.join(asset);
         if dest.exists() {
             continue;
         }
+        // No more than the archive says the file holds.
+        let size = entry.size();
         let tmp = assets_dir.join(format!(".{asset}.part"));
         {
             let mut out = BufWriter::new(File::create(&tmp)?);
-            io::copy(&mut entry, &mut out)?;
+            if io::copy(&mut (&mut entry).take(size), &mut out)? != size {
+                bail!("The presentation file is damaged");
+            }
             out.flush()?;
         }
         fs::rename(&tmp, &dest)?;
@@ -194,12 +203,36 @@ pub fn write(path: &Path, deck: &Deck, assets_dir: &Path) -> anyhow::Result<()> 
         let _ = fs::remove_file(&tmp);
         return Err(e);
     }
-    fs::rename(&tmp, path).or_else(|_| {
-        // Some filesystems refuse to rename over an existing file.
-        let _ = fs::remove_file(path);
-        fs::rename(&tmp, path)
-    })?;
+    if let Err(e) = replace(&tmp, path, &dir.join(format!(".{file_name}.{}.bak", now_ms()))) {
+        let _ = fs::remove_file(&tmp);
+        return Err(e.into());
+    }
+    // The rename itself is kept through a power cut once the folder is synced.
+    #[cfg(unix)]
+    let _ = File::open(dir).and_then(|d| d.sync_all());
     Ok(())
+}
+
+/// Renames `tmp` over `path`. Some filesystems (sshfs, some network shares)
+/// refuse to rename over an existing file: then the old file moves to
+/// `backup` first, and back if the new one can't take its place, so a
+/// failure never leaves the file's last good version missing. A folder in
+/// the way is never moved.
+pub(crate) fn replace(tmp: &Path, path: &Path, backup: &Path) -> io::Result<()> {
+    let Err(first) = fs::rename(tmp, path) else { return Ok(()) };
+    if !path.is_file() || fs::rename(path, backup).is_err() {
+        return Err(first);
+    }
+    match fs::rename(tmp, path) {
+        Ok(()) => {
+            let _ = fs::remove_file(backup);
+            Ok(())
+        }
+        Err(e) => {
+            let _ = fs::rename(backup, path);
+            Err(e)
+        }
+    }
 }
 
 /// Lists the assets stored in a package without extracting it.
@@ -254,6 +287,44 @@ mod tests {
             .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
             .collect();
         assert!(leftovers.is_empty());
+    }
+
+    #[test]
+    fn replacing_falls_back_without_losing_the_old_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tmp, path, backup) = (dir.path().join("new.tmp"), dir.path().join("talk.cadenza"), dir.path().join("talk.bak"));
+        fs::write(&path, b"old").unwrap();
+        fs::write(&tmp, b"new").unwrap();
+        replace(&tmp, &path, &backup).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"new");
+        assert!(!tmp.exists() && !backup.exists());
+        // The new file can't take the old one's place, even once the old
+        // one is moved aside (here it is missing): the old one is put back.
+        assert!(replace(&tmp, &path, &backup).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"new");
+        assert!(!backup.exists());
+    }
+
+    #[test]
+    fn only_media_the_deck_uses_is_extracted() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("extra.cadenza");
+        {
+            let mut zip = ZipWriter::new(File::create(&file).unwrap());
+            let o = SimpleFileOptions::default();
+            zip.start_file("deck.json", o).unwrap();
+            zip.write_all(br#"{"slides": [{"elements": [{"content": {"kind": "image", "src": "used.png"}}]}]}"#)
+                .unwrap();
+            for name in ["used.png", "unused.png"] {
+                zip.start_file(format!("assets/{name}"), o).unwrap();
+                zip.write_all(name.as_bytes()).unwrap();
+            }
+            zip.finish().unwrap();
+        }
+        let assets = dir.path().join("assets");
+        read(&file, &assets).unwrap();
+        assert_eq!(fs::read(assets.join("used.png")).unwrap(), b"used.png");
+        assert!(!assets.join("unused.png").exists());
     }
 
     #[test]

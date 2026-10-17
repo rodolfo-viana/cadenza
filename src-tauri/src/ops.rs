@@ -535,7 +535,7 @@ const MAX_HISTORY: usize = 300;
 const COALESCE_WINDOW: std::time::Duration = std::time::Duration::from_millis(2500);
 
 impl History {
-    pub fn record(&mut self, before: &Deck, after: &Deck, out: &OpOutcome, coalesce: Option<&str>) {
+    pub fn record(&mut self, before: Deck, after: &Deck, out: &OpOutcome, coalesce: Option<&str>) {
         let now = std::time::Instant::now();
         let merge = match (coalesce, &self.last_key) {
             (Some(k), Some((last, at))) => k == last && now.duration_since(*at) < COALESCE_WINDOW,
@@ -553,7 +553,7 @@ impl History {
             return;
         }
         self.undo.push(Entry {
-            deck: before.clone(),
+            deck: before,
             label: out.label.clone(),
             slide: out.slide.clone(),
         });
@@ -824,7 +824,7 @@ mod tests {
                 },
             )
             .unwrap();
-            h.record(&before, &d, &out, Some("drag"));
+            h.record(before.clone(), &d, &out, Some("drag"));
         }
         assert_eq!(d.slides[0].elements[0].x, 3.0);
         h.undo(&mut d).unwrap();
@@ -854,7 +854,7 @@ mod tests {
                 },
             )
             .unwrap();
-            h.record(&before, d, &out, Some(key));
+            h.record(before.clone(), d, &out, Some(key));
         };
         step(&mut d, &mut h, 50.0, "move");
         let moved = d.clone();

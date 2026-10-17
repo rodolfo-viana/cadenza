@@ -226,6 +226,50 @@ pub fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
+/// A hidden temporary name next to `path` that no other writer uses, in this
+/// process or another (writers of the same file at the same millisecond
+/// would otherwise share one).
+pub fn temp_path(path: &std::path::Path) -> std::path::PathBuf {
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    path.with_file_name(format!(".{name}.{}.{n}.tmp", std::process::id()))
+}
+
+/// Creates a file that must not exist yet; `private` ones are readable by
+/// their owner only (Unix), from the start rather than after being written.
+pub fn create_new(path: &std::path::Path, private: bool) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    if private {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    #[cfg(not(unix))]
+    let _ = private;
+    options.open(path)
+}
+
+/// Replaces a file in one step: the bytes go to a temporary file in the same
+/// folder, which is renamed over `path` once complete. Readers see the old
+/// file or the new one, never a partial one, and a failure leaves the old
+/// one in place.
+pub fn write_atomic(path: &std::path::Path, bytes: &[u8], private: bool) -> std::io::Result<()> {
+    use std::io::Write;
+    let tmp = temp_path(path);
+    let result = create_new(&tmp, private).and_then(|mut f| {
+        f.write_all(bytes)?;
+        f.sync_all()?;
+        drop(f);
+        std::fs::rename(&tmp, path)
+    });
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result
+}
+
 /// Text from a file of unknown encoding: UTF-8 or UTF-16 with a byte order
 /// mark, UTF-8 without one, and else Windows-1252 (what spreadsheets on
 /// Windows export).

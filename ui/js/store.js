@@ -533,21 +533,32 @@ export async function closeDocument() {
   set({ doc: null, slideId: null, selection: [], selectedSlides: [], editing: null, editingTable: null });
   updateWindowTitle();
   refreshRecent();
+  refreshRecoverable();
 }
 
 export async function recover(sessionId) {
   try {
     loadView(await invoke('doc_recover', { sessionId }));
-    set({ info: { ...state.info, recoverable: state.info.recoverable.filter((r) => r.sessionId !== sessionId) } });
     toast(t('Recovered unsaved presentation — remember to save it.'));
   } catch (e) {
     toast(String(e), 'error');
   }
+  refreshRecoverable();
 }
 
 export async function discardRecovery(sessionId) {
-  await invoke('doc_discard_recovery', { sessionId }).catch(() => {});
-  set({ info: { ...state.info, recoverable: state.info.recoverable.filter((r) => r.sessionId !== sessionId) } });
+  await invoke('doc_discard_recovery', { sessionId }).catch((e) => toast(String(e), 'error'));
+  refreshRecoverable();
+}
+
+/** Other windows may have recovered or discarded sessions listed here. */
+export async function refreshRecoverable() {
+  try {
+    const recoverable = await invoke('recovery_list');
+    set({ info: { ...state.info, recoverable } });
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function updateSettings(patch) {
@@ -669,8 +680,16 @@ export async function boot() {
     .then((fonts) => set({ fonts }))
     .catch(() => set({ fonts: [] }));
 
-  // Crash-recovery checkpoints.
+  // Crash-recovery checkpoints. A failure is shown once, until one works again.
+  let checkpointFailed = false;
   setInterval(() => {
-    if (state.doc?.dirty) invoke('doc_checkpoint').catch(() => {});
+    if (!state.doc?.dirty) return;
+    invoke('doc_checkpoint').then(
+      () => (checkpointFailed = false),
+      (e) => {
+        if (!checkpointFailed) toast(`${t('Unsaved changes could not be backed up. Save your work.')} (${t(String(e))})`, 'error');
+        checkpointFailed = true;
+      },
+    );
   }, 15000);
 }

@@ -516,10 +516,7 @@ fn presentation_path(path: PathBuf) -> PathBuf {
 /// Writes a crash-recovery snapshot if there are unsaved changes.
 #[tauri::command]
 fn doc_checkpoint(window: Window, state: State<AppState>) -> CmdResult<()> {
-    state.with_doc(window.label(), |doc| {
-        doc.maybe_write_recovery(true);
-        Ok(())
-    })
+    state.with_doc(window.label(), |doc| doc.maybe_write_recovery(true))
 }
 
 #[tauri::command]
@@ -531,18 +528,49 @@ fn doc_close(window: Window, state: State<AppState>) -> CmdResult<()> {
     Ok(())
 }
 
+/// The window whose open presentation works in a session's folder.
+fn session_owner(docs: &HashMap<String, Document>, session_id: &str) -> Option<String> {
+    docs.iter().find(|(_, d)| d.id == session_id).map(|(label, _)| label.clone())
+}
+
+/// Recovers a crashed session. A session belongs to one window: a second
+/// recovery (from a welcome screen that still lists it) shows the window
+/// that has it, as the folder and its media can't be shared.
 #[tauri::command]
-fn doc_recover(window: Window, state: State<AppState>, session_id: String) -> CmdResult<DocView> {
-    let doc = Document::recover(&state.sessions_root, &session_id).map_err(err)?;
+fn doc_recover(app: AppHandle, window: Window, state: State<AppState>, session_id: String) -> CmdResult<DocView> {
+    let mut docs = state.docs.lock().map_err(err)?;
+    if let Some(owner) = session_owner(&docs, &session_id) {
+        if let Some(w) = app.get_webview_window(&owner) {
+            let _ = w.set_focus();
+        }
+        return Err("This presentation is already open in another window.".into());
+    }
+    let mut doc = Document::recover(&state.sessions_root, &session_id).map_err(err)?;
     state.recoverable.lock().map_err(err)?.retain(|r| r.session_id != session_id);
-    install_doc(&state, window.label(), doc)
+    let view = doc.view(true, None);
+    if let Some(old) = docs.insert(window.label().to_string(), doc) {
+        old.dispose();
+    }
+    Ok(view)
 }
 
 #[tauri::command]
 fn doc_discard_recovery(state: State<AppState>, session_id: String) -> CmdResult<()> {
+    let docs = state.docs.lock().map_err(err)?;
+    // Recovered meanwhile in another window: its media is in use.
+    if session_owner(&docs, &session_id).is_some() {
+        return Err("This presentation is already open in another window.".into());
+    }
     document::discard_recovery(&state.sessions_root, &session_id);
     state.recoverable.lock().map_err(err)?.retain(|r| r.session_id != session_id);
     Ok(())
+}
+
+/// Crashed sessions still waiting to be recovered or discarded (another
+/// window may have taken some since this one started).
+#[tauri::command]
+fn recovery_list(state: State<AppState>) -> CmdResult<Vec<RecoveryInfo>> {
+    Ok(state.recoverable.lock().map_err(err)?.clone())
 }
 
 // ---------------------------------------------------------------------------
@@ -574,9 +602,22 @@ fn clipboard_paste(
     })
 }
 
+/// Copies a file into the presentation `doc_id`. The copy runs outside the
+/// lock on open presentations, which a large video would hold up.
 #[tauri::command]
-async fn asset_import_file(window: Window, state: State<'_, AppState>, path: String) -> CmdResult<AssetInfo> {
-    state.with_doc(window.label(), |doc| doc.import_file(Path::new(&path)))
+async fn asset_import_file(window: Window, state: State<'_, AppState>, path: String, doc_id: String) -> CmdResult<AssetInfo> {
+    let label = window.label().to_string();
+    let dir = state.with_doc_id(&label, &doc_id, |doc| Ok(doc.assets_dir()))?;
+    let name = tauri::async_runtime::spawn_blocking({
+        let dir = dir.clone();
+        move || document::store_asset_file(&dir, Path::new(&path))
+    })
+    .await
+    .map_err(err)?
+    .map_err(err)?;
+    // Still the same presentation (closing it removes its folder).
+    state.with_doc_id(&label, &doc_id, |_| Ok(()))?;
+    Ok(document::asset_info(&dir, name))
 }
 
 /// Imports raw bytes (clipboard images) for the session named by `x-doc-id`.
@@ -653,18 +694,18 @@ async fn import_markdown(window: Window, state: State<'_, AppState>, path: Strin
 }
 
 /// Downloads a Google font into the presentation (embedded for offline use).
+/// The font goes to the presentation `doc_id` only: another one opened in
+/// the window during the download has none of its files.
 #[tauri::command]
-async fn font_install(window: Window, state: State<'_, AppState>, family: String, variants: String) -> CmdResult<DocView> {
+async fn font_install(window: Window, state: State<'_, AppState>, family: String, variants: String, doc_id: String) -> CmdResult<DocView> {
     let label = window.label().to_string();
-    let assets = {
-        let docs = state.docs.lock().map_err(err)?;
-        let doc = docs.get(&label).ok_or("No presentation is open")?;
-        if doc.deck.web_fonts.iter().any(|f| f.family == family) {
+    let assets = state.with_doc_id(&label, &doc_id, |doc| {
+        Ok(if doc.deck.web_fonts.iter().any(|f| f.family == family) {
             None
         } else {
             Some(doc.assets_dir())
-        }
-    };
+        })
+    })?;
     let font = match assets {
         Some(dir) => {
             let fam = family.clone();
@@ -677,7 +718,7 @@ async fn font_install(window: Window, state: State<'_, AppState>, family: String
         }
         None => None,
     };
-    state.with_doc(&label, |doc| {
+    state.with_doc_id(&label, &doc_id, |doc| {
         let Some(font) = font else { return Ok(doc.view(false, None)) };
         let mut fonts = doc.deck.web_fonts.clone();
         fonts.retain(|f| f.family != font.family);
@@ -938,15 +979,13 @@ fn harden_browser(_w: &tauri::WebviewWindow, _safe: bool) {}
 
 /// Downloads a picture/GIF into the presentation's assets.
 #[tauri::command]
-async fn media_import(window: Window, state: State<'_, AppState>, url: String) -> CmdResult<AssetInfo> {
-    if !state.docs.lock().map_err(err)?.contains_key(window.label()) {
-        return Err("No presentation is open".into());
-    }
+async fn media_import(window: Window, state: State<'_, AppState>, url: String, doc_id: String) -> CmdResult<AssetInfo> {
+    state.with_doc_id(window.label(), &doc_id, |_| Ok(()))?;
     let (bytes, ext) = tauri::async_runtime::spawn_blocking(move || media::download(&url))
         .await
         .map_err(err)?
         .map_err(err)?;
-    state.with_doc(window.label(), |doc| doc.import_bytes(&bytes, &ext))
+    state.with_doc_id(window.label(), &doc_id, |doc| doc.import_bytes(&bytes, &ext))
 }
 
 // ---------------------------------------------------------------------------
@@ -1441,23 +1480,23 @@ fn update_cancel(state: State<AppState>) {
 
 /// What to reopen after restarting, window by window in the order they were
 /// opened. Unsaved changes go into recovery snapshots first, so they survive
-/// even an installation cut short.
-fn reopen_list(state: &AppState) -> Vec<updates::Reopen> {
-    let Ok(mut docs) = state.docs.lock() else { return vec![] };
+/// even an installation cut short; if one can't be written, the update
+/// doesn't go ahead.
+fn reopen_list(state: &AppState) -> anyhow::Result<Vec<updates::Reopen>> {
+    let mut docs = state.docs.lock().map_err(|_| anyhow::anyhow!("lock poisoned"))?;
     let mut labels: Vec<String> = docs.keys().cloned().collect();
     labels.sort_by_key(|l| l.strip_prefix("editor-").and_then(|n| n.parse::<u32>().ok()).unwrap_or(u32::MAX));
-    labels
-        .iter()
-        .filter_map(|l| {
-            let doc = docs.get_mut(l)?;
-            if doc.is_dirty() {
-                doc.maybe_write_recovery(true);
-                Some(updates::Reopen::Session { id: doc.id.clone() })
-            } else {
-                doc.path.clone().map(|path| updates::Reopen::File { path })
-            }
-        })
-        .collect()
+    let mut out = Vec::new();
+    for l in &labels {
+        let Some(doc) = docs.get_mut(l) else { continue };
+        if doc.is_dirty() {
+            doc.maybe_write_recovery(true)?;
+            out.push(updates::Reopen::Session { id: doc.id.clone() });
+        } else if let Some(path) = doc.path.clone() {
+            out.push(updates::Reopen::File { path });
+        }
+    }
+    Ok(out)
 }
 
 /// Installs the downloaded update and restarts into it; the presentations
@@ -1470,7 +1509,7 @@ async fn update_install(app: AppHandle, state: State<'_, AppState>) -> CmdResult
         Some((version, bytes)) if version == update.version => bytes,
         _ => return Err("The update hasn't been downloaded.".into()),
     };
-    updates::write_reopen(&state.config_dir, &reopen_list(&state)).map_err(err)?;
+    updates::write_reopen(&state.config_dir, &reopen_list(&state).map_err(err)?).map_err(err)?;
     state.updates.installing.store(true, Ordering::SeqCst);
     // The media browsers run Cadenza's own program, which Windows can't
     // replace while it runs.
@@ -1617,7 +1656,9 @@ fn keep_unsaved_work(app: &AppHandle) {
         && let Ok(mut docs) = state.docs.lock()
     {
         for doc in docs.values_mut() {
-            doc.maybe_write_recovery(true);
+            if let Err(e) = doc.maybe_write_recovery(true) {
+                eprintln!("{e:#}");
+            }
         }
     }
 }
@@ -1829,6 +1870,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             doc_close,
             doc_recover,
             doc_discard_recovery,
+            recovery_list,
             clipboard_copy,
             clipboard_paste,
             asset_import_file,

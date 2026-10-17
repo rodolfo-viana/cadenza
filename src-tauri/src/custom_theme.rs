@@ -322,8 +322,15 @@ pub fn library_dir(config_dir: &Path) -> PathBuf {
 }
 
 pub fn read_file(path: &Path) -> anyhow::Result<ThemeDef> {
-    let bytes = fs::read(path).with_context(|| format!("Cannot read {}", path.display()))?;
-    if bytes.len() > 30 * 1024 * 1024 {
+    const MAX: u64 = 30 * 1024 * 1024;
+    let file = fs::File::open(path).with_context(|| format!("Cannot read {}", path.display()))?;
+    // Checked before reading: a huge file would otherwise be read whole first.
+    if file.metadata()?.len() > MAX {
+        bail!("Theme file is too large");
+    }
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(&mut std::io::Read::take(file, MAX + 1), &mut bytes)?;
+    if bytes.len() as u64 > MAX {
         bail!("Theme file is too large");
     }
     let v: serde_json::Value = serde_json::from_slice(&bytes).context("This is not a Cadenza theme file")?;
@@ -339,9 +346,7 @@ pub fn write_file(path: &Path, def: &ThemeDef) -> anyhow::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
-    let tmp = path.with_extension("tmp");
-    fs::write(&tmp, serde_json::to_vec_pretty(def)?)?;
-    fs::rename(tmp, path)?;
+    crate::util::write_atomic(path, &serde_json::to_vec_pretty(def)?, false)?;
     Ok(())
 }
 

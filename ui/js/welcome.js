@@ -1,8 +1,8 @@
 // Start screen: pick a theme and size, open recent files, recover crashes.
 
-import { html, useState } from './lib.js';
+import { html, useEffect, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, useStore, newDocument, openDialog, openPath, recover, discardRecovery, settings, openModal, refreshRecent } from './store.js';
+import { state, useStore, newDocument, openDialog, openPath, recover, discardRecovery, refreshRecoverable, settings, openModal, refreshRecent } from './store.js';
 import { invoke } from './api.js';
 import { Segmented } from './controls.js';
 import { cardFromDef } from './themebuilder.js';
@@ -49,6 +49,12 @@ export function Welcome() {
   const [aspect, setAspect] = useState(settings().defaultAspect || '16:9');
   const recent = info.recent || [];
   const create = (id = theme) => newDocument(id, aspect);
+  // Another window may have recovered or discarded unsaved work meanwhile.
+  useEffect(() => {
+    refreshRecoverable();
+    addEventListener('focus', refreshRecoverable);
+    return () => removeEventListener('focus', refreshRecoverable);
+  }, []);
   const groups = [
     ['Cadenza', t('Cadenza themes')],
     ['reveal.js', t('Classic reveal.js themes')],
