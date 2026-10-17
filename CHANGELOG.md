@@ -2,6 +2,52 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## 0.3.3 — 2026-10-17
+
+Cadenza now installs new versions itself, charts get error bars, dot plots and Chart from Data, and text boxes fit their text exactly. There is no macOS version any longer.
+
+### New
+
+- Updates: when Cadenza starts, it looks for a newer version and offers to download and install it. Cadenza then restarts and reopens the presentations you had open, unsaved changes included. Skip This Version and Not Now put it off, Check for Updates… in the main menu looks again, and Settings can turn the check off. Versions up to 0.3.2 can't do this yet, so install this one by hand.
+- Chart from Data (Chart > From Data…, or Edit as CSV… on a chart): paste cells from a spreadsheet or open a CSV file, see a preview of every chart the data makes, and insert one. It reads commas, semicolons or tabs, decimal commas and pgfplots tables, and guesses what each column holds (labels, values, error bars, groups), which you can change.
+- Error bars on column, bar, line and dot charts: ± an amount, − and + amounts, or lower and upper ends.
+- Dot plots: a point per category for each series, on an axis that follows the data instead of starting at zero.
+- Point shapes for lines, dot plots and scatterplots: circle, ring, square, triangle or diamond, filled or open.
+- Charts can have ends of the value axis of your own, axis titles and dashed reference lines with a label.
+- Equation boxes fit their formula, and dragging a corner scales the formula. Equations in older presentations keep their boxes until you turn on Fit box to equation.
+
+### Changes
+
+- No more macOS version: it could not be tested on a Mac. Releases have installers for Linux and Windows.
+- Grow box to fit text is now Fit box to text: the box is exactly as tall as its text and shows only its left and right handles. Typing a height turns it off.
+- A new text box opens for typing, and one left empty goes away again.
+- With all of a box's text selected, Font, Size and Color change the box, so its line height, bullets and numbers follow.
+- Undo and Redo select what they brought back or changed.
+- Tables grow to hold their rows.
+- Empty cells in a chart's data stay empty: charts leave them out instead of drawing zero.
+- Axis labels get the decimals their step needs, and long category labels wrap onto more lines.
+- During a show, links in text open in the browser; in exported presentations, in a new tab.
+
+### Fixes
+
+- Clicking a link in a text box replaced the editor with the web page.
+- On Linux, Ctrl+Z and Ctrl+Y did nothing while editing text or table cells.
+- Pressing Enter in the Size, color or link field with text selected replaced the text with an empty paragraph.
+- Undo from the toolbar while editing text brought the undone text back at the next key.
+- Text boxes had extra space below their text, and bottom- or middle-aligned text sat too high.
+- A box placed on a ruler guide couldn't be resized.
+- The inspector could show the wrong size and color for selected text.
+- Copying with nothing selected emptied the clipboard.
+- On Linux, images copied from other apps didn't paste.
+- Slide background videos didn't fill the slide in the editor and didn't play in single-file HTML exports.
+- The Theme Builder's Export menu opened behind the dialog.
+- The teleprompter didn't start scrolling when opened during a slide.
+- A diagram drawn just before a show, printout or export came out empty.
+- Markdown import dropped the text of slides with code or a diagram.
+- Typing "name.cadenza" in the save dialog saved "name.cadenza.cadenza".
+- With many recovered presentations, the welcome screen pushed the Recent list out of view.
+- In French, Hindi, Italian, Portuguese, Russian, Turkish and Chinese, the Heading text style had the same name as Title.
+
 ## 0.3.2 — 2026-10-15
 
 Fixes for Windows: starting a show or printing no longer freezes Cadenza, and PDFs come out a slide per page. Plus fixes to charts, equations and editing.
