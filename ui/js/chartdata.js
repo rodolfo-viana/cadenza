@@ -241,11 +241,12 @@ export function guessRoles(table) {
 /**
  * The labels and series that columns with `roles` give, with error bars
  * and, when a column sorts the rows into groups, one series per group.
+ * Values the data doesn't have stay empty (`null`).
  */
 export function chartData(table, roles) {
   const { columns, rows } = table;
   const label = roles.indexOf('label');
-  const labels = label >= 0 ? columns[label].cells.slice() : Array.from({ length: rows }, (_, i) => String(i + 1));
+  let labels = label >= 0 ? columns[label].cells.slice() : Array.from({ length: rows }, (_, i) => String(i + 1));
   const found = [];
   let current = null;
   roles.forEach((role, j) => {
@@ -270,7 +271,7 @@ export function chartData(table, roles) {
     });
     return {
       name,
-      values: values.map((v) => v ?? 0),
+      values: values.slice(),
       color: '',
       marker: '',
       low: errorBars ? ends.map((x) => x[0]) : [],
@@ -279,15 +280,34 @@ export function chartData(table, roles) {
   });
   const g = roles.indexOf('group');
   if (g >= 0 && series.length) {
-    const kinds = [...new Set(columns[g].cells.filter((c) => c !== ''))];
-    const keep = (list, i, k) => (columns[g].cells[i] === k ? list[i] : null);
+    // One row per label (rows of each group in turn without labels); each
+    // group's rows go in their group's series.
+    const groups = columns[g].cells;
+    const kinds = [...new Set(groups.filter((c) => c !== ''))];
+    const seen = new Map(kinds.map((k) => [k, 0]));
+    const keys = groups.map((k, i) => {
+      if (!seen.has(k)) return null;
+      if (label >= 0) return labels[i];
+      seen.set(k, seen.get(k) + 1);
+      return String(seen.get(k));
+    });
+    labels = [...new Set(keys.filter((k) => k !== null))];
+    const at = new Map(labels.map((l, r) => [l, r]));
+    const pick = (list, k) => {
+      const out = labels.map(() => null);
+      groups.forEach((group, i) => {
+        const r = at.get(keys[i]);
+        if (group === k && r !== undefined && out[r] === null) out[r] = list[i] ?? null;
+      });
+      return out;
+    };
     series = series.flatMap((s) =>
       kinds.map((k) => ({
         ...s,
         name: series.length > 1 ? `${s.name} · ${k}` : k,
-        values: s.values.map((v, i) => keep(s.values, i, k) ?? 0),
-        low: s.low.length ? s.low.map((_, i) => keep(s.low, i, k)) : [],
-        high: s.high.length ? s.high.map((_, i) => keep(s.high, i, k)) : [],
+        values: pick(s.values, k),
+        low: s.low.length ? pick(s.low, k) : [],
+        high: s.high.length ? pick(s.high, k) : [],
       })),
     );
   }
@@ -315,16 +335,21 @@ export function chartChoices(table, roles, kinds) {
   const links = chartLinks(table, roles);
   const n = labels.length;
   const S = series.length;
-  const all = series.flatMap((s) => s.values);
+  const all = series.flatMap((s) => s.values).filter((v) => v !== null);
   const sum = all.reduce((a, b) => a + b, 0);
   const positive = all.every((v) => v >= 0) && sum > 0;
   const base = { stacked: false, labels, series, errorBars, links: [], map: '' };
   // A scatterplot's first series holds X: numbers naming the rows, or the first values.
   const label = roles.indexOf('label');
-  const xs = label >= 0 && table.columns[label].numeric ? table.columns[label].numbers.map((v) => v ?? 0) : null;
+  const number = (l) => {
+    const v = parseNumber(l, table.delimiter);
+    return Number.isFinite(v) ? v : null;
+  };
+  const xs = label >= 0 && table.columns[label].numeric ? labels.map(number) : null;
   const scatter = xs && S >= 1 ? [{ ...series[0], name: table.columns[label].name, values: xs, low: [], high: [] }, ...series] : S >= 2 ? series : null;
   const candles = S === 4 && n > 0 && labels.every((_, i) => {
     const [open, high, low, close] = series.map((s) => s.values[i]);
+    if ([open, high, low, close].includes(null)) return false;
     return high >= Math.max(open, close, low) && low <= Math.min(open, close, high);
   });
   const fits = {
@@ -341,7 +366,8 @@ export function chartChoices(table, roles, kinds) {
     donut: S === 1 && n >= 2 && positive,
     treemap: positive,
     parliament: S === 1 && positive && all.every(Number.isInteger) && sum <= 1000,
-    scatter: !!scatter,
+    // Some row needs both an X and a Y.
+    scatter: !!scatter && scatter[0].values.some((x, i) => x !== null && scatter.slice(1).some((s) => s.values[i] !== null)),
     heatmap: S >= 2 && n >= 2,
     candlestick: candles,
     sankey: links.length >= 2 && links.every((l) => l.value > 0),

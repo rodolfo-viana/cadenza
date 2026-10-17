@@ -216,6 +216,7 @@ function fitsEnds(content, min, max) {
   const mode = content.errorBars;
   const values = content.series.flatMap((s) =>
     s.values.flatMap((v, i) => {
+      if (v === null || v === undefined) return [];
       const [lo, hi] = [s.low?.[i] ?? null, s.high?.[i] ?? null];
       if (mode === 'range') return [v, lo ?? v, hi ?? v];
       if (mode === 'pm') return [v - Math.abs(hi ?? lo ?? 0), v + Math.abs(hi ?? lo ?? 0)];

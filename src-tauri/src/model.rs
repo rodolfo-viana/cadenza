@@ -978,12 +978,12 @@ impl Default for ChartContent {
             series: vec![
                 Series {
                     name: "2025".into(),
-                    values: vec![12.0, 19.0, 15.0, 24.0],
+                    values: [12.0, 19.0, 15.0, 24.0].map(Some).to_vec(),
                     ..Default::default()
                 },
                 Series {
                     name: "2026".into(),
-                    values: vec![16.0, 22.0, 21.0, 31.0],
+                    values: [16.0, 22.0, 21.0, 31.0].map(Some).to_vec(),
                     ..Default::default()
                 },
             ],
@@ -1056,7 +1056,9 @@ pub struct Link {
 #[serde(rename_all = "camelCase", default)]
 pub struct Series {
     pub name: String,
-    pub values: Vec<f64>,
+    /// One per label; null where the data has no value (charts leave the
+    /// point out, or draw nothing there).
+    pub values: Vec<Option<f64>>,
     /// Empty = from the palette.
     pub color: String,
     /// Shape of the points of lines, dot plots and scatterplots (one of
@@ -1066,6 +1068,23 @@ pub struct Series {
     /// `ChartContent::error_bars` says.
     pub low: Vec<Option<f64>>,
     pub high: Vec<Option<f64>>,
+}
+
+impl Series {
+    /// The value of row `i`, if it has a number.
+    pub fn value(&self, i: usize) -> Option<f64> {
+        self.values.get(i).copied().flatten().filter(|v| v.is_finite())
+    }
+
+    /// The values that are numbers.
+    pub fn numbers(&self) -> impl Iterator<Item = f64> + '_ {
+        self.values.iter().flatten().copied().filter(|v| v.is_finite())
+    }
+
+    /// The values, NaN where there is none.
+    pub fn plain(&self) -> Vec<f64> {
+        self.values.iter().map(|v| v.unwrap_or(f64::NAN)).collect()
+    }
 }
 
 #[cfg(test)]
@@ -1082,6 +1101,17 @@ mod tests {
         assert_eq!(json["content"]["kind"], "shape");
         let back: Element = serde_json::from_value(json).unwrap();
         assert_eq!(back, el);
+    }
+
+    #[test]
+    fn chart_values_can_be_missing() {
+        let s: Series = serde_json::from_str(r#"{"name":"A","values":[1.5,null,3]}"#).unwrap();
+        assert_eq!(s.values, [Some(1.5), None, Some(3.0)]);
+        assert_eq!(s.value(1), None);
+        assert_eq!(s.numbers().sum::<f64>(), 4.5);
+        assert_eq!(serde_json::to_value(&s).unwrap()["values"], serde_json::json!([1.5, null, 3.0]));
+        // Missing values compare equal, so a chart with gaps can be saved clean.
+        assert_eq!(s.clone(), s);
     }
 
     #[test]

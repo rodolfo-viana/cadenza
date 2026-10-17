@@ -192,6 +192,18 @@ document.addEventListener('contextmenu', (e) => {
   if (!isTyping(e.target)) e.preventDefault();
 });
 
+// Links on slides work in the show. Here a click on one selects or edits
+// it: following it would put the web page in place of the editor.
+for (const type of ['click', 'auxclick']) {
+  document.addEventListener(
+    type,
+    (e) => {
+      if (e.target.closest?.('.cz-editor-reveal a[href]')) e.preventDefault();
+    },
+    true,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Files dropped from the system
 // ---------------------------------------------------------------------------

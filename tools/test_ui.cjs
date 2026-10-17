@@ -721,7 +721,7 @@ test('the columns of real data get their roles and make the charts they can', as
   eq(gainRoles, ['ignore', 'label', 'group', 'value', 'minus', 'plus']);
   const split = D.chartData(gain, gainRoles);
   eq(split.series.map((s) => s.name), ['fusao', 'escolhida', 'regra']);
-  eq(split.series[1].values, [0, 0, 3.806, 0]);
+  eq(split.series[1].values, [null, null, 3.806, null]);
   eq(split.series[1].high, [null, null, 0.4764, null]);
   const choices = D.chartChoices(gain, gainRoles, KINDS);
   assert.ok(choices.some((c) => c.kind === 'stacked-bar'), 'one bar per row, colored by group');
@@ -754,6 +754,41 @@ test('the columns of real data get their roles and make the charts they can', as
   const seats = D.readTable('party,seats\nA,120\nB,95\nC,60');
   const seatKinds = D.chartChoices(seats, D.guessRoles(seats), KINDS).map((c) => c.kind);
   assert.ok(['pie', 'donut', 'parliament', 'treemap'].every((k) => seatKinds.includes(k)), seatKinds.join());
+});
+
+test('values the data does not have stay empty, and groups share their labels', async () => {
+  const D = await chartdata();
+  // Each label in one group: one dot per row, no zeros elsewhere.
+  const qa = D.readTable('Group,Estimate,Low,High,Series\nAlpha,10,8,12,A\nBeta,18,15,21,A\nGamma,13,11,15,B\nDelta,22,19,25,B');
+  const roles = D.guessRoles(qa);
+  eq(roles, ['label', 'value', 'low', 'high', 'group']);
+  const data = D.chartData(qa, roles);
+  eq(data.labels, ['Alpha', 'Beta', 'Gamma', 'Delta']);
+  eq(data.series.map((s) => [s.name, s.values, s.low]), [
+    ['A', [10, 18, null, null], [8, 15, null, null]],
+    ['B', [null, null, 13, 22], [null, null, 11, 19]],
+  ]);
+  const qaKinds = D.chartChoices(qa, roles, KINDS).map((c) => c.kind);
+  assert.ok(qaKinds.includes('dot') && !qaKinds.includes('scatter'), 'no row has both an X and a Y: ' + qaKinds.join());
+  // Long data: a label for each group in turn becomes one row.
+  const long = D.readTable('year,country,sales\n2024,BR,5\n2024,PT,3\n2025,BR,7\n2026,PT,4');
+  const longRoles = ['label', 'group', 'value'];
+  const pivot = D.chartData(long, longRoles);
+  eq(pivot.labels, ['2024', '2025', '2026']);
+  eq(pivot.series.map((s) => [s.name, s.values]), [['BR', [5, 7, null]], ['PT', [3, null, 4]]]);
+  const scatter = D.chartChoices(long, longRoles, KINDS).find((c) => c.kind === 'scatter');
+  eq(scatter.content.series.map((s) => s.values), [[2024, 2025, 2026], [5, 7, null], [3, null, 4]], 'X for each row of the groups');
+  // Without labels, the rows of each group are numbered.
+  const plain = D.chartData(D.readTable('kind,value\nA,1\nA,2\nB,3\nB,4\nB,5'), ['group', 'value']);
+  eq(plain.labels, ['1', '2', '3']);
+  eq(plain.series.map((s) => s.values), [[1, 2, null], [3, 4, 5]]);
+  // An empty cell is no value, not zero; charts that need every value don't fit.
+  const gaps = D.readTable('item,a\nx,4\ny,\nz,2');
+  eq(D.chartData(gaps, D.guessRoles(gaps)).series[0].values, [4, null, 2]);
+  const kinds = D.chartChoices(gaps, D.guessRoles(gaps), KINDS).map((c) => c.kind);
+  assert.ok(kinds.includes('pie') && kinds.includes('dot'), kinds.join());
+  const ohlc = D.readTable('day,open,high,low,close\n1,10,12,9,11\n2,11,,10,12');
+  assert.ok(!D.chartChoices(ohlc, D.guessRoles(ohlc), KINDS).some((c) => c.kind === 'candlestick'));
 });
 
 test('a chart written as CSV reads back the same', async () => {

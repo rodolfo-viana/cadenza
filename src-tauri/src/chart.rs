@@ -44,10 +44,7 @@ fn axis_kind(chart: &ChartContent) -> (&str, bool) {
 }
 
 fn positive_count(chart: &ChartContent) -> u32 {
-    chart
-        .series
-        .first()
-        .map_or(0, |s| s.values.iter().filter(|v| v.is_finite() && **v > 0.0).count() as u32)
+    chart.series.first().map_or(0, |s| s.numbers().filter(|v| *v > 0.0).count() as u32)
 }
 
 /// Steps a chart takes when it builds by series: one per series, or per
@@ -207,9 +204,9 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
         "sankey" => sankey_chart(&mut svg, chart, w, plot_h, f, steps),
         "network" => network_chart(&mut svg, chart, w, plot_h, f, steps),
         "map" => {
-            let values = chart.series.first().map_or(&[][..], |s| &s.values[..]);
+            let values = chart.series.first().map(|s| s.plain()).unwrap_or_default();
             let color = scale_color(chart);
-            scale = crate::maps::map_chart(&mut svg, &chart.map, &chart.labels, values, &color, chart.show_values, (w, plot_h, f));
+            scale = crate::maps::map_chart(&mut svg, &chart.map, &chart.labels, &values, &color, chart.show_values, (w, plot_h, f));
         }
         _ => axis_chart(&mut svg, chart, w, plot_h, f, steps),
     }
@@ -277,7 +274,10 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
         return;
     }
     let ns = chart.series.len();
-    let value = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite()).unwrap_or(0.0);
+    let value = |s: usize, i: usize| chart.series[s].value(i).unwrap_or(0.0);
+    // Rows without a value get no point, bar or error bar (areas still
+    // pass through zero there).
+    let has = |s: usize, i: usize| chart.series[s].value(i).is_some();
     // Where each value starts and ends along the value axis. Stacked columns
     // and bars pile positive and negative values apart; areas pile them all.
     let mut seg = vec![vec![(0.0f64, 0.0f64); n]; ns];
@@ -302,6 +302,9 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
     // Error bars around where a value ends (a stacked value's top).
     let error_at = |s: usize, i: usize| -> Option<(f64, f64)> {
         if !errors {
+            return None;
+        }
+        if !has(s, i) {
             return None;
         }
         let v = value(s, i);
@@ -437,15 +440,32 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                     .enumerate()
                     .map(|(i, &(start, end))| (px + (i as f64 + 0.5) * band, vpos(end), vpos(start)))
                     .collect();
-                let line: String = pts
-                    .iter()
-                    .enumerate()
-                    .map(|(k, (x, y, _))| format!("{}{} {}", if k == 0 { "M" } else { "L" }, num(*x), num(*y)))
-                    .collect();
-                if area {
-                    let back: String = pts.iter().rev().map(|(x, _, y0)| format!("L{} {}", num(*x), num(*y0))).collect();
-                    let _ = write!(svg, r#"<path d="{line}{back}Z" style="fill:{c};fill-opacity:0.28"/>"#, c = esc(&color));
+                // Lines and areas break where a value is missing; stacked
+                // areas pass through zero there, under the layers above.
+                let mut runs: Vec<Vec<usize>> = Vec::new();
+                for k in (0..pts.len()).filter(|&k| stacked || has(s, k)) {
+                    match runs.last_mut() {
+                        Some(run) if run.last().is_some_and(|&j| j + 1 == k) => run.push(k),
+                        _ => runs.push(vec![k]),
+                    }
                 }
+                let trace = |run: &[usize]| -> String {
+                    run.iter()
+                        .enumerate()
+                        .map(|(n, &k)| format!("{}{} {}", if n == 0 { "M" } else { "L" }, num(pts[k].0), num(pts[k].1)))
+                        .collect()
+                };
+                if area {
+                    let fill: String = runs
+                        .iter()
+                        .map(|run| {
+                            let back: String = run.iter().rev().map(|&k| format!("L{} {}", num(pts[k].0), num(pts[k].2))).collect();
+                            format!("{}{back}Z", trace(run))
+                        })
+                        .collect();
+                    let _ = write!(svg, r#"<path d="{fill}" style="fill:{c};fill-opacity:0.28"/>"#, c = esc(&color));
+                }
+                let line: String = runs.iter().map(|run| trace(run)).collect();
                 let _ = write!(
                     svg,
                     r#"<path d="{}" fill="none" style="stroke:{}" stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"/>"#,
@@ -454,6 +474,9 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                     num((f * 0.18).max(2.0))
                 );
                 for (k, (x, y, _)) in pts.iter().enumerate() {
+                    if !has(s, k) {
+                        continue;
+                    }
                     if let Some((a, b)) = error_at(s, k) {
                         error_bar(svg, false, *x, (vpos(a), vpos(b)), r * 1.4, f);
                     }
@@ -481,6 +504,9 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                 open_step(svg, steps, s as u32);
                 let color = series_color(chart, s);
                 for (i, &(start, end)) in row.iter().enumerate() {
+                    if !has(s, i) {
+                        continue;
+                    }
                     let v = value(s, i);
                     let offset = i as f64 * band + gap / 2.0 + if stacked { 0.0 } else { s as f64 * bw };
                     let (a, b) = (vpos(start), vpos(end));
@@ -547,7 +573,7 @@ fn dot_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
     if n == 0 || ns == 0 {
         return;
     }
-    let get = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite());
+    let get = |s: usize, i: usize| chart.series[s].value(i);
     let mut range: Option<(f64, f64)> = None;
     let mut extend = |a: f64, b: f64| range = Some(range.map_or((a, b), |(lo, hi)| (lo.min(a), hi.max(b))));
     for s in 0..ns {
@@ -580,17 +606,22 @@ fn dot_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
         label_text(svg, (center(i), plot.y + plot.h + f * 1.3), &wrap_label(label, chars, lines), "middle", false);
     }
     let y = |v: f64| plot.y + plot.h - axis.t(v) * plot.h;
-    // Series side by side within a category, so that equal values stay apart.
+    // Series side by side within a category, so that equal values stay apart;
+    // only those with a value there take room.
     let spacing = if ns > 1 { (band * 0.6 / ns as f64).min(f * 1.4) } else { 0.0 };
+    let dx = |s: usize, i: usize| {
+        let shown = (0..ns).filter(|&k| get(k, i).is_some());
+        let (place, count) = shown.fold((0, 0), |(p, c), k| (p + usize::from(k < s), c + 1));
+        (place as f64 - (count as f64 - 1.0) / 2.0) * spacing
+    };
     let r = (f * 0.3).max(3.0);
     let clip = open_clip(svg, chart, plot);
     for s in 0..ns {
         open_step(svg, steps, s as u32);
         let color = series_color(chart, s);
-        let dx = (s as f64 - (ns as f64 - 1.0) / 2.0) * spacing;
         for i in 0..n {
             let Some(v) = get(s, i) else { continue };
-            let x = center(i) + dx;
+            let x = center(i) + dx(s, i);
             if let Some((a, b)) = error_span(chart, s, i, v) {
                 error_bar(svg, false, x, (y(a), y(b)), r * 1.1, f);
             }
@@ -953,7 +984,7 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
     let values: Vec<f64> = chart
         .series
         .first()
-        .map(|s| s.values.iter().map(|v| if v.is_finite() { v.max(0.0) } else { 0.0 }).collect())
+        .map(|s| (0..s.values.len()).map(|i| s.value(i).map_or(0.0, |v| v.max(0.0))).collect())
         .unwrap_or_default();
     let total: f64 = values.iter().sum();
     if total <= 0.0 {
@@ -1082,9 +1113,9 @@ fn value_range(chart: &ChartContent) -> Option<(f64, f64)> {
     chart
         .series
         .iter()
-        .flat_map(|s| s.values.iter().take(n.max(1)))
+        .flat_map(|s| s.values.iter().take(n.max(1)).flatten().copied())
         .filter(|v| v.is_finite())
-        .fold(None, |r, &v| Some(r.map_or((v, v), |(lo, hi): (f64, f64)| (lo.min(v), hi.max(v)))))
+        .fold(None, |r, v| Some(r.map_or((v, v), |(lo, hi): (f64, f64)| (lo.min(v), hi.max(v)))))
 }
 
 /// Every how many category labels to print so that they do not overlap.
@@ -1185,7 +1216,7 @@ fn stream_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, 
     if n == 0 || m == 0 {
         return;
     }
-    let v = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite()).unwrap_or(0.0).max(0.0);
+    let v = |s: usize, i: usize| chart.series[s].value(i).unwrap_or(0.0).max(0.0);
     let totals: Vec<f64> = (0..n).map(|i| (0..m).map(|s| v(s, i)).sum()).collect();
     let top = totals.iter().cloned().fold(0.0, f64::max);
     if top <= 0.0 {
@@ -1259,7 +1290,7 @@ fn scatter_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
     if ns == 0 || n == 0 {
         return;
     }
-    let get = |s: usize, i: usize| chart.series[s].values.get(i).copied().filter(|v| v.is_finite());
+    let get = |s: usize, i: usize| chart.series[s].value(i);
     // With a single series, X is the row number.
     let x_of = |i: usize| if ns > 1 { get(0, i) } else { Some(i as f64 + 1.0) };
     let groups: Vec<usize> = if ns > 1 { (1..ns).collect() } else { vec![0] };
@@ -1394,7 +1425,7 @@ fn heatmap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
     for (c, s) in chart.series.iter().enumerate() {
         open_step(svg, steps, c as u32);
         for i in 0..n {
-            let Some(v) = s.values.get(i).copied().filter(|v| v.is_finite()) else {
+            let Some(v) = s.value(i) else {
                 continue;
             };
             let o = heat(v, range);
@@ -1577,21 +1608,18 @@ fn treemap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
     if chart.series.len() <= 1 {
         let Some(s) = chart.series.first() else { return };
         let mut step = 0;
-        for (i, r) in squarify(&s.values, area).into_iter().enumerate() {
+        let values = s.plain();
+        for (i, r) in squarify(&values, area).into_iter().enumerate() {
             let Some(r) = r else { continue };
             open_step(svg, steps, step);
             step += 1;
-            treemap_cell(svg, r, &slice_color(i), label(i), shown(s.values[i]), f);
+            treemap_cell(svg, r, &slice_color(i), label(i), shown(values[i]), f);
             close_step(svg, steps);
         }
         return;
     }
     // Groups: one per series, sized by their totals.
-    let totals: Vec<f64> = chart
-        .series
-        .iter()
-        .map(|s| s.values.iter().filter(|v| v.is_finite() && **v > 0.0).sum())
-        .collect();
+    let totals: Vec<f64> = chart.series.iter().map(|s| s.numbers().filter(|v| *v > 0.0).sum()).collect();
     for (g, r) in squarify(&totals, area).into_iter().enumerate() {
         open_step(svg, steps, g as u32);
         if let Some(r) = r {
@@ -1616,8 +1644,8 @@ fn treemap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
                 w: r.w,
                 h: r.h - head,
             };
-            let values = &chart.series[g].values;
-            for (i, c) in squarify(values, inner).into_iter().enumerate() {
+            let values = chart.series[g].plain();
+            for (i, c) in squarify(&values, inner).into_iter().enumerate() {
                 if let Some(c) = c {
                     treemap_cell(svg, c, &color, label(i), shown(values[i]), f);
                 }
@@ -1634,7 +1662,7 @@ fn treemap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
 /// Seats per party (row) of the first series; at most 2,000 in all.
 fn parliament_seats(chart: &ChartContent) -> Vec<u32> {
     let raw: Vec<f64> = chart.series.first().map_or_else(Vec::new, |s| {
-        s.values.iter().map(|v| if v.is_finite() && *v > 0.0 { v.round() } else { 0.0 }).collect()
+        (0..s.values.len()).map(|i| s.value(i).filter(|v| *v > 0.0).map_or(0.0, f64::round)).collect()
     });
     let total: f64 = raw.iter().sum();
     let k = if total > 2000.0 { 2000.0 / total } else { 1.0 };
@@ -1741,7 +1769,7 @@ const FALLING: &str = "var(--cz-chart-down, #dc2626)";
 
 fn candle_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64) {
     let n = rows(chart);
-    let get = |s: usize, i: usize| chart.series.get(s).and_then(|x| x.values.get(i)).copied().filter(|v| v.is_finite());
+    let get = |s: usize, i: usize| chart.series.get(s).and_then(|x| x.value(i));
     let candles: Vec<Option<[f64; 4]>> = (0..n).map(|i| Some([get(0, i)?, get(1, i)?, get(2, i)?, get(3, i)?])).collect();
     let all = candles.iter().flatten().flat_map(|c| c.iter().copied());
     let Some((lo, hi)) = all.fold(None, |r, v| Some(r.map_or((v, v), |(a, b): (f64, f64)| (a.min(v), b.max(v))))) else {
@@ -2388,11 +2416,61 @@ mod tests {
         assert!(!svg.contains(">0</text>"), "the axis follows the data, not zero");
     }
 
+    /// A series of `values`; NaN stands for a missing value.
     fn series(values: &[f64]) -> crate::model::Series {
         crate::model::Series {
-            values: values.to_vec(),
+            values: values.iter().map(|&v| (!v.is_nan()).then_some(v)).collect(),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn missing_values_are_left_out() {
+        let gap = f64::NAN;
+        let mut c = ChartContent {
+            chart: "dot".into(),
+            labels: ["Alpha", "Beta", "Gamma", "Delta"].map(String::from).to_vec(),
+            series: vec![series(&[10.0, 18.0, gap, gap]), series(&[gap, gap, 13.0, 22.0])],
+            show_legend: false,
+            show_values: true,
+            ..Default::default()
+        };
+        let cxs = |svg: &str| -> Vec<f64> {
+            svg.match_indices("<circle cx=\"")
+                .map(|(i, _)| svg[i + 12..].split('"').next().unwrap().parse().unwrap())
+                .collect()
+        };
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        let xs = cxs(&svg);
+        assert_eq!(xs.len(), 4, "one dot per value, none at zero: {svg}");
+        // Alone in their categories, the dots sit in the middle of each.
+        let band = (xs[3] - xs[0]) / 3.0;
+        assert!((xs[1] - xs[0] - band).abs() < 1e-6 && (xs[2] - xs[1] - band).abs() < 1e-6, "{xs:?}");
+        assert!(!svg.contains(">0</text>"), "no value label for missing values");
+
+        c.chart = "line".into();
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert_eq!(cxs(&svg).len(), 4, "line points only where there are values");
+        let lines = |svg: &str| -> Vec<String> {
+            svg.match_indices(r#"<path d=""#)
+                .map(|(i, _)| svg[i + 9..].split('"').next().unwrap().to_string())
+                .collect()
+        };
+        assert!(lines(&svg).iter().all(|d| d.matches('M').count() == 1 && d.matches('L').count() == 1), "{svg}");
+        c.series[1].values = vec![Some(5.0), None, Some(13.0), Some(22.0)];
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert_eq!(lines(&svg)[1].matches('M').count(), 2, "the line breaks at the gap");
+
+        c.chart = "area".into();
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert_eq!(lines(&svg)[2].matches('Z').count(), 2, "areas break too: {svg}");
+        c.chart = "stacked-area".into();
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert!(lines(&svg).iter().all(|d| d.matches('M').count() == 1), "stacked areas don't: {svg}");
+
+        c.chart = "column".into();
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        assert_eq!(svg.matches("<rect").count(), 5, "a bar per value: {svg}");
     }
 
     #[test]
@@ -2627,10 +2705,7 @@ mod tests {
         }
         let pie = ChartContent {
             chart: "pie".into(),
-            series: vec![crate::model::Series {
-                values: vec![3.0, 0.0, 2.0],
-                ..Default::default()
-            }],
+            series: vec![series(&[3.0, 0.0, 2.0])],
             ..Default::default()
         };
         let svg = chart_svg(&pie, 400.0, 400.0, steps);

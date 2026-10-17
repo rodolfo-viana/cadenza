@@ -191,8 +191,22 @@
    * Cadenza; `options.notes === false` leaves out the speaker-notes plugin
    * and `options.camera === false` keeps live video off (previews, printing).
    */
+  /**
+   * Links to web pages open beside the presentation (in the browser, from
+   * the app), never in its place. Links to slides (#/…) stay.
+   */
+  function openLinksBeside() {
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('.reveal a[href]');
+      if (!a || a.target || (a.getAttribute('href') || '').charAt(0) === '#') return;
+      a.target = '_blank';
+      a.rel = 'noopener';
+    }, true);
+  }
+
   function start(config, options) {
     options = options || {};
+    openLinksBeside();
     renderMath(document.querySelector('.reveal'));
     wrapYouTube(document);
     embedBackgroundVideos(document);

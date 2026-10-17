@@ -725,7 +725,7 @@ export function ChartPanel({ els }) {
   const { regions, unmatched, repeated } = useMapRegions(isMap, ch.map, ch.labels);
   const n = ch.labels.length;
   const setCell = (s, i, v) => {
-    const series = ch.series.map((x, k) => (k === s ? { ...x, values: Array.from({ length: n }, (_, j) => (j === i ? v : x.values[j] ?? 0)) } : x));
+    const series = ch.series.map((x, k) => (k === s ? { ...x, values: Array.from({ length: n }, (_, j) => (j === i ? v : x.values[j] ?? null)) } : x));
     set_({ series }, 'data', true);
   };
   const setLabel = (i, v) => set_({ labels: ch.labels.map((l, j) => (j === i ? v : l)) }, 'labels', true);
@@ -894,7 +894,7 @@ export function ChartPanel({ els }) {
               <td><${Cell} class="cell label" list=${isMap ? 'cz-map-regions' : undefined} value=${l} onChange=${(v) => setLabel(i, v)} /></td>
               ${shownSeries.map(
                 (s, k) => html`<td>
-                    <${Cell} class="cell num" number value=${s.values[i] ?? 0} onChange=${(v) => setCell(k, i, v)} />
+                    <${Cell} class="cell num" number nullable value=${s.values[i] ?? null} onChange=${(v) => setCell(k, i, v)} />
                   </td>
                   ${errCols.map(
                     ([key]) => html`<td>
