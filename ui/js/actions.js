@@ -25,7 +25,7 @@ import {
 } from './store.js';
 import { t, N_ } from './i18n.js';
 import { chartSteps } from './charts.js';
-import { fileExt, fileName, textToHtml, bounds, unionBounds } from './util.js';
+import { fileExt, fileName, textToHtml, bounds, unionBounds, isBlankHtml } from './util.js';
 
 // ---------------------------------------------------------------------------
 // Inserting elements
@@ -52,7 +52,7 @@ export async function insertText(variant = 'body') {
     if (state.editing === id) return;
     window.removeEventListener('cz-edit-ended', ended);
     const el = currentSlide()?.elements.find((e) => e.id === id);
-    if (el && !el.content.html.replace(/<[^>]*>|&nbsp;|\s|\u200b/g, '') && state.doc?.undoLabel === added) undo();
+    if (el && isBlankHtml(el.content.html) && state.doc?.undoLabel === added) undo();
   };
   window.addEventListener('cz-edit-ended', ended);
   const [{ canvasApi }, { beginTextEdit }] = await Promise.all([import('./canvas.js'), import('./textedit.js')]);

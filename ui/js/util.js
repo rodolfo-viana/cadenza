@@ -31,6 +31,13 @@ export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+/** Whether rich text shows no characters, only spaces (parsed inert: nothing runs or loads). */
+export function isBlankHtml(html) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html || '';
+  return !tpl.content.textContent.replace(/[\s​]/g, '');
+}
+
 /** Plain text → paragraphs of escaped HTML (mirrors the Rust helper). */
 export function textToHtml(text) {
   return String(text)
