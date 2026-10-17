@@ -27,6 +27,27 @@ export function debounce(fn, ms) {
   return d;
 }
 
+/**
+ * Follows a pointer drag on the window. `onEnd` gets the pointerup event, or
+ * null when the drag was cancelled (by the system, or by calling the returned
+ * function, e.g. when the component goes away mid-drag).
+ */
+export function trackPointer(onMove, onEnd) {
+  let done = false;
+  const end = (ev) => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
+    onEnd(ev?.type === 'pointerup' ? ev : null);
+  };
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
+  return () => end(null);
+}
+
 export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }

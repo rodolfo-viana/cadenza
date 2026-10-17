@@ -8,7 +8,7 @@ import { state, set, useStore, goToSlide, openMenu, play } from './store.js';
 import * as A from './actions.js';
 import { item } from './commands.js';
 import { Popover } from './controls.js';
-import { cls } from './util.js';
+import { cls, trackPointer } from './util.js';
 import { t, tn } from './i18n.js';
 
 const THUMB_W = 164;
@@ -40,6 +40,9 @@ export function Navigator() {
   const listRef = useRef();
   const anchor = useRef(null);
   const [drop, setDrop] = useState(null);
+  // A drag still going when the navigator goes away ends with it.
+  const drag = useRef(null);
+  useEffect(() => () => drag.current?.(), []);
 
   // Keep the current slide visible.
   useEffect(() => {
@@ -94,19 +97,17 @@ export function Navigator() {
       if (ev.clientY < r.top + 30) listRef.current.scrollTop -= 12;
       if (ev.clientY > r.bottom - 30) listRef.current.scrollTop += 12;
     };
-    const up = (ev) => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
+    // A cancelled drag moves nothing.
+    drag.current = trackPointer(move, (ev) => {
       document.body.classList.remove('dragging-slides');
       setDrop(null);
+      if (!ev) return;
       if (dragging) {
         A.moveSlides(ids, dropIndexAt(ev.clientY));
       } else if (wasSelected && st.selectedSlides.length > 1) {
         set({ selectedSlides: [slide.id] });
       }
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    });
   }
 
   function onKeyDown(e) {

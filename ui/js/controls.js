@@ -3,7 +3,7 @@
 import { html, useEffect, useLayoutEffect, useMemo, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
 import { state, registerFlush } from './store.js';
-import { clamp, cls } from './util.js';
+import { clamp, cls, trackPointer } from './util.js';
 import { t, N_ } from './i18n.js';
 
 export function Section({ title, children, actions, open: initialOpen = true, id }) {
@@ -34,10 +34,17 @@ export function Section({ title, children, actions, open: initialOpen = true, id
   </section>`;
 }
 
+let rowIds = 0;
+// What clicking a row's label focuses: a field, not a button (it would be pressed).
+const ROW_FIELD = 'input:not([type=checkbox]):not([type=range]):not([type=color]):not(:disabled), select:not(:disabled), textarea:not(:disabled)';
+
+/** A labeled row; the label names the row's controls as a group and focuses its first field. */
 export function Row({ label, children, hint, stack }) {
+  const [id] = useState(() => `cz-row-${++rowIds}`);
+  const ctl = useRef();
   return html`<div class=${cls('irow', stack && 'stack')}>
-    ${label && html`<label class="irow-label" title=${hint}>${label}</label>`}
-    <div class="irow-ctl">${children}</div>
+    ${label && html`<label class="irow-label" id=${id} title=${hint} onClick=${() => ctl.current?.querySelector(ROW_FIELD)?.focus()}>${label}</label>`}
+    <div class="irow-ctl" ref=${ctl} role=${label ? 'group' : undefined} aria-labelledby=${label ? id : undefined}>${children}</div>
   </div>`;
 }
 
@@ -88,6 +95,9 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
   };
   useFlushWhenFocused(field, (v) => commit(v));
 
+  // A scrub still going when the field goes away ends with it.
+  const scrub = useRef(null);
+  useEffect(() => () => scrub.current?.(), []);
   const onScrubStart = (e) => {
     if (disabled || e.button !== 0) return;
     e.preventDefault();
@@ -103,14 +113,8 @@ export function NumberField({ value, onChange, min = -100000, max = 100000, step
       const n = clamp(Math.round((start + Math.round(dx / 3) * unit) * 1000) / 1000, min, max);
       onChange(n, true);
     };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      document.body.classList.remove('scrubbing');
-    };
     document.body.classList.add('scrubbing');
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    scrub.current = trackPointer(move, () => document.body.classList.remove('scrubbing'));
   };
 
   return html`<div class=${cls('numfield', disabled && 'disabled')} style=${width ? { width: width + 'px' } : null} title=${title}>

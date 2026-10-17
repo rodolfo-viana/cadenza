@@ -19,6 +19,8 @@
   // Teleprompter (teleprompter.js) and the slide whose notes it shows.
   var tp = null;
   var tpSlide = null;
+  // The slide whose notes are shown: builds and blackouts keep their scroll.
+  var notesSlide = null;
   // Interface translation (replaced by i18n.js once the language is known).
   var t = function (s, v) { return v ? s.replace(/\{(\w+)\}/g, function (m, k) { return k in v ? v[k] : m; }) : s; };
   // New presentations are titled in English by Rust.
@@ -33,6 +35,8 @@
   var started = null;
   var elapsedBefore = 0;
   var running = false;
+  // The show starts the timer once; after that only Pause/Resume do.
+  var begun = false;
 
   function fmt(ms) {
     var s = Math.floor(ms / 1000);
@@ -155,9 +159,14 @@
     $('paused').classList.toggle('on', !!st.paused);
     var slide = data && data.slides.find(function (s) { return s.id === st.slideId; });
     var notes = slide && slide.notes.trim();
-    $('notes').textContent = notes || t('No notes for this slide.');
-    $('notes').classList.toggle('empty', !notes);
-    $('notes').scrollTop = 0;
+    var box = $('notes');
+    var text = notes || t('No notes for this slide.');
+    if (box.textContent !== text) box.textContent = text;
+    box.classList.toggle('empty', !notes);
+    if (st.slideId !== notesSlide) {
+      notesSlide = st.slideId;
+      box.scrollTop = 0;
+    }
     if (tp && st.slideId !== tpSlide) {
       tpSlide = st.slideId;
       tp.setSlide(notes);
@@ -206,7 +215,10 @@
     tauri.event.listen('cz-present-state', function (e) {
       if (!e.payload || e.payload.doc !== docLabel) return;
       lastState = e.payload;
-      startTimer();
+      if (!begun) {
+        begun = true;
+        startTimer();
+      }
       applyState(lastState);
     });
     // Ask the audience window for its current state in case we missed it.

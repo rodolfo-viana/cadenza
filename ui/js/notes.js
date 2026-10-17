@@ -4,6 +4,7 @@ import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
 import { state, currentSlide, apply, registerFlush, updateSettings, useStore } from './store.js';
 import { t } from './i18n.js';
+import { trackPointer } from './util.js';
 
 export function NotesPanel() {
   useStore();
@@ -19,6 +20,9 @@ export function NotesPanel() {
   const pending = useRef(null);
   const timer = useRef(null);
   const ref = useRef();
+  // A resize still going when the panel is hidden ends with it.
+  const resize = useRef(null);
+  useEffect(() => () => resize.current?.(), []);
 
   // Stable flush: commits typed notes for the slide they belong to.
   const flush = useRef(async () => {
@@ -58,17 +62,14 @@ export function NotesPanel() {
       h = Math.max(70, Math.min(innerHeight * 0.6, h0 - (ev.clientY - y0)));
       setHeight(h);
     };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
+    // However it ends, the panel keeps the height it was given.
+    resize.current = trackPointer(move, () => {
       try {
         localStorage.setItem('cz-notes-h', String(Math.round(h)));
       } catch {
         /* ignore */
       }
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    });
   };
 
   return html`<div class="notes-panel" style=${{ height: height + 'px' }}>

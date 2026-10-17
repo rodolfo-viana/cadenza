@@ -32,7 +32,7 @@ function Unsaved({ name, resolve }) {
       <${Button} label=${t('Don’t Save')} variant="ghost" onClick=${() => resolve('discard')} />
       <span class="spacer" />
       <${Button} label=${t('Cancel')} onClick=${() => resolve('cancel')} />
-      <${Button} label=${t('Save')} variant="primary" onClick=${() => resolve('save')} />
+      <${Button} label=${t('Save')} variant="primary" autofocus onClick=${() => resolve('save')} />
     `}
   >
     <div class="alert">
@@ -198,7 +198,7 @@ function About() {
         })}
         ${' '}${withLinks(t('Maps from {naturalEarth} (public domain).'), { naturalEarth: link('https://www.naturalearthdata.com', 'Natural Earth') })}
       </p>
-      <${Button} label=${t('Close')} onClick=${closeModal} />
+      <${Button} label=${t('Close')} autofocus onClick=${closeModal} />
     </div>
   <//>`;
 }

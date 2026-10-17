@@ -1021,7 +1021,7 @@ async function control(name, props) {
   const document = { activeElement: null };
   const C = await standalone('controls.js', {
     'lib.js': lib, 'icons.js': { Icon() {} }, 'store.js': { state: {}, registerFlush: (fn) => (flushers.add(fn), () => flushers.delete(fn)) },
-    'util.js': { clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)), cls: (...a) => a.filter(Boolean).join(' ') },
+    'util.js': { clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)), cls: (...a) => a.filter(Boolean).join(' '), trackPointer() {} },
     'i18n.js': { t: (s) => s, N_: (s) => s },
   }, { window: {}, document, setTimeout, clearTimeout });
   let out;
@@ -1151,4 +1151,361 @@ test('inline math is typeset again after editing without changes', async () => {
   assert.equal(slideView.update(html), true);
   assert.equal(root.children[0].text.innerHTML, typeset, 'the formula is typeset again');
   assert.equal(root.children.length, 2);
+});
+
+/**
+ * Just enough of Preact's hooks to render components by hand: each instance
+ * keeps its hook slots, effects run after the render (`ready` sees the
+ * output first, to attach refs) and `unmount` runs their cleanups.
+ */
+function hookHarness() {
+  let cur = null;
+  let pending = [];
+  const slot = (init) => (cur.at in cur.slots ? cur.slots[cur.at++] : (cur.slots[cur.at++] = init()));
+  const effect = (fn, deps) => {
+    const s = slot(() => ({ deps: null, cleanup: null }));
+    if (!s.deps || deps.some((d, k) => d !== s.deps[k])) {
+      s.deps = deps;
+      pending.push([s, fn]);
+    }
+  };
+  const lib = {
+    html: (strings, ...values) => ({ strings, values }),
+    useState(initial) {
+      const s = slot(() => ({ v: typeof initial === 'function' ? initial() : initial }));
+      return [s.v, (v) => { s.v = typeof v === 'function' ? v(s.v) : v; }];
+    },
+    useRef: (current) => slot(() => ({ current })),
+    useMemo: (f) => f(),
+    useEffect: effect,
+    useLayoutEffect: effect,
+  };
+  const render = (inst, C, props, ready) => {
+    cur = inst;
+    inst.at = 0;
+    const out = C(props);
+    ready?.(out);
+    const run = pending;
+    pending = [];
+    for (const [s, fn] of run) {
+      s.cleanup?.();
+      s.cleanup = fn() || null;
+    }
+    return out;
+  };
+  const unmount = (inst) => inst.slots.forEach((s) => s?.cleanup?.());
+  return { lib, render, unmount, instance: () => ({ slots: [], at: 0 }) };
+}
+
+/** The value of attribute `name` in a template from the `html` stub, searched depth-first. */
+function attrOf(tpl, name) {
+  if (Array.isArray(tpl)) {
+    for (const x of tpl) {
+      const v = attrOf(x, name);
+      if (v !== undefined) return v;
+    }
+    return undefined;
+  }
+  if (!tpl || !tpl.strings) return undefined;
+  const i = tpl.strings.findIndex((s) => new RegExp(`\\s${name}=$`).test(s));
+  if (i >= 0) return tpl.values[i];
+  return attrOf(tpl.values, name);
+}
+
+/** A fake window that keeps its listeners. */
+function fakeWindow() {
+  const listeners = {};
+  return {
+    listeners,
+    addEventListener: (type, fn) => (listeners[type] ||= []).push(fn),
+    removeEventListener: (type, fn) => { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); },
+    dispatch(type, e = {}) {
+      const ev = { type, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...e };
+      for (const fn of [...(listeners[type] || [])]) fn(ev);
+      return ev;
+    },
+  };
+}
+
+async function uiModule({ rtl = false, store = {} } = {}) {
+  const H = hookHarness();
+  const window = fakeWindow();
+  const body = { classList: { add() {}, remove() {} } };
+  const document = { body, activeElement: body };
+  const i18n = { t: (s) => s, isRtl: () => rtl.value ?? rtl };
+  const U = await standalone('ui.js', {
+    'lib.js': H.lib, 'icons.js': { Icon() {} },
+    'store.js': { state: { menu: null }, set() {}, openMenu() {}, closeMenu() {}, useStore: () => ({}), ...store },
+    'util.js': { cls: (...a) => a.filter(Boolean).join(' '), keyLabel: (k) => k },
+    'i18n.js': i18n,
+  }, { window, document, innerWidth: 1000, innerHeight: 800, setTimeout, clearTimeout });
+  return { U, H, window, document };
+}
+
+/** The root menu and the submenu open in it, rendered by hand like Preact would. */
+async function menu(items, opts) {
+  const done = [];
+  const { U, H, window, document } = await uiModule({ ...opts, store: { useStore: () => ({ menu: { x: 0, y: 0, items } }) } });
+  const MenuList = H.render(H.instance(), U.MenuHost, {}).values[0];
+  const root = H.instance();
+  let child = null;
+  let out = null;
+  let subOut = null;
+  const focusable = (tpl) => {
+    // Items get elements that take the focus.
+    for (const [i, item] of (tpl.values.find(Array.isArray) || []).entries()) {
+      const ref = item && attrOf(item, 'ref');
+      if (typeof ref === 'function') ref({ i, focus() { document.activeElement = this; } });
+    }
+  };
+  const flush = () => {
+    for (let pass = 0; pass < 3; pass++) {
+      out = H.render(root, MenuList, { items, x: 0, y: 0, onDone: () => done.push('done') }, focusable);
+      const sub = out.values.find(Array.isArray).map((it) => it && attrOf(it, 'items') && it.values.find((v) => v?.values?.[0]?.name === 'SubMenu')).find(Boolean);
+      if (!sub) {
+        if (child) H.unmount(child);
+        child = null;
+        subOut = null;
+        continue;
+      }
+      const props = Object.fromEntries(['items', 'onDone', 'depth', 'keyboard', 'onKeyboard', 'onBack', 'labelledBy', 'nav'].map((k) => [k, attrOf(sub, k)]));
+      child ||= H.instance();
+      subOut = H.render(child, MenuList, { ...props, x: 0, y: 0 }, focusable);
+    }
+  };
+  flush();
+  const itemsOf = (tpl) => tpl.values.find(Array.isArray);
+  const active = (tpl) => itemsOf(tpl).findIndex((it) => it && /\bactive\b/.test(attrOf(it, 'class') || ''));
+  const key = (k) => { window.dispatch('keydown', { key: k }); flush(); };
+  const hover = (i) => { attrOf(itemsOf(out)[i], 'onMouseEnter')(); flush(); };
+  return { done, key, hover, document, window, root: () => out, sub: () => subOut, active, itemsOf };
+}
+
+const fileMenu = (runs) => [
+  { label: 'New', run: () => runs.push('new') },
+  { label: 'Recent', disabled: true, children: [{ label: 'Old', run: () => runs.push('old') }] },
+  '-',
+  { label: 'Export', children: [{ label: 'Folder', run: () => runs.push('folder') }, { label: 'PDF', disabled: true, run: () => runs.push('pdf') }, { label: 'Single', run: () => runs.push('single') }] },
+  { label: 'Close', disabled: true, run: () => runs.push('close') },
+];
+
+test('menus and their submenus work from the keyboard alone', async () => {
+  const runs = [];
+  const m = await menu(fileMenu(runs));
+  assert.match(m.root().strings.join(''), /role="menu"/);
+  m.key('ArrowUp');
+  assert.equal(m.active(m.root()), 3, 'Up from nothing goes to the last enabled item');
+  m.key('ArrowDown');
+  m.key('ArrowDown');
+  assert.equal(m.active(m.root()), 3, 'disabled items and separators are skipped');
+  const exportItem = () => m.itemsOf(m.root())[3];
+  assert.equal(attrOf(exportItem(), 'aria-haspopup'), 'menu');
+  assert.equal(attrOf(exportItem(), 'aria-expanded'), false);
+
+  m.key('ArrowRight');
+  assert.ok(m.sub(), 'Right opens the submenu');
+  assert.equal(attrOf(exportItem(), 'aria-expanded'), true);
+  assert.equal(attrOf(m.sub(), 'aria-labelledby'), attrOf(exportItem(), 'aria-labelledby'), 'the submenu is named by its item');
+  assert.equal(m.active(m.sub()), 0, 'and goes to its first item');
+  assert.equal(m.document.activeElement.i, 0, 'which has the focus');
+  m.key('ArrowDown');
+  assert.equal(m.active(m.sub()), 2, 'Down moves inside the submenu, past its disabled item');
+  assert.equal(m.active(m.root()), 3, 'the parent item stays active');
+  assert.equal(m.window.listeners.keydown.length, 1, 'one menu level has the keyboard');
+
+  m.key('ArrowLeft');
+  assert.equal(m.sub(), null, 'Left closes the submenu');
+  assert.equal(m.active(m.root()), 3);
+  m.key('Enter');
+  assert.equal(m.active(m.sub()), 0, 'Enter opens it too');
+  m.key('Escape');
+  assert.equal(m.sub(), null, 'Escape goes back to the parent item');
+  assert.deepEqual(m.done, [], 'without closing the menu');
+  m.key(' ');
+  m.key('ArrowDown');
+  m.key('ArrowDown');
+  assert.equal(m.active(m.sub()), 0, 'Down wraps around');
+  m.key('ArrowDown');
+  m.key(' ');
+  assert.deepEqual(runs, ['single']);
+  assert.deepEqual(m.done, ['done']);
+});
+
+test('disabled menu items never become active or run', async () => {
+  const runs = [];
+  const m = await menu(fileMenu(runs));
+  assert.equal(attrOf(m.itemsOf(m.root())[4], 'aria-disabled'), 'true');
+  m.hover(4);
+  assert.equal(m.active(m.root()), -1, 'hovering a disabled item leaves it inactive');
+  m.key('Enter');
+  m.key(' ');
+  m.hover(1);
+  assert.equal(m.sub(), null, 'a disabled item opens no submenu');
+  m.key('ArrowRight');
+  assert.equal(m.sub(), null);
+  assert.deepEqual(runs, []);
+  assert.deepEqual(m.done, []);
+  // Hovering a submenu opens it; moving down closes it again.
+  m.hover(3);
+  assert.ok(m.sub());
+  m.key('ArrowDown');
+  assert.equal(m.sub(), null, 'arrow keys close a submenu opened by hovering');
+});
+
+test('in right-to-left languages Left opens a submenu and Right goes back', async () => {
+  const m = await menu(fileMenu([]), { rtl: true });
+  m.key('ArrowUp');
+  m.key('ArrowRight');
+  assert.equal(m.sub(), null);
+  m.key('ArrowLeft');
+  assert.equal(m.active(m.sub()), 0);
+  m.key('ArrowRight');
+  assert.equal(m.sub(), null);
+});
+
+/** A Modal rendered by hand over fake elements. */
+async function modal({ storeState = { menu: null }, focusCaller = false } = {}) {
+  const { U, H, window, document } = await uiModule({ store: { state: storeState } });
+  const el = (name, more = {}) => ({ name, tabIndex: 0, disabled: false, getClientRects: () => [{}], focus() { document.activeElement = this; }, ...more });
+  const editor = { previousElementSibling: null, inert: false };
+  const before = el('canvas', { isConnected: true });
+  document.activeElement = before;
+  const field = el('field');
+  const other = el('other');
+  const cancel = el('cancel');
+  const close = el('close');
+  const inside = [close, field, other, cancel];
+  let popover = null;
+  const dialog = {
+    name: 'dialog', parentElement: { previousElementSibling: editor },
+    contains: (x) => x === dialog || inside.includes(x),
+    querySelectorAll: () => inside,
+    querySelector: (sel) => sel === '.popover' ? popover
+      : sel.includes('modal-body') ? { querySelectorAll: () => [field, other] }
+      : sel.includes('modal-foot') ? { querySelectorAll: () => [cancel] } : null,
+    focus() { document.activeElement = this; },
+  };
+  const closes = [];
+  const inst = H.instance();
+  const out = H.render(inst, U.Modal, { title: 'Settings', onClose: () => closes.push(1), footer: 'x' }, (o) => {
+    attrOf(o, 'ref').current = dialog;
+  });
+  if (focusCaller) other.focus();
+  await new Promise((r) => setTimeout(r, 5));
+  const key = (k, shiftKey = false) => window.dispatch('keydown', { key: k, shiftKey });
+  return { out, document, editor, before, field, other, cancel, close, closes, key, setPopover: (p) => (popover = p), unmount: () => H.unmount(inst) };
+}
+
+test('a dialog takes the focus, keeps Tab inside and gives the focus back', async () => {
+  const d = await modal();
+  assert.equal(attrOf(d.out, 'aria-labelledby'), attrOf(d.out, 'id'), 'the title names the dialog');
+  assert.equal(d.document.activeElement, d.field, 'the first field of the body gets the focus');
+  assert.equal(d.editor.inert, true, 'the page behind is out of reach');
+  d.document.activeElement = d.cancel;
+  assert.ok(d.key('Tab').defaultPrevented);
+  assert.equal(d.document.activeElement, d.close, 'Tab wraps from the last to the first');
+  assert.ok(d.key('Tab', true).defaultPrevented);
+  assert.equal(d.document.activeElement, d.cancel, 'Shift+Tab wraps from the first to the last');
+  d.document.activeElement = d.field;
+  assert.ok(!d.key('Tab').defaultPrevented, 'inside, Tab moves as usual');
+  d.unmount();
+  assert.equal(d.editor.inert, false);
+  assert.equal(d.document.activeElement, d.before, 'the focus goes back where it was');
+});
+
+test('a dialog leaves the focus a caller gives and Escape to an open menu or popover', async () => {
+  const storeState = { menu: null };
+  const d = await modal({ storeState, focusCaller: true });
+  assert.equal(d.document.activeElement, d.other, 'the field the caller focused keeps the focus');
+  storeState.menu = { items: [] };
+  d.key('Escape');
+  d.key('Tab');
+  storeState.menu = null;
+  d.setPopover({});
+  d.key('Escape');
+  assert.deepEqual(d.closes, [], 'the menu or popover closes first');
+  d.setPopover(null);
+  d.key('Escape');
+  assert.deepEqual(d.closes, [1]);
+});
+
+test('a row label names its controls and clicking it focuses the field', async () => {
+  const H = hookHarness();
+  const C = await standalone('controls.js', {
+    'lib.js': H.lib, 'icons.js': { Icon() {} }, 'store.js': { state: {}, registerFlush: () => () => {} },
+    'util.js': { clamp: (v) => v, cls: (...a) => a.filter(Boolean).join(' '), trackPointer() {} },
+    'i18n.js': { t: (s) => s, N_: (s) => s },
+  }, { window: {}, document: {} });
+  let focused = null;
+  const out = H.render(H.instance(), C.Row, { label: 'Size', children: 'field' }, (o) => {
+    attrOf(o, 'ref').current = { querySelector: (sel) => (/input/.test(sel) && !/button/.test(sel) ? { focus: () => (focused = sel) } : null) };
+  });
+  assert.equal(attrOf(out, 'role'), 'group');
+  assert.equal(attrOf(out, 'aria-labelledby'), attrOf(out, 'id'));
+  attrOf(out, 'onClick')();
+  assert.ok(focused, 'the label focuses a field');
+  assert.ok(/:not\(\[type=checkbox\]\)/.test(focused), 'not a checkbox, which a click would toggle');
+  const plain = H.render(H.instance(), C.Row, { children: 'toggle' });
+  assert.equal(attrOf(plain, 'role'), undefined, 'a row without a label is no group');
+});
+
+test('drags end on pointer cancel and when their component goes away', async () => {
+  const window = fakeWindow();
+  const U = await standalone('util.js', { 'i18n.js': { t: (s) => s, language: () => 'en' } }, { window, navigator: { platform: 'Linux' } });
+  const ends = [];
+  const moves = [];
+  U.trackPointer((ev) => moves.push(ev.clientY), (ev) => ends.push(ev && ev.clientY));
+  window.dispatch('pointermove', { clientY: 5 });
+  window.dispatch('pointerup', { clientY: 9 });
+  window.dispatch('pointermove', { clientY: 7 });
+  assert.deepEqual([moves, ends], [[5], [9]], 'pointerup ends with its event');
+  U.trackPointer(() => {}, (ev) => ends.push(ev));
+  window.dispatch('pointercancel', { clientY: 0 });
+  assert.deepEqual(ends, [9, null], 'a cancelled drag ends with nothing to drop');
+  const stop = U.trackPointer(() => {}, (ev) => ends.push(ev));
+  stop();
+  stop();
+  window.dispatch('pointerup', { clientY: 3 });
+  assert.deepEqual(ends, [9, null, null], 'stopping ends it once');
+  assert.ok(['pointermove', 'pointerup', 'pointercancel'].every((t) => !window.listeners[t].length), 'no listener is left');
+});
+
+test('presenter pauses stay paused and notes keep their scroll during builds', async () => {
+  const els = {};
+  const $ = (id) => (els[id] ||= {
+    id, textContent: '', scrollTop: 0, style: { setProperty() {} }, title: '',
+    classList: { set: new Set(), toggle(c, on) { if (on) this.set.add(c); else this.set.delete(c); }, contains(c) { return this.set.has(c); } },
+    setAttribute() {}, addEventListener() {}, click() {},
+    contentWindow: null, contentDocument: null,
+  });
+  let onState = null;
+  const data = { width: 1280, height: 720, title: 'Talk', language: 'en', slides: [{ id: 's1', notes: 'Long notes' }, { id: 's2', notes: 'More notes' }] };
+  const tauri = {
+    core: { invoke: async (name) => (name === 'present_data' ? data : undefined) },
+    event: { listen: (name, fn) => { if (name === 'cz-present-state') onState = fn; }, emit() {} },
+  };
+  const context = vm.createContext({
+    window: { addEventListener() {}, __TAURI__: tauri }, location: { search: '?doc=d1' }, URLSearchParams,
+    document: { getElementById: $, addEventListener() {}, querySelectorAll: () => [], documentElement: { style: { setProperty() {} } }, title: '' },
+    setInterval() {}, setTimeout: () => 0, localStorage: { getItem: () => null, setItem() {} }, console,
+  });
+  new vm.Script(fs.readFileSync(path.join(root, 'presenter.js'), 'utf8'), { filename: 'presenter.js' }).runInContext(context);
+  await tick();
+  const state = (slideId, extra = {}) => onState({ payload: { doc: 'd1', slideId, index: 0, total: 2, state: {}, ...extra } });
+  // Reset redraws the timer, whose button says what it would do.
+  state('s1', { started: true });
+  $('timer-reset').onclick();
+  assert.equal($('timer-toggle').textContent, 'Pause', 'the show starts the timer');
+  $('timer-toggle').onclick();
+  assert.equal($('timer-toggle').textContent, 'Resume');
+  $('notes').scrollTop = 120;
+  state('s1');
+  state('s1', { paused: true });
+  $('timer-reset').onclick();
+  assert.equal($('timer-toggle').textContent, 'Resume', 'builds, blackouts and syncs leave the timer paused');
+  assert.equal($('notes').scrollTop, 120, 'and the notes where they were scrolled');
+  assert.equal($('notes').textContent, 'Long notes');
+  state('s2');
+  assert.equal($('notes').textContent, 'More notes');
+  assert.equal($('notes').scrollTop, 0, 'another slide starts at the top of its notes');
 });
