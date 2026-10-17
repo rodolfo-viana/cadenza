@@ -92,7 +92,7 @@ export function parseRows(text, delimiter = delimiterOf(text)) {
     else if (c !== '\r') cell += c;
   }
   endRow();
-  const width = Math.max(0, ...rows.map((r) => r.length));
+  const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
   return rows.map((r) => [...r, ...Array(width - r.length).fill('')]);
 }
 
@@ -281,7 +281,9 @@ export function chartData(table, roles) {
   const g = roles.indexOf('group');
   if (g >= 0 && series.length) {
     // One row per label (rows of each group in turn without labels); each
-    // group's rows go in their group's series.
+    // group's rows go in their group's series. A label repeated within a
+    // group takes its first row with a value (see repeatedRows), and the
+    // error bars of that same row.
     const groups = columns[g].cells;
     const kinds = [...new Set(groups.filter((c) => c !== ''))];
     const seen = new Map(kinds.map((k) => [k, 0]));
@@ -293,25 +295,48 @@ export function chartData(table, roles) {
     });
     labels = [...new Set(keys.filter((k) => k !== null))];
     const at = new Map(labels.map((l, r) => [l, r]));
-    const pick = (list, k) => {
-      const out = labels.map(() => null);
+    const rowsOf = (values, k) => {
+      const out = labels.map(() => -1);
       groups.forEach((group, i) => {
         const r = at.get(keys[i]);
-        if (group === k && r !== undefined && out[r] === null) out[r] = list[i] ?? null;
+        if (group !== k || r === undefined) return;
+        if (out[r] < 0 || (values[out[r]] === null && values[i] !== null)) out[r] = i;
       });
       return out;
     };
     series = series.flatMap((s) =>
-      kinds.map((k) => ({
-        ...s,
-        name: series.length > 1 ? `${s.name} · ${k}` : k,
-        values: pick(s.values, k),
-        low: s.low.length ? pick(s.low, k) : [],
-        high: s.high.length ? pick(s.high, k) : [],
-      })),
+      kinds.map((k) => {
+        const rows = rowsOf(s.values, k);
+        const pick = (list) => rows.map((i) => (i < 0 ? null : list[i] ?? null));
+        return {
+          ...s,
+          name: series.length > 1 ? `${s.name} · ${k}` : k,
+          values: pick(s.values),
+          low: s.low.length ? pick(s.low) : [],
+          high: s.high.length ? pick(s.high) : [],
+        };
+      }),
     );
   }
   return { labels, series, errorBars };
+}
+
+/**
+ * How many rows repeat the group and label of an earlier row: chartData
+ * charts only the first value of each pair.
+ */
+export function repeatedRows(table, roles) {
+  const [g, label] = [roles.indexOf('group'), roles.indexOf('label')];
+  if (g < 0 || label < 0) return 0;
+  const seen = new Set();
+  let n = 0;
+  table.columns[g].cells.forEach((group, i) => {
+    if (group === '') return;
+    const pair = JSON.stringify([group, table.columns[label].cells[i]]);
+    if (seen.has(pair)) n++;
+    else seen.add(pair);
+  });
+  return n;
 }
 
 /** Links between named nodes: from the labels to the groups, as much as the first values. */

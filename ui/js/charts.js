@@ -204,6 +204,48 @@ export function switchChart(c, kind) {
   return patch;
 }
 
+/**
+ * Rows of a chart's data grid: its labels or its longest series, as chart.rs
+ * counts them (rows). Labels are optional: scatterplots made from numbers
+ * keep their points in the series alone.
+ */
+export const chartRows = (c) => c.series.reduce((n, s) => Math.max(n, s.values.length), c.labels.length);
+
+/** `list` as `n` cells: its own, then `empty` ones. */
+const padTo = (list, n, empty = null) => Array.from({ length: n }, (_, j) => list?.[j] ?? empty);
+
+/** Data with cell `i` of series `k` set: its value, or with `key` 'low' or 'high', an error bar. */
+export function setChartCell(c, k, i, v, key = 'values') {
+  const n = chartRows(c);
+  return { series: c.series.map((s, j) => (j === k ? { ...s, [key]: padTo(s[key], n).map((x, r) => (r === i ? v : x)) } : s)) };
+}
+
+/** Data with the label of row `i` set (rows before it get blank ones). */
+export const setChartLabel = (c, i, v) => ({ labels: padTo(c.labels, Math.max(chartRows(c), i + 1), '').map((l, j) => (j === i ? v : l)) });
+
+/** Data with a row added: zero in each series, labeled unless the rows have no labels. */
+export function addChartRow(c) {
+  const n = chartRows(c);
+  return {
+    labels: n > 0 && !c.labels.length ? [] : [...padTo(c.labels, n, ''), t('Item {n}', { n: n + 1 })],
+    series: c.series.map((s) => ({
+      ...s,
+      values: [...padTo(s.values, n), 0],
+      low: s.low?.length ? [...padTo(s.low, n), null] : [],
+      high: s.high?.length ? [...padTo(s.high, n), null] : [],
+    })),
+  };
+}
+
+/** Data without row `i`: its label, values and error bars. */
+export function deleteChartRow(c, i) {
+  const other = (_, j) => j !== i;
+  return {
+    labels: c.labels.filter(other),
+    series: c.series.map((s) => ({ ...s, values: s.values.filter(other), low: (s.low || []).filter(other), high: (s.high || []).filter(other) })),
+  };
+}
+
 /** What a build by series reveals one step at a time ('' when it can't). */
 export function buildUnit(c) {
   const kind = chartKind(c);
@@ -248,7 +290,7 @@ export function sankeyColumns(g) {
     }
     if (!changed) break;
   }
-  const last = Math.max(0, ...col);
+  const last = col.reduce((a, b) => Math.max(a, b), 0);
   return col.map((c, i) => (g.links.some((l) => l[0] === i) ? c : last));
 }
 
@@ -265,7 +307,7 @@ export function chartSteps(c) {
     case '':
       return 0;
     case 'column':
-      return chartKind(c) === 'sankey' ? Math.max(0, ...sankeyColumns(graph(c, true))) : n;
+      return chartKind(c) === 'sankey' ? sankeyColumns(graph(c, true)).reduce((a, b) => Math.max(a, b), 0) : n;
     default:
       return chartKind(c) === 'scatter' ? Math.max(n - 1, Math.min(n, 1)) : n;
   }

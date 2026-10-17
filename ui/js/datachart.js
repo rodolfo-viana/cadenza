@@ -8,7 +8,7 @@ import { Select, Toggle } from './controls.js';
 import { Icon } from './icons.js';
 import { invoke, dialog } from './api.js';
 import { t, tn, language } from './i18n.js';
-import { readTable, guessRoles, chartChoices, toCsv, ROLES } from './chartdata.js';
+import { readTable, guessRoles, chartChoices, repeatedRows, toCsv, ROLES } from './chartdata.js';
 import { CHART_ICONS, ERROR_MODES, hasErrorBars } from './charts.js';
 import { insert } from './actions.js';
 import { cls } from './util.js';
@@ -131,6 +131,7 @@ export function ChartData({ target = null }) {
           .filter(Boolean)
           .join(' · ')
       : t('No column of numbers to chart. Mark one as Values.');
+  const repeated = series.length ? repeatedRows(table, roles) : 0;
   const svgs = previews.key === previewKey ? previews.svgs : [];
 
   return html`<${Modal} title=${el ? t('Chart Data') : t('Chart from Data')} width=${1040} class="dc-modal" onClose=${closeModal}>
@@ -166,6 +167,14 @@ export function ChartData({ target = null }) {
           )}
         </div>`}
         ${summary && html`<p class="ihint">${summary}</p>`}
+        ${repeated > 0 &&
+        html`<p class="ihint">
+          ${tn(
+            '{n} row repeats the group and label of an earlier row. Only the first value is charted.',
+            '{n} rows repeat the group and label of an earlier row. Only the first value is charted.',
+            repeated,
+          )}
+        </p>`}
         ${errors && !choices.some((c) => hasErrorBars(c.kind)) && html`<p class="ihint">${t('Error bars show on column, bar, line and dot charts.')}</p>`}
       </div>
       <div class="dc-gallery">
@@ -225,7 +234,7 @@ function fitsEnds(content, min, max) {
     }),
   );
   if (!values.length) return true;
-  const [lo, hi] = [Math.min(...values), Math.max(...values)];
+  const [lo, hi] = values.reduce(([a, b], v) => [Math.min(a, v), Math.max(b, v)], [Infinity, -Infinity]);
   const [a, b] = [min ?? Math.min(lo, 0), max ?? Math.max(hi, 0)];
   return lo >= a && hi <= b && hi - lo >= (b - a) * 0.25;
 }

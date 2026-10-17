@@ -7,7 +7,23 @@
 use std::fmt::Write as _;
 
 use crate::model::ChartContent;
-use crate::util::{css_value, esc, num};
+use crate::util::{css_value, esc};
+
+/// A number of the SVG. `util::num` writes what is not finite as 0, which
+/// would hide broken geometry: debug builds (and tests) stop at it instead.
+fn num(v: f64) -> String {
+    debug_assert!(v.is_finite(), "a chart computed {v}");
+    crate::util::num(v)
+}
+
+/// The largest size charts compute with: larger values are drawn as if they
+/// were this large, so that sums, spans and rounding out to nice ends stay
+/// finite.
+const LIMIT: f64 = 1e300;
+
+fn capped(v: f64) -> f64 {
+    v.clamp(-LIMIT, LIMIT)
+}
 
 pub const CHART_TYPES: &[(&str, &str)] = &[
     ("column", "Column"),
@@ -89,8 +105,12 @@ pub fn nice_scale(min: f64, max: f64, ticks: usize) -> (f64, f64, f64) {
 
 /// Picks "nice" axis bounds and step around a value range.
 pub fn nice_range(min: f64, max: f64, ticks: usize) -> (f64, f64, f64) {
-    let (mut lo, mut hi) = (min, max);
-    if (hi - lo).abs() < f64::EPSILON {
+    // Ends too small to tell from zero count as zero, and ends too close
+    // together for their size get room around them: the step stays a
+    // normal number that splits the span into a few parts.
+    let end = |v: f64| if v.abs() < 1.0 / LIMIT { 0.0 } else { capped(v) };
+    let (mut lo, mut hi) = (end(min), end(max));
+    if (hi - lo).abs() < f64::EPSILON.max(lo.abs().max(hi.abs()) * 1e-12) {
         let pad = if lo == 0.0 { 1.0 } else { lo.abs() * 0.1 };
         lo -= if lo == 0.0 { 0.0 } else { pad };
         hi += pad;
@@ -115,14 +135,38 @@ pub fn nice_range(min: f64, max: f64, ticks: usize) -> (f64, f64, f64) {
     (lo, hi, step)
 }
 
+/// A data value as labels show it: two decimals at most (in thousands from
+/// 10,000, in millions from a million), but never fewer than two
+/// significant digits, and in scientific notation when tiny or huge.
 pub(crate) fn fmt_value(v: f64) -> String {
-    if v.abs() >= 1_000_000.0 {
+    let a = v.abs();
+    if a == 0.0 {
+        "0".into()
+    } else if !(1e-4..1e15).contains(&a) {
+        sci(v, 2)
+    } else if a >= 1_000_000.0 {
         format!("{}M", num(v / 1_000_000.0))
-    } else if v.abs() >= 10_000.0 {
+    } else if a >= 10_000.0 {
         format!("{}k", num(v / 1000.0))
-    } else {
+    } else if a >= 0.1 {
         num(v)
+    } else {
+        let decimals = (1.0 - a.log10().floor()) as usize;
+        let text = format!("{v:.decimals$}");
+        text.trim_end_matches('0').trim_end_matches('.').to_string()
     }
+}
+
+/// `v` in scientific notation, with at most `decimals` decimals ("2.5e-7").
+fn sci(v: f64, decimals: usize) -> String {
+    let text = format!("{v:.decimals$e}");
+    let (mantissa, exp) = text.split_once('e').unwrap_or((&text, "0"));
+    let mantissa = if mantissa.contains('.') {
+        mantissa.trim_end_matches('0').trim_end_matches('.')
+    } else {
+        mantissa
+    };
+    format!("{mantissa}e{exp}")
 }
 
 /// Chart builds by series: the build-in effect and the step of the first
@@ -170,7 +214,7 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
                 .labels
                 .iter()
                 .enumerate()
-                .map(|(i, l)| (format!("{l} ({})", seats.get(i).unwrap_or(&0)), slice_color(i)))
+                .map(|(i, l)| (format!("{l} ({})", fmt_value(seats.get(i).copied().unwrap_or(0.0))), slice_color(i)))
                 .collect()
         }
         _ if by_label => chart.labels.iter().enumerate().map(|(i, l)| (l.clone(), slice_color(i))).collect(),
@@ -274,7 +318,8 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
         return;
     }
     let ns = chart.series.len();
-    let value = |s: usize, i: usize| chart.series[s].value(i).unwrap_or(0.0);
+    let label = |s: usize, i: usize| fmt_value(chart.series[s].value(i).unwrap_or(0.0));
+    let value = |s: usize, i: usize| capped(chart.series[s].value(i).unwrap_or(0.0));
     // Rows without a value get no point, bar or error bar (areas still
     // pass through zero there).
     let has = |s: usize, i: usize| chart.series[s].value(i).is_some();
@@ -395,7 +440,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
         }
     }
     // Baseline: zero, or the end of the axis nearest to it.
-    let zero = vpos(0.0f64.clamp(axis.lo, axis.hi));
+    let zero = vpos(0.0f64.max(axis.lo).min(axis.hi));
     if horizontal {
         let _ = write!(
             svg,
@@ -488,7 +533,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                             num(*x),
                             num(y - f * 0.6),
                             num(f * 0.8),
-                            fmt_value(value(s, k))
+                            label(s, k)
                         );
                     }
                 }
@@ -532,7 +577,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                         error_bar(svg, horizontal, across, (vpos(ea), vpos(eb)), (bw * 0.25).min(f * 0.5), f);
                     }
                     if chart.show_values && v != 0.0 {
-                        let label = fmt_value(v);
+                        let text = label(s, i);
                         if horizontal {
                             let _ = write!(
                                 svg,
@@ -540,7 +585,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                                 num(x + rw + f * 0.3),
                                 num(y + rh / 2.0),
                                 num(f * 0.8),
-                                label
+                                text
                             );
                         } else {
                             let _ = write!(
@@ -549,7 +594,7 @@ fn axis_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, st
                                 num(x + rw / 2.0),
                                 num(y - f * 0.35),
                                 num(f * 0.8),
-                                label
+                                text
                             );
                         }
                     }
@@ -661,9 +706,10 @@ impl Axis {
         Axis { lo, hi, step }
     }
 
-    /// Where `v` falls between the ends: 0 at `lo`, 1 at `hi`.
+    /// Where `v` falls between the ends: 0 at `lo`, 1 at `hi`. Values far
+    /// beyond ends of its own (cut off anyway) stop a million spans out.
     fn t(self, v: f64) -> f64 {
-        (v - self.lo) / (self.hi - self.lo)
+        ((capped(v) - self.lo) / (self.hi - self.lo)).clamp(-1e6, 1e6)
     }
 
     /// The multiples of the step from one end to the other.
@@ -671,7 +717,7 @@ impl Axis {
         let first = (self.lo / self.step - 1e-6).ceil() as i64;
         let last = (self.hi / self.step + 1e-6).floor() as i64;
         let step = self.step;
-        (first..=last.min(first + 100)).map(move |k| k as f64 * step)
+        (first..=last.min(first.saturating_add(100))).map(move |k| k as f64 * step)
     }
 }
 
@@ -688,8 +734,8 @@ fn value_axis(chart: &ChartContent, data: Option<(f64, f64)>, from_zero: bool) -
         lo = lo.min(0.0);
         hi = hi.max(0.0);
     }
-    let min = chart.axis_min.filter(|v| v.is_finite());
-    let max = chart.axis_max.filter(|v| v.is_finite());
+    let min = chart.axis_min.filter(|v| v.is_finite()).map(capped);
+    let max = chart.axis_max.filter(|v| v.is_finite()).map(capped);
     let (a, b) = (min.unwrap_or(lo), max.unwrap_or(hi));
     if b <= a {
         // Ends that leave no room: the data decides.
@@ -705,7 +751,13 @@ fn value_axis(chart: &ChartContent, data: Option<(f64, f64)>, from_zero: bool) -
 
 /// An axis label, with as many decimals as the step between labels needs.
 fn fmt_tick(v: f64, step: f64) -> String {
-    if v.abs() >= 10_000.0 {
+    let a = v.abs();
+    if a >= 1e15 || (a > 0.0 && a < 1e-4 && step < 1e-6) {
+        // Scientific notation, with the digits that tell labels apart.
+        let decimals = a.log10().floor() - (step / 4.0).log10().floor();
+        return sci(v, decimals.clamp(0.0, 15.0) as usize);
+    }
+    if a >= 10_000.0 {
         return fmt_value(v);
     }
     let mut decimals = 0;
@@ -729,8 +781,9 @@ fn fmt_tick(v: f64, step: f64) -> String {
 /// (low, high); `None` when it has none.
 fn error_span(chart: &ChartContent, s: usize, i: usize, v: f64) -> Option<(f64, f64)> {
     let series = chart.series.get(s)?;
-    let at = |list: &[Option<f64>]| list.get(i).copied().flatten().filter(|x| x.is_finite());
+    let at = |list: &[Option<f64>]| list.get(i).copied().flatten().filter(|x| x.is_finite()).map(capped);
     let (low, high) = (at(&series.low), at(&series.high));
+    let v = capped(v);
     if low.is_none() && high.is_none() {
         return None;
     }
@@ -984,7 +1037,7 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
     let values: Vec<f64> = chart
         .series
         .first()
-        .map(|s| (0..s.values.len()).map(|i| s.value(i).map_or(0.0, |v| v.max(0.0))).collect())
+        .map(|s| (0..s.values.len()).map(|i| s.value(i).map_or(0.0, |v| capped(v).max(0.0))).collect())
         .unwrap_or_default();
     let total: f64 = values.iter().sum();
     if total <= 0.0 {
@@ -1080,13 +1133,15 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
             let mid = angle + sweep / 2.0;
             let lr = if hole > 0.0 { (r + hole) / 2.0 } else { r * 0.62 };
             let pct = v / total * 100.0;
+            // Whole percents, but a slice too thin for one still shows its share.
+            let text = if pct < 0.5 { fmt_value(pct) } else { num(pct.round()) };
             let _ = write!(
                 svg,
                 r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-weight="600" style="fill:#fff" font-size="{}">{}%</text>"#,
                 num(cx + lr * mid.cos()),
                 num(cy + lr * mid.sin()),
                 num(f * 0.85),
-                num(pct.round())
+                text
             );
         }
         close_step(svg, steps);
@@ -1216,7 +1271,7 @@ fn stream_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, 
     if n == 0 || m == 0 {
         return;
     }
-    let v = |s: usize, i: usize| chart.series[s].value(i).unwrap_or(0.0).max(0.0);
+    let v = |s: usize, i: usize| capped(chart.series[s].value(i).unwrap_or(0.0)).max(0.0);
     let totals: Vec<f64> = (0..n).map(|i| (0..m).map(|s| v(s, i)).sum()).collect();
     let top = totals.iter().cloned().fold(0.0, f64::max);
     if top <= 0.0 {
@@ -1236,7 +1291,6 @@ fn stream_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, 
     } else {
         ((0..n).collect(), (0..n).map(|i| plot.x + i as f64 * plot.w / (n - 1) as f64).collect())
     };
-    let scale = plot.h / top;
     let mid = plot.y + plot.h / 2.0;
     if chart.show_grid {
         for x in &xs {
@@ -1252,7 +1306,8 @@ fn stream_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, 
     let mut cum = vec![0.0f64; n];
     for s in 0..m {
         open_step(svg, steps, s as u32);
-        let y = |val: f64| mid - val * scale;
+        // Shares of the fullest column first: tiny totals cannot overflow.
+        let y = |val: f64| mid - val / top * plot.h;
         let lower: Vec<Point> = cols.iter().zip(&xs).map(|(&i, &x)| (x, y(cum[i] - totals[i] / 2.0))).collect();
         for (i, c) in cum.iter_mut().enumerate() {
             *c += v(s, i);
@@ -1377,8 +1432,9 @@ fn scale_color(chart: &ChartContent) -> String {
 /// How strongly a value is colored: 0.1 (lowest) to 1 (highest); halfway
 /// when all values are alike.
 pub(crate) fn heat(v: f64, (lo, hi): (f64, f64)) -> f64 {
-    let t = if hi > lo { (v - lo) / (hi - lo) } else { 0.5 };
-    0.1 + 0.9 * t.clamp(0.0, 1.0)
+    // Halved first, so that the span of extreme values stays finite.
+    let t = (v / 2.0 - lo / 2.0) / (hi / 2.0 - lo / 2.0);
+    0.1 + 0.9 * if t.is_nan() { 0.5 } else { t.clamp(0.0, 1.0) }
 }
 
 fn heatmap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
@@ -1501,14 +1557,15 @@ fn heat_legend(svg: &mut String, (lo, hi): (f64, f64), color: &str, w: f64, cy: 
 /// per value, in the order given; zero and negative values get none.
 fn squarify(values: &[f64], area: Rect) -> Vec<Option<Rect>> {
     let mut out = vec![None; values.len()];
-    let mut order: Vec<usize> = (0..values.len()).filter(|&i| values[i].is_finite() && values[i] > 0.0).collect();
-    let total: f64 = order.iter().map(|&i| values[i]).sum();
+    let value = |i: usize| values[i].min(LIMIT);
+    let mut order: Vec<usize> = (0..values.len()).filter(|&i| values[i] > 0.0).collect();
+    let total: f64 = order.iter().map(|&i| value(i)).sum();
     if total <= 0.0 || area.w <= 0.0 || area.h <= 0.0 {
         return out;
     }
     order.sort_by(|a, b| values[*b].total_cmp(&values[*a]));
-    let scale = area.w * area.h / total;
-    let size = |k: usize| values[order[k]] * scale;
+    // Shares first: tiny totals cannot overflow.
+    let size = |k: usize| value(order[k]) / total * (area.w * area.h);
     let mut rest = area;
     let mut i = 0;
     while i < order.len() {
@@ -1659,14 +1716,40 @@ fn treemap_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64,
 // Parliament: seats as dots in a half circle, party by party
 // ---------------------------------------------------------------------------
 
-/// Seats per party (row) of the first series; at most 2,000 in all.
-fn parliament_seats(chart: &ChartContent) -> Vec<u32> {
-    let raw: Vec<f64> = chart.series.first().map_or_else(Vec::new, |s| {
+/// Seats per party (row) of the first series, in whole seats.
+fn parliament_seats(chart: &ChartContent) -> Vec<f64> {
+    chart.series.first().map_or_else(Vec::new, |s| {
         (0..s.values.len()).map(|i| s.value(i).filter(|v| *v > 0.0).map_or(0.0, f64::round)).collect()
-    });
-    let total: f64 = raw.iter().sum();
-    let k = if total > 2000.0 { 2000.0 / total } else { 1.0 };
-    raw.iter().map(|v| (v * k).round() as u32).collect()
+    })
+}
+
+/// Dots per party: one per seat, or past 2,000 seats in all, 2,000 shared
+/// out in proportion (largest remainders first). A party too small for a
+/// dot of its own still gets one, from the party with the most.
+fn parliament_dots(seats: &[f64]) -> Vec<u32> {
+    const MOST: u32 = 2000;
+    let total: f64 = seats.iter().map(|v| capped(*v)).sum();
+    if total <= MOST as f64 {
+        return seats.iter().map(|v| *v as u32).collect();
+    }
+    let share: Vec<f64> = seats.iter().map(|v| capped(*v) / total * MOST as f64).collect();
+    let mut dots: Vec<u32> = share.iter().map(|s| s.floor() as u32).collect();
+    let mut order: Vec<usize> = (0..seats.len()).collect();
+    order.sort_by(|a, b| (share[*b] - share[*b].floor()).total_cmp(&(share[*a] - share[*a].floor())).then(a.cmp(b)));
+    let short = MOST.saturating_sub(dots.iter().sum());
+    for &i in order.iter().take(short as usize) {
+        dots[i] += 1;
+    }
+    let mut most: std::collections::BinaryHeap<(u32, usize)> = dots.iter().copied().zip(0..).collect();
+    for i in 0..seats.len() {
+        if seats[i] > 0.0 && dots[i] == 0 {
+            let Some((n, j)) = most.pop().filter(|(n, _)| *n > 1) else { break };
+            dots[j] -= 1;
+            dots[i] = 1;
+            most.push((n - 1, j));
+        }
+    }
+    dots
 }
 
 /// Seat positions (angle, radius as a share of the outer radius) for
@@ -1718,7 +1801,8 @@ fn parliament_layout(total: u32) -> (Vec<(f64, f64)>, f64) {
 
 fn parliament_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, steps: Option<SeriesSteps>) {
     let seats = parliament_seats(chart);
-    let total: u32 = seats.iter().sum();
+    let dots = parliament_dots(&seats);
+    let total: u32 = dots.iter().sum();
     if total == 0 {
         return;
     }
@@ -1729,7 +1813,7 @@ fn parliament_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f
     let dot = radius * d * 0.4;
     let mut next = layout.iter();
     let mut step = 0;
-    for (i, &n) in seats.iter().enumerate() {
+    for (i, &n) in dots.iter().enumerate() {
         if n == 0 {
             continue;
         }
@@ -1755,7 +1839,7 @@ fn parliament_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f
             num(cx),
             num(cy - dot),
             num(f * 1.6),
-            total
+            fmt_value(seats.iter().map(|v| capped(*v)).sum())
         );
     }
 }
@@ -1857,7 +1941,7 @@ fn graph(chart: &ChartContent, flows: bool) -> Graph {
     for l in &chart.links {
         let (a, b) = (l.from.trim(), l.to.trim());
         let v = if l.value.is_finite() && l.value > 0.0 {
-            l.value
+            l.value.clamp(1.0 / LIMIT, LIMIT)
         } else if flows {
             continue;
         } else {
@@ -2711,5 +2795,165 @@ mod tests {
         let svg = chart_svg(&pie, 400.0, 400.0, steps);
         assert_eq!(svg.matches("class=\"fragment").count(), 2, "zero slices take no step");
         assert!(svg.contains(r#"data-fragment-index="4""#));
+    }
+
+    #[test]
+    fn extreme_values_draw_finite_charts() {
+        const EPS: f64 = f64::EPSILON;
+        // Values of the series, and the ends given to the value axis.
+        type Case = (&'static [&'static [f64]], Option<f64>, Option<f64>);
+        let cases: &[Case] = &[
+            (&[&[-1e308, 1e308]], None, None),
+            (&[&[-9e307, 9e307], &[f64::MAX, -f64::MAX]], None, None),
+            // Stacked, these add up past the largest number there is.
+            (&[&[1e308, 1e308], &[1e308, 1e308], &[1e308, 1e308], &[1e308, 1e308]], None, None),
+            (&[&[-1e308, 1e308], &[1e308, 1e308], &[-1e308, -1e308], &[1e308, -1e308]], None, None),
+            (&[&[1.0, 1.0 + EPS], &[1.0, 1.0]], None, None),
+            (&[&[1e300, 1e300 * (1.0 + 4.0 * EPS)]], None, None),
+            (&[&[5e-324, 1e-323], &[-5e-324, 0.0]], None, None),
+            (&[&[1e-310, 1e-310]], None, None),
+            (&[&[1.0, 2.0], &[-1e308, 1e308]], Some(-1e308), Some(1e308)),
+            (&[&[1e308, -1e308]], Some(0.0), Some(1e-300)),
+            (&[&[3.0, 4.0]], Some(1.0), Some(1.0 + EPS)),
+            (&[&[3.0, 4.0]], Some(1e308), None),
+            (&[&[3.0, 4.0]], None, Some(-1e308)),
+        ];
+        for (k, (values, min, max)) in cases.iter().enumerate() {
+            for (kind, _) in CHART_TYPES {
+                let mut c = ChartContent {
+                    chart: kind.to_string(),
+                    labels: vec!["Brazil".into(), "France".into()],
+                    series: values.iter().map(|v| series(v)).collect(),
+                    axis_min: *min,
+                    axis_max: *max,
+                    error_bars: "amounts".into(),
+                    ref_lines: vec![crate::model::RefLine {
+                        value: -f64::MAX,
+                        label: "far".into(),
+                    }],
+                    links: flows(&[("A", "B", values[0][0].abs()), ("B", "C", values[0][1].abs()), ("A", "C", values[0][1].abs())]),
+                    show_values: true,
+                    ..Default::default()
+                };
+                for s in &mut c.series {
+                    s.low = vec![Some(f64::MAX), Some(1e-320)];
+                    s.high = vec![Some(1e-320), Some(-f64::MAX)];
+                }
+                // Debug builds check every number written (see `num`), so
+                // geometry gone wrong on the way fails here too.
+                let svg = std::panic::catch_unwind(|| chart_svg(&c, 800.0, 450.0, None)).unwrap_or_else(|_| panic!("{kind}, case {k}"));
+                for bad in ["NaN", "inf", "9223372036854775807"] {
+                    assert!(!svg.contains(bad), "{kind}, case {k}: {svg}");
+                }
+            }
+        }
+        // Opposite extremes still make bars of equal length on both sides.
+        let c = ChartContent {
+            series: vec![series(&[-1e308, 1e308])],
+            labels: vec!["A".into(), "B".into()],
+            show_legend: false,
+            ..Default::default()
+        };
+        let svg = chart_svg(&c, 800.0, 450.0, None);
+        let heights: Vec<f64> = svg
+            .match_indices(r#" height=""#)
+            .skip(1)
+            .map(|(i, _)| svg[i + 9..].split('"').next().unwrap().parse().unwrap())
+            .collect();
+        assert_eq!(heights.len(), 2, "{svg}");
+        assert!(heights[0] > 100.0 && (heights[0] - heights[1]).abs() < 0.02, "{heights:?}");
+    }
+
+    #[test]
+    fn values_keep_their_digits_in_labels() {
+        for (v, text) in [
+            (0.0, "0"),
+            (-0.0, "0"),
+            (1.23456, "1.23"),
+            (0.5, "0.5"),
+            (0.123, "0.12"),
+            (0.0123, "0.012"),
+            (0.001, "0.001"),
+            (0.0025, "0.0025"),
+            (-0.0012, "-0.0012"),
+            (0.00005, "5e-5"),
+            (-2.5e-7, "-2.5e-7"),
+            (1234.5, "1234.5"),
+            (12_500.0, "12.5k"),
+            (2_250_000.0, "2.25M"),
+            (-1_500_000.0, "-1.5M"),
+            (1e30, "1e30"),
+            (-1.234e20, "-1.23e20"),
+            (f64::MAX, "1.8e308"),
+        ] {
+            assert_eq!(fmt_value(v), text, "{v}");
+        }
+        // Axis labels of huge or tiny steps still tell their values apart.
+        assert_eq!(fmt_tick(1.25e15, 2.5e14), "1.25e15");
+        assert_eq!(fmt_tick(2e15, 5e14), "2e15");
+        assert_eq!(fmt_tick(4e-9, 2e-9), "4e-9");
+        assert_eq!(fmt_tick(0.0, 2e-9), "0");
+        assert_eq!(fmt_tick(1e300, 2e299), "1e300");
+
+        // Data labels and legends show small values as they are.
+        let heat = ChartContent {
+            chart: "heatmap".into(),
+            labels: vec!["a".into(), "b".into()],
+            series: vec![series(&[0.001, 0.002]), series(&[0.0015, 0.0025])],
+            show_values: true,
+            ..Default::default()
+        };
+        let svg = chart_svg(&heat, 800.0, 450.0, None);
+        // The lowest and highest are in a cell and at an end of the legend.
+        for (text, count) in [(">0.001<", 2), (">0.002<", 1), (">0.0015<", 1), (">0.0025<", 2)] {
+            assert_eq!(svg.matches(text).count(), count, "{text}: {svg}");
+        }
+        assert!(!svg.contains(">0<"), "{svg}");
+        let column = ChartContent {
+            series: vec![series(&[0.001, 0.0042])],
+            labels: vec!["a".into(), "b".into()],
+            show_values: true,
+            ..Default::default()
+        };
+        let svg = chart_svg(&column, 800.0, 450.0, None);
+        assert!(svg.contains(">0.001</text>") && svg.contains(">0.0042</text>"), "{svg}");
+        let pie = ChartContent {
+            chart: "pie".into(),
+            series: vec![series(&[996.0, 4.0])],
+            labels: vec!["a".into(), "b".into()],
+            show_values: true,
+            ..Default::default()
+        };
+        let svg = chart_svg(&pie, 800.0, 450.0, None);
+        assert!(svg.contains(">100%<") && svg.contains(">0.4%<"), "a thin slice is not 0%: {svg}");
+    }
+
+    #[test]
+    fn parliament_labels_keep_the_seats_given() {
+        let chart = |seats: &[f64]| ChartContent {
+            chart: "parliament".into(),
+            labels: (0..seats.len()).map(|i| format!("P{i}")).collect(),
+            series: vec![series(seats)],
+            show_values: true,
+            ..Default::default()
+        };
+        // Up to 2,000 seats, a dot per seat.
+        assert_eq!(parliament_dots(&[120.0, 0.0, 1.0]), [120, 0, 1]);
+        let svg = chart_svg(&chart(&[1500.0, 1500.0]), 800.0, 450.0, None);
+        assert!(svg.contains(">P0 (1500)<") && svg.contains(">P1 (1500)<"), "{svg}");
+        assert!(svg.contains(">3000<"), "the total as given");
+        assert_eq!(svg.matches("<circle").count(), 2000, "dots stop at 2,000");
+        assert_eq!(parliament_dots(&[1500.0, 1500.0]), [1000, 1000]);
+        // Shared out by largest remainders, every party with seats keeps a dot.
+        assert_eq!(parliament_dots(&[2950.0, 26.0, 1.0]), [1982, 17, 1]);
+        let dots = parliament_dots(&[1e6, 1.0, 0.0, 1.0, 1.0]);
+        assert_eq!(dots, [1997, 1, 0, 1, 1]);
+        let svg = chart_svg(&chart(&[2950.0, 26.0, 1.0]), 800.0, 450.0, None);
+        assert!(svg.contains(">P0 (2950)<") && svg.contains(">P1 (26)<") && svg.contains(">P2 (1)<"), "{svg}");
+        assert_eq!(svg.matches("<circle").count(), 2000);
+        let steps = Some(SeriesSteps { effect: "fade-in", first: 1 });
+        let svg = chart_svg(&chart(&[1e6, 1.0, 1.0]), 800.0, 450.0, steps);
+        assert_eq!(svg.matches("class=\"fragment").count(), 3, "one step per party, as series_steps counts");
+        assert_eq!(series_steps(&chart(&[1e6, 1.0, 1.0])), 3);
     }
 }

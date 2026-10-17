@@ -921,6 +921,77 @@ test('a chart written as CSV reads back the same', async () => {
   }
 });
 
+test('large data is read without spreading its rows into one call', async () => {
+  const D = await chartdata();
+  const rows = D.parseRows('x,y\n' + '1,2\n'.repeat(300000));
+  assert.equal(rows.length, 300001);
+  assert.equal(rows[300000].length, 2);
+});
+
+test('rows repeating a group and label are counted, and error bars come from the row charted', async () => {
+  const D = await chartdata();
+  const table = D.readTable('item,kind,value,low,high\na,X,1,,1.5\na,X,9,8,10\nb,X,,1.9,\nb,X,2,,2.5\nb,Y,3,2,4\nc,Y,4,3,5');
+  const roles = ['label', 'group', 'value', 'low', 'high'];
+  assert.equal(D.repeatedRows(table, roles), 2, 'a in X and b in X come twice');
+  const data = D.chartData(table, roles);
+  eq(data.labels, ['a', 'b', 'c']);
+  // The first row with a value, and its own ends: none borrowed from another row.
+  eq(data.series.map((s) => [s.name, s.values, s.low, s.high]), [
+    ['X', [1, 2, null], [null, null, null], [1.5, 2.5, null]],
+    ['Y', [null, 3, 4], [null, 2, 3], [null, 4, 5]],
+  ]);
+  assert.equal(D.repeatedRows(table, ['ignore', 'group', 'value', 'low', 'high']), 0, 'rows of a group without labels are numbered');
+  assert.equal(D.repeatedRows(D.readTable('item,kind,v\na,X,1\na,Y,2\nb,X,3'), ['label', 'group', 'value']), 0);
+});
+
+test('the data grid of a scatterplot made from numbers keeps its points', async () => {
+  const D = await chartdata();
+  const C = await standalone('charts.js', { 'i18n.js': { t: (s, v = {}) => s.replace(/\{(\w+)\}/g, (_, k) => v[k]), N_: (s) => s } });
+  const xy = D.readTable('x,y\n1,2\n2,4\n3,5');
+  const chart = plainJson(D.chartChoices(xy, D.guessRoles(xy), KINDS).find((c) => c.kind === 'scatter').content);
+  eq(chart.labels, []);
+  assert.equal(C.chartRows(chart), 3, 'a grid row per point, as chart.rs counts rows');
+  const points = (c) => plainJson(c.series.map((s) => s.values));
+  // Editing a point leaves the others as they were.
+  const edited = { ...chart, ...C.setChartCell(chart, 1, 1, 40) };
+  eq(points(edited), [[1, 2, 3], [2, 40, 5]]);
+  eq(edited.labels, []);
+  // Labels stay optional: writing one gives the rows before it blank ones.
+  eq(C.setChartLabel(edited, 2, 'outlier').labels, ['', '', 'outlier']);
+  // A new row is added after the points, still without labels.
+  const added = { ...edited, ...C.addChartRow(edited) };
+  eq(points(added), [[1, 2, 3, 0], [2, 40, 5, 0]]);
+  eq(added.labels, []);
+  eq(points({ ...added, ...C.deleteChartRow(added, 0) }), [[2, 3, 0], [40, 5, 0]]);
+  // Edit as CSV gives the same points back.
+  const table = D.readTable(D.toCsv(edited));
+  const again = D.chartChoices(table, D.guessRoles(table), KINDS).find((c) => c.kind === 'scatter').content;
+  eq(points(again), points(edited));
+  eq(again.labels, []);
+
+  // Error bars stay beside their values when rows come and go.
+  const withErrors = {
+    labels: ['Q1'],
+    series: [{ name: 'a', values: [1, 2, 3], low: [0.5], high: [] }, { name: 'b', values: [4, 5, 6], low: [0.1, 0.2, 0.3], high: [1, null, 3] }],
+  };
+  assert.equal(C.chartRows(withErrors), 3);
+  const more = C.addChartRow(withErrors);
+  eq(more.labels, ['Q1', '', '', 'Item 4']);
+  eq(more.series.map((s) => [s.values, s.low, s.high]), [
+    [[1, 2, 3, 0], [0.5, null, null, null], []],
+    [[4, 5, 6, 0], [0.1, 0.2, 0.3, null], [1, null, 3, null]],
+  ]);
+  const fewer = C.deleteChartRow(withErrors, 1);
+  eq(fewer.series.map((s) => [s.values, s.low, s.high]), [
+    [[1, 3], [0.5], []],
+    [[4, 6], [0.1, 0.3], [1, 3]],
+  ]);
+  const err = C.setChartCell(withErrors, 1, 2, 9, 'high');
+  eq(err.series[1], { ...withErrors.series[1], high: [1, null, 9] });
+  eq(err.series[0], withErrors.series[0]);
+  eq(C.addChartRow({ labels: [], series: [{ name: 'a', values: [] }] }).labels, ['Item 1'], 'an empty chart starts its labels');
+});
+
 /**
  * controls.js with just enough of Preact's hooks to render a control again
  * and call its handlers. `field` stands for the control's <input>.

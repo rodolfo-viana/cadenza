@@ -13,7 +13,7 @@ import { Button } from './ui.js';
 import { renderDiagram, svgAspect, DIAGRAM_TEMPLATES } from './diagrams.js';
 import { opener, invoke } from './api.js';
 import { t, N_, language } from './i18n.js';
-import { CHART_ICONS, MAP_AREAS, MARKERS, ERROR_MODES, chartKind, errorColumns, hasAxes, hasErrorBars, hasMarkers, isSample, linkChart, oneSeries, switchChart } from './charts.js';
+import { CHART_ICONS, MAP_AREAS, MARKERS, ERROR_MODES, addChartRow, chartKind, chartRows, deleteChartRow, errorColumns, hasAxes, hasErrorBars, hasMarkers, isSample, linkChart, oneSeries, setChartCell, setChartLabel, switchChart } from './charts.js';
 
 const ids = (els) => els.map((e) => e.id).join(',');
 
@@ -729,46 +729,16 @@ export function ChartPanel({ els }) {
   const isMap = kind === 'map';
   const countries = useMapCountries(isMap);
   const { regions, unmatched, repeated } = useMapRegions(isMap, ch.map, ch.labels);
-  const n = ch.labels.length;
-  const setCell = (s, i, v) => {
-    const series = ch.series.map((x, k) => (k === s ? { ...x, values: Array.from({ length: n }, (_, j) => (j === i ? v : x.values[j] ?? null)) } : x));
-    set_({ series }, 'data', true);
-  };
-  const setLabel = (i, v) => set_({ labels: ch.labels.map((l, j) => (j === i ? v : l)) }, 'labels', true);
-  // Error bars: one number (or none) per value, kept beside the values.
-  const padded = (list = []) => Array.from({ length: n }, (_, j) => list[j] ?? null);
-  const setErr = (k, i, key, v) => {
-    const series = ch.series.map((x, j) => (j === k ? { ...x, [key]: padded(x[key]).map((e, r) => (r === i ? v : e)) } : x));
-    set_({ series }, 'data', true);
-  };
-  const addRow = () =>
-    set_(
-      {
-        labels: [...ch.labels, t('Item {n}', { n: n + 1 })],
-        series: ch.series.map((s) => ({
-          ...s,
-          values: [...s.values.slice(0, n), 0],
-          low: s.low?.length ? [...padded(s.low), null] : [],
-          high: s.high?.length ? [...padded(s.high), null] : [],
-        })),
-      },
-      'rows',
-    );
-  const delRow = (i) =>
-    set_(
-      {
-        labels: ch.labels.filter((_, j) => j !== i),
-        series: ch.series.map((s) => ({
-          ...s,
-          values: s.values.filter((_, j) => j !== i),
-          low: (s.low || []).filter((_, j) => j !== i),
-          high: (s.high || []).filter((_, j) => j !== i),
-        })),
-      },
-      'rows',
-    );
+  // Rows as chart.rs counts them: labels are optional (scatterplots made
+  // from numbers have none). Error bars sit beside the values.
+  const n = chartRows(ch);
+  const setCell = (s, i, v) => set_(setChartCell(ch, s, i, v), 'data', true);
+  const setLabel = (i, v) => set_(setChartLabel(ch, i, v), 'labels', true);
+  const setErr = (k, i, key, v) => set_(setChartCell(ch, k, i, v, key), 'data', true);
+  const addRow = () => set_(addChartRow(ch), 'rows');
+  const delRow = (i) => set_(deleteChartRow(ch, i), 'rows');
   const addSeries = () =>
-    set_({ series: [...ch.series, { name: t('Series {n}', { n: ch.series.length + 1 }), values: ch.labels.map(() => 0), color: '', marker: '', low: [], high: [] }] }, 'series');
+    set_({ series: [...ch.series, { name: t('Series {n}', { n: ch.series.length + 1 }), values: Array.from({ length: n }, () => 0), color: '', marker: '', low: [], high: [] }] }, 'series');
   const delSeries = (k) => set_({ series: ch.series.filter((_, j) => j !== k) }, 'series');
   const shownSeries = one ? ch.series.slice(0, 1) : ch.series;
   const linked = linkChart(kind);
@@ -895,9 +865,10 @@ export function ChartPanel({ els }) {
           </tr>
         </thead>
         <tbody>
-          ${ch.labels.map(
-            (l, i) => html`<tr>
-              <td><${Cell} class="cell label" list=${isMap ? 'cz-map-regions' : undefined} value=${l} onChange=${(v) => setLabel(i, v)} /></td>
+          ${Array.from(
+            { length: n },
+            (_, i) => html`<tr>
+              <td><${Cell} class="cell label" list=${isMap ? 'cz-map-regions' : undefined} value=${ch.labels[i] ?? ''} onChange=${(v) => setLabel(i, v)} /></td>
               ${shownSeries.map(
                 (s, k) => html`<td>
                     <${Cell} class="cell num" number nullable value=${s.values[i] ?? null} onChange=${(v) => setCell(k, i, v)} />
@@ -973,8 +944,8 @@ export function ChartPanel({ els }) {
 /** Arrow keys and scrubbing in a chart's value fields move by about a tenth of its data's spread. */
 function axisStep(c) {
   const values = c.series.flatMap((s) => s.values).filter(Number.isFinite);
-  const spread = values.length ? Math.max(...values) - Math.min(...values) : 0;
-  return spread > 0 ? 10 ** Math.floor(Math.log10(spread / 10)) : 1;
+  const spread = values.reduce((a, v) => Math.max(a, v), -Infinity) - values.reduce((a, v) => Math.min(a, v), Infinity);
+  return spread > 0 && spread < Infinity ? 10 ** Math.floor(Math.log10(spread / 10)) : 1;
 }
 
 /** Where a new reference line starts: the average of the data, rounded to its step. */
