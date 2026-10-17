@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest something Cadenza could do, or do better.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [open issues](https://github.com/rodolfo-viana/cadenza/issues) first, in case someone has asked for it already. If you'd like to build it yourself, open this issue before you start, so we can agree on the approach.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task or the presentation you have in mind, and what gets in the way today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like Cadenza to do?
+      description: How it would work for you. Sketches and screenshots are welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: elsewhere
+    attributes:
+      label: How do you do it now, or in other apps?
+      description: A workaround you use, or how Keynote, PowerPoint, Google Slides or reveal.js handle it.

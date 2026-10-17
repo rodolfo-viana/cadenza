@@ -1,0 +1,79 @@
+name: Bug report
+description: Something in Cadenza doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please check the [open issues](https://github.com/rodolfo-viana/cadenza/issues) first, in case it's already there.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include any error message exactly as Cadenza showed it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, one step at a time, from opening Cadenza.
+      placeholder: |
+        1. New presentation with the Paper theme
+        2. Insert > Chart > Column
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Cadenza version
+      description: Shown in **Menu > About Cadenza**.
+      placeholder: "0.3.3"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: "Ubuntu 24.04, Fedora 41, Windows 11 24H2…"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: How did you install Cadenza?
+      options:
+        - .deb package
+        - .rpm package
+        - AppImage
+        - Windows installer (.exe)
+        - Windows installer (.msi)
+        - Built from source
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Interface language
+      description: If it isn't English (**Settings > Language**).
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Presentation, screenshots or recording
+      description: |
+        A small presentation that shows the problem helps a lot. GitHub doesn't accept `.cadenza` files, so zip it first. Leave out anything private.

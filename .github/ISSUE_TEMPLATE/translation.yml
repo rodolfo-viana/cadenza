@@ -1,0 +1,61 @@
+name: Translation
+description: A wrong, unclear or missing translation, or a new language.
+title: "[Translation] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        You can also fix it yourself: the texts are in [`ui/locales`](https://github.com/rodolfo-viana/cadenza/tree/main/ui/locales), and [CONTRIBUTING.md](https://github.com/rodolfo-viana/cadenza/blob/main/CONTRIBUTING.md#interface-text-and-translations) explains how they work.
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - Arabic
+        - Bengali
+        - Chinese (Simplified)
+        - Dutch
+        - French
+        - German
+        - Hindi
+        - Italian
+        - Japanese
+        - Polish
+        - Portuguese
+        - Portuguese (Brazil)
+        - Russian
+        - Spanish
+        - Turkish
+        - A language Cadenza doesn't have yet
+    validations:
+      required: true
+
+  - type: input
+    id: where
+    attributes:
+      label: Where does the text appear?
+      placeholder: "Insert menu, chart inspector, the dialog when saving…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Text shown now
+      description: As Cadenza shows it, or the English text if it isn't translated.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested
+    attributes:
+      label: Suggested text
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What's wrong with the current text, if it isn't obvious (meaning, tone, the term other apps use…).
