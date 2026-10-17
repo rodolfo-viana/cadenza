@@ -388,6 +388,10 @@ pub fn from_builtin(id: &str) -> ThemeDef {
         accent: t.accent.into(),
         on_accent: t.on_accent.into(),
         palette: t.palette.iter().map(|c| c.to_string()).collect(),
+        // The sans stack is the custom default (empty); other stacks are kept
+        // whole so their generic fallback (serif, monospace) still applies.
+        heading_font: if t.heading_font == SANS { String::new() } else { t.heading_font.into() },
+        body_font: if t.body_font == SANS { String::new() } else { t.body_font.into() },
         ..Default::default()
     };
     // Backgrounds: keep solid colors and simple two-stop gradients.
@@ -481,5 +485,16 @@ mod tests {
         assert!(def.dark && def.background.starts_with('#') && !def.background2.is_empty());
         let def = from_builtin("white");
         assert!(!def.dark && def.background2.is_empty());
+    }
+
+    #[test]
+    fn builtin_themes_keep_their_fonts() {
+        for t in crate::themes::THEMES {
+            let css = from_builtin(t.id).css();
+            assert!(css.contains(&format!("--r-heading-font:{}", t.heading_font)), "{}", t.id);
+            assert!(css.contains(&format!("--r-main-font:{}", t.body_font)), "{}", t.id);
+        }
+        assert!(from_builtin("cadenza-midnight").heading_font.is_empty());
+        assert!(from_builtin("cadenza-paper").heading_font.contains("serif"));
     }
 }

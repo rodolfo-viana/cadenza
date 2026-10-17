@@ -48,8 +48,10 @@
 
 /* ---- Text ---------------------------------------------------------------- */
 
-/* `.cz-text:not(.cz-el)` is the text itself: a text element's wrapper is
-   `.cz-el.cz-text` too, and must not get the spacing of paragraphs. */
+/* `.cz-text:where(:not(.cz-el))` is the text itself: a text element's wrapper is
+   `.cz-el.cz-text` too, and must not get the spacing of paragraphs. `:where`
+   keeps these rules as weak as plain `.cz-text`, so the role rules below (on
+   the same element) still set the heading font and line height. */
 
 .reveal .cz-text-box,
 .reveal .cz-shape-text {
@@ -61,7 +63,7 @@
 .reveal .cz-v-middle { justify-content: center; }
 .reveal .cz-v-bottom { justify-content: flex-end; }
 
-.reveal .cz-text:not(.cz-el) {
+.reveal .cz-text:where(:not(.cz-el)) {
   width: 100%;
   font-family: var(--r-main-font);
   line-height: 1.25;
@@ -71,42 +73,42 @@
   outline: none;
 }
 
-.reveal .cz-text:not(.cz-el) p,
-.reveal .cz-text:not(.cz-el) div {
+.reveal .cz-text:where(:not(.cz-el)) p,
+.reveal .cz-text:where(:not(.cz-el)) div {
   margin: 0 0 var(--cz-ps, 0.4em);
   line-height: inherit;
 }
 
-.reveal .cz-text:not(.cz-el) ul,
-.reveal .cz-text:not(.cz-el) ol {
+.reveal .cz-text:where(:not(.cz-el)) ul,
+.reveal .cz-text:where(:not(.cz-el)) ol {
   display: block;
   margin: 0 0 var(--cz-ps, 0.4em);
   padding: 0 0 0 1.25em;
   text-align: inherit;
 }
 
-.reveal .cz-text:not(.cz-el) li {
+.reveal .cz-text:where(:not(.cz-el)) li {
   margin: 0 0 calc(var(--cz-ps, 0.4em) * 0.5);
 }
 
-.reveal .cz-text:not(.cz-el) li > ul,
-.reveal .cz-text:not(.cz-el) li > ol {
+.reveal .cz-text:where(:not(.cz-el)) li > ul,
+.reveal .cz-text:where(:not(.cz-el)) li > ol {
   margin: calc(var(--cz-ps, 0.4em) * 0.5) 0 0;
 }
 
-.reveal .cz-text:not(.cz-el) > :last-child,
-.reveal .cz-text:not(.cz-el) li:last-child {
+.reveal .cz-text:where(:not(.cz-el)) > :last-child,
+.reveal .cz-text:where(:not(.cz-el)) li:last-child {
   margin-bottom: 0;
 }
 
-.reveal .cz-text:not(.cz-el) a {
+.reveal .cz-text:where(:not(.cz-el)) a {
   color: var(--r-link-color);
   text-decoration: underline;
   text-decoration-thickness: 0.06em;
   text-underline-offset: 0.12em;
 }
 
-.reveal .cz-text:not(.cz-el) code {
+.reveal .cz-text:where(:not(.cz-el)) code {
   font-family: var(--r-code-font);
   font-size: 0.9em;
   padding: 0.05em 0.3em;
@@ -115,7 +117,7 @@
   text-transform: none;
 }
 
-.reveal .cz-text:not(.cz-el) blockquote {
+.reveal .cz-text:where(:not(.cz-el)) blockquote {
   width: auto;
   margin: 0 0 var(--cz-ps, 0.4em);
   padding: 0 0 0 0.8em;
@@ -125,13 +127,13 @@
   font-style: italic;
 }
 
-.reveal .cz-text:not(.cz-el) mark {
+.reveal .cz-text:where(:not(.cz-el)) mark {
   color: inherit;
   background: color-mix(in srgb, var(--cz-accent, #fde047) 35%, transparent);
   padding: 0 0.1em;
 }
 
-.reveal .cz-text:not(.cz-el) small {
+.reveal .cz-text:where(:not(.cz-el)) small {
   display: inline;
   vertical-align: baseline;
   line-height: inherit;
