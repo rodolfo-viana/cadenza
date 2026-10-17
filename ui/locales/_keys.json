@@ -813,6 +813,12 @@
   ]
  },
  {
+  "key": "Cadenza is missing some of its own files. Reinstall Cadenza, then export again.",
+  "files": [
+   "export.rs"
+  ]
+ },
+ {
   "key": "Cadenza is up to date",
   "files": [
    "updates.js"
@@ -882,6 +888,24 @@
   ]
  },
  {
+  "key": "Cannot export: media is missing on these slides: {slides}. Replace or delete it, then export again.",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
+  "key": "Cannot export: the files of these embedded fonts are missing: {fonts}. Remove them under Document > Typography, then export again.",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
+  "key": "Cannot keep a copy of the unsaved changes",
+  "files": [
+   "document.rs"
+  ]
+ },
+ {
   "key": "Cannot save: media is missing on these slides: {slides}. Replace or delete it, then save again.",
   "files": [
    "package.rs"
@@ -933,6 +957,18 @@
   ]
  },
  {
+  "key": "Change",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Change Document",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
   "key": "Change Slide",
   "files": [
    "ops.rs"
@@ -940,6 +976,12 @@
  },
  {
   "key": "Change Slide Size",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Change Theme",
   "files": [
    "ops.rs"
   ]
@@ -1508,7 +1550,14 @@
   "key": "Delete Slide",
   "files": [
    "commands.js",
-   "navigator.js"
+   "navigator.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Delete Slides",
+  "files": [
+   "ops.rs"
   ]
  },
  {
@@ -1815,7 +1864,8 @@
  {
   "key": "Edit",
   "files": [
-   "commands.js"
+   "commands.js",
+   "ops.rs"
   ]
  },
  {
@@ -2756,20 +2806,76 @@
    "canvas.js",
    "commands.js",
    "inspector.js",
-   "media.js"
+   "media.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Chart",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Code",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Diagram",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Equation",
+  "files": [
+   "ops.rs"
   ]
  },
  {
   "key": "Insert Image",
   "files": [
    "actions.js",
-   "media.js"
+   "media.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Line",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Live Camera",
+  "files": [
+   "ops.rs"
   ]
  },
  {
   "key": "Insert Online Video",
   "files": [
    "actions.js"
+  ]
+ },
+ {
+  "key": "Insert Shape",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Table",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Text",
+  "files": [
+   "ops.rs"
   ]
  },
  {
@@ -2800,7 +2906,14 @@
   "key": "Insert Video",
   "files": [
    "actions.js",
-   "media.js"
+   "media.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Insert Web Page",
+  "files": [
+   "ops.rs"
   ]
  },
  {
@@ -2866,8 +2979,7 @@
  {
   "key": "Item {n}",
   "files": [
-   "charts.js",
-   "panels.js"
+   "charts.js"
   ]
  },
  {
@@ -3104,6 +3216,7 @@
  {
   "key": "lock poisoned",
   "files": [
+   "lib.rs",
    "secrets.rs"
   ]
  },
@@ -3304,6 +3417,12 @@
   "key": "Mouse & presenting",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "Move",
+  "files": [
+   "ops.rs"
   ]
  },
  {
@@ -4363,6 +4482,12 @@
   ]
  },
  {
+  "key": "Replace Presentation",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
   "key": "Replace Video…",
   "files": [
    "inspector.js"
@@ -4384,6 +4509,12 @@
   "key": "Reset timer (R)",
   "files": [
    "presenter.html"
+  ]
+ },
+ {
+  "key": "Resize",
+  "files": [
+   "ops.rs"
   ]
  },
  {
@@ -5440,6 +5571,12 @@
   ]
  },
  {
+  "key": "The presentation file is damaged",
+  "files": [
+   "package.rs"
+  ]
+ },
+ {
   "key": "The presentation is missing deck.json",
   "files": [
    "package.rs"
@@ -5455,6 +5592,12 @@
   "key": "The update hasn't been downloaded.",
   "files": [
    "lib.rs"
+  ]
+ },
+ {
+  "key": "The update was not installed: some changes could not be kept. Check them, then try again.",
+  "files": [
+   "updates.js"
   ]
  },
  {
@@ -5637,6 +5780,12 @@
   ]
  },
  {
+  "key": "This font has too many files to embed",
+  "files": [
+   "webfonts.rs"
+  ]
+ },
+ {
   "key": "This is not a Cadenza theme file",
   "files": [
    "custom_theme.rs"
@@ -5646,6 +5795,12 @@
   "key": "This link does not show an image. Right-click the image and copy its address, then paste that.",
   "files": [
    "media.rs"
+  ]
+ },
+ {
+  "key": "This presentation is already open in another window.",
+  "files": [
+   "lib.rs"
   ]
  },
  {
@@ -5856,6 +6011,12 @@
   "files": [
    "canvas.js",
    "panels.js"
+  ]
+ },
+ {
+  "key": "Unsaved changes could not be backed up. Save your work.",
+  "files": [
+   "store.js"
   ]
  },
  {
@@ -6354,6 +6515,13 @@
    "datachart.js"
   ],
   "one": "{n} row"
+ },
+ {
+  "key": "{n} rows repeat the group and label of an earlier row. Only the first value is charted.",
+  "files": [
+   "datachart.js"
+  ],
+  "one": "{n} row repeats the group and label of an earlier row. Only the first value is charted."
  },
  {
   "key": "{n} series",

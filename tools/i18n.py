@@ -6,7 +6,13 @@
 
 Keys are the English strings passed to t(), tn() and N_() in ui/js, data-i18n
 attributes in ui/*.html, and static user-facing strings in src-tauri/src
-(error messages, layout/shape/chart names, undo labels).
+(error messages, layout/shape/chart names, undo labels: literals in
+`outcome("…")`, others marked with `n_("…")`).
+
+`check` also fails when the manifest is out of date (run `extract`), or when a
+language of ui/js/i18n.js has no catalog. With --allow-missing (pull request
+checks), untranslated strings are listed but don't fail it: they show in
+English until translated.
 """
 
 import json
@@ -32,6 +38,7 @@ RS_PATTERNS = [
     re.compile(r'(?:Err|ok_or|bail!|anyhow!|context)\(\s*"((?:[^"\\]|\\.)*)"\s*\)'),
     re.compile(r'Err\(\s*"((?:[^"\\]|\\.)*)"\.into\(\)\s*\)'),
     re.compile(r'outcome\(\s*"((?:[^"\\]|\\.)*)"'),
+    re.compile(r'\bn_\(\s*"((?:[^"\\]|\\.)*)"\s*\)'),
     re.compile(r'LayoutInfo \{\s*id: "[^"]*",\s*name: "((?:[^"\\]|\\.)*)"'),
     re.compile(r'label: Some\("((?:[^"\\]|\\.)*)"'),
     re.compile(r'tr\(\s*&\w+,\s*"((?:[^"\\]|\\.)*)"'),
@@ -49,7 +56,7 @@ def rust_unescape(s: str) -> str:
     return re.sub(r"\\(.)", lambda m: {"n": "\n", "t": "\t"}.get(m.group(1), m.group(1)), s)
 
 
-def extract():
+def collect() -> list[dict]:
     keys: dict[str, dict] = {}
 
     def add(key, where, one=None):
@@ -87,7 +94,11 @@ def extract():
         if f.name in ("chart.rs", "shapes.rs"):
             for m in re.finditer(r'\(\s*"[a-z0-9-]+"\s*,\s*"([A-Z][^"]*)"\s*\)', src):
                 add(m.group(1), f.name)
-    out = sorted(keys.values(), key=lambda k: k["key"].lower())
+    return sorted(keys.values(), key=lambda k: k["key"].lower())
+
+
+def extract():
+    out = collect()
     LOCALES.mkdir(parents=True, exist_ok=True)
     KEYS.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
     plural = sum(1 for k in out if "one" in k)
@@ -97,9 +108,28 @@ def extract():
 PLACEHOLDER = re.compile(r"\{(\w+)\}")
 
 
-def check():
+def languages() -> list[str]:
+    src = (ROOT / "ui/js/i18n.js").read_text()
+    block = re.search(r"LANGUAGES = \[(.*?)\];", src, re.S)
+    return [c for c in re.findall(r"code: '([^']+)'", block.group(1) if block else "") if c != "en"]
+
+
+def check(allow_missing: bool = False):
     keys = json.loads(KEYS.read_text())
     ok = True
+    # Strings added to the sources since the last `extract` would go unchecked.
+    fresh = collect()
+    if [k["key"] for k in fresh] != [k["key"] for k in keys] or [k.get("one") for k in fresh] != [k.get("one") for k in keys]:
+        print(f"{KEYS.relative_to(ROOT)} is out of date: run `python3 tools/i18n.py extract`")
+        ok = False
+    expected = languages()
+    if not expected:
+        print("No languages found in ui/js/i18n.js")
+        ok = False
+    for code in expected:
+        if not (LOCALES / f"{code}.json").exists():
+            print(f"{code}.json: missing catalog")
+            ok = False
     for f in sorted(LOCALES.glob("*.json")):
         if f.name.startswith("_"):
             continue
@@ -121,12 +151,14 @@ def check():
             if isinstance(v, dict) and "other" not in v:
                 bad.append(f"{key!r}: plural without 'other'")
             for s in forms:
-                if not isinstance(s, str):
-                    bad.append(f"{key!r}: non-string value")
+                if not isinstance(s, str) or not s.strip():
+                    bad.append(f"{key!r}: empty or non-string value")
                     continue
                 got = set(PLACEHOLDER.findall(s))
-                # A plural form may drop {n} (e.g. "one slide"), nothing else.
-                if not got <= want or not (want - {"n"}) <= got:
+                # A plural form may drop {n} (e.g. "one slide"), nothing else
+                # may drop anything.
+                needed = want - {"n"} if isinstance(v, dict) else want
+                if not got <= want or not needed <= got:
                     bad.append(f"{key!r}: placeholders {sorted(got)} != {sorted(want)}")
         extra = sorted(set(cat) - {k["key"] for k in keys} - {"_language"})
         status = "OK" if not missing and not bad else "PROBLEMS"
@@ -135,9 +167,13 @@ def check():
             print("   ", b)
         for m in missing[:8]:
             print("    missing:", repr(m))
-        ok = ok and not missing and not bad
+        ok = ok and (allow_missing or not missing) and not bad
     sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":
-    {"extract": extract, "check": check}[sys.argv[1] if len(sys.argv) > 1 else "extract"]()
+    command = sys.argv[1] if len(sys.argv) > 1 else "extract"
+    if command == "check":
+        check("--allow-missing" in sys.argv[2:])
+    else:
+        {"extract": extract}[command]()

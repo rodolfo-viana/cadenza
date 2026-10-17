@@ -121,6 +121,31 @@ pub struct OpOutcome {
     pub created: Vec<String>,
 }
 
+/// Marks an undo label that is not written straight into `outcome(…)`, so
+/// tools/i18n.py finds it for translation (like `N_` in JavaScript).
+const fn n_(label: &'static str) -> &'static str {
+    label
+}
+
+/// The undo label for inserting an element of a kind.
+fn insert_label(kind: &str) -> &'static str {
+    match kind {
+        "text" => n_("Insert Text"),
+        "image" => n_("Insert Image"),
+        "video" => n_("Insert Video"),
+        "shape" => n_("Insert Shape"),
+        "line" => n_("Insert Line"),
+        "chart" => n_("Insert Chart"),
+        "table" => n_("Insert Table"),
+        "code" => n_("Insert Code"),
+        "math" => n_("Insert Equation"),
+        "diagram" => n_("Insert Diagram"),
+        "embed" => n_("Insert Web Page"),
+        "camera" => n_("Insert Live Camera"),
+        _ => n_("Insert"),
+    }
+}
+
 fn outcome(label: &str, slide: Option<String>, created: Vec<String>) -> OpOutcome {
     OpOutcome {
         label: label.into(),
@@ -215,7 +240,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                 deck.slides.push(layouts::new_slide("blank", deck.width, deck.height));
             }
             let next = first.map(|i| i.min(deck.slides.len() - 1)).map(|i| deck.slides[i].id.clone());
-            Ok(outcome(if ids.len() > 1 { "Delete Slides" } else { "Delete Slide" }, next, vec![]))
+            Ok(outcome(if ids.len() > 1 { n_("Delete Slides") } else { n_("Delete Slide") }, next, vec![]))
         }
         Op::MoveSlides { ids, to } => {
             let to = to.min(deck.slides.len());
@@ -267,7 +292,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             let id = el.id.clone();
             let s = find_slide(deck, &slide)?;
             s.elements.push(el);
-            Ok(outcome(&format!("Insert {}", capitalize(&kind)), Some(slide), vec![id]))
+            Ok(outcome(insert_label(&kind), Some(slide), vec![id]))
         }
         Op::InsertElements { slide, elements, offset } => {
             let s = find_slide(deck, &slide)?;
@@ -291,7 +316,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
         }
         Op::UpdateElements { slide, updates } => {
             let s = find_slide(deck, &slide)?;
-            let mut label = "Change";
+            let mut label = n_("Change");
             for u in &updates {
                 let el = s.element_mut(&u.id).ok_or_else(|| anyhow::anyhow!("element not found"))?;
                 let mut patch = strip(&u.patch, &["id"]);
@@ -300,11 +325,11 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                 }
                 if let Value::Object(m) = &patch {
                     if m.keys().all(|k| matches!(k.as_str(), "x" | "y")) {
-                        label = "Move";
+                        label = n_("Move");
                     } else if m.keys().all(|k| matches!(k.as_str(), "x" | "y" | "w" | "h")) {
-                        label = "Resize";
+                        label = n_("Resize");
                     } else if m.contains_key("content") {
-                        label = "Edit";
+                        label = n_("Edit");
                     }
                 }
                 let mut updated = patched(el, &patch)?;
@@ -358,7 +383,11 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             let slides = std::mem::take(&mut deck.slides);
             let mut updated: Deck = patched(deck, &patch)?;
             updated.slides = slides;
-            let label = if patch.get("theme").is_some() { "Change Theme" } else { "Change Document" };
+            let label = if patch.get("theme").is_some() {
+                n_("Change Theme")
+            } else {
+                n_("Change Document")
+            };
             *deck = updated;
             Ok(outcome(label, None, vec![]))
         }
@@ -396,14 +425,9 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             // Imports start at the first slide; labelled replacements
             // (pastes) leave the view where it is, also when undone.
             let slide = if label.is_some() { None } else { deck.slides.first().map(|s| s.id.clone()) };
-            Ok(outcome(label.as_deref().unwrap_or("Replace Presentation"), slide, vec![]))
+            Ok(outcome(label.as_deref().unwrap_or(n_("Replace Presentation")), slide, vec![]))
         }
     }
-}
-
-fn capitalize(s: &str) -> String {
-    let mut c = s.chars();
-    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
 }
 
 /// Font sizes follow the slide size, including the sizes of parts of a text.

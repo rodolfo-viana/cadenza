@@ -113,7 +113,7 @@ t('line height::Line')                     // "context::" separates identical En
 
 Keep whole sentences in one call; never build a sentence from translated pieces, because word order
 differs between languages. Strings shown by Rust (errors, undo labels, layout and shape names) are
-collected too.
+collected too; an undo label not written straight into `outcome("…")` is marked with `n_("…")`.
 
 After changing interface text, run from the repository root:
 
