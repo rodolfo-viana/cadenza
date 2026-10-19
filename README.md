@@ -2,12 +2,14 @@
 
 ![badge](https://shieldcn.dev/badge/platforms-Linux%20|%20Windows.svg?size=xs&theme=violet&font=jetbrains-mono&logo=lu%3ACircleCheckBig&labelOpacity=0.9) [![badge](https://shieldcn.dev/github/rodolfo-viana/cadenza/downloads.svg?size=xs&theme=violet&font=jetbrains-mono&labelOpacity=0.9)](https://github.com/rodolfo-viana/cadenza/releases) [![badge](https://shieldcn.dev/github/rodolfo-viana/cadenza/release.svg?size=xs&theme=violet&font=jetbrains-mono&labelOpacity=0.9)](https://github.com/rodolfo-viana/cadenza/releases) [![badge](https://shieldcn.dev/github/rodolfo-viana/cadenza/license.svg?size=xs&theme=violet&font=jetbrains-mono&labelOpacity=0.9)](https://github.com/rodolfo-viana/cadenza)
 
+[![badge](https://shieldcn.dev/badge/see-live%20demo.svg?size=xs&theme=violet&font=jetbrains-mono&logo=lu%3ATerminal&labelOpacity=0.9)](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-need.html)
+
 
 **Presentations, powered by reveal.js.** Cadenza is a desktop presentation app in the spirit of
 Keynote and PowerPoint, built on the [reveal.js](https://revealjs.com) engine, written in Rust
 with [Tauri](https://tauri.app). It runs on Linux and Windows.
 
-![Cadenza editing a slide with a Mermaid diagram](docs/screenshot.png)
+See **[live demo](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-need.html)** of most of its features.
 
 ## Features
 
