@@ -213,9 +213,15 @@ struct View<'a> {
 enum Projection {
     /// Equal Earth, for the world.
     EqualEarth,
+    /// Mercator, for the world when chosen: shapes as on web maps, areas
+    /// growing toward the poles.
+    Mercator,
     /// Lambert azimuthal equal-area, centered on (longitude, latitude).
     Azimuthal(f64, f64),
 }
+
+/// How far toward the poles Mercator goes (they are infinitely far).
+const MERCATOR_LAT: f64 = 85.0;
 
 impl Projection {
     /// Projects a point; y grows downward, as in SVG.
@@ -230,6 +236,10 @@ impl Projection {
                 let x = l * t.cos() / (m * (A[0] + 3.0 * A[1] * t2 + t6 * (7.0 * A[2] + 9.0 * A[3] * t2)));
                 let y = t * (A[0] + A[1] * t2 + t6 * (A[2] + A[3] * t2));
                 Some((x, -y))
+            }
+            Projection::Mercator => {
+                let p = lat.clamp(-MERCATOR_LAT, MERCATOR_LAT).to_radians();
+                Some((l, -(std::f64::consts::FRAC_PI_4 + p / 2.0).tan().ln()))
             }
             Projection::Azimuthal(lon0, lat0) => {
                 let dl = wrap(lon - lon0).to_radians();
@@ -580,17 +590,25 @@ fn projected_bounds(points: impl Iterator<Item = Point>) -> Option<[f64; 4]> {
 
 /// A map chart: regions colored by the first series (rows matched by
 /// name or code), the others gray. `color` is the color of the highest
-/// value; returns the value range, for the legend.
+/// value; `projection` is the world's ("mercator", else Equal Earth).
+/// Returns the value range, for the legend.
+#[allow(clippy::too_many_arguments)]
 pub fn map_chart(
     svg: &mut String,
     map: &str,
+    projection: &str,
     labels: &[String],
     values: &[f64],
     color: &str,
     show_values: bool,
     (w, h, f): (f64, f64, f64),
 ) -> Option<(f64, f64)> {
-    let v = view(if map.is_empty() { "world" } else { map });
+    let mut v = view(if map.is_empty() { "world" } else { map });
+    // Only the world has a choice: continents and countries keep the
+    // azimuthal projection centered on them.
+    if matches!(v.projection, Projection::EqualEarth) && projection == "mercator" {
+        v.projection = Projection::Mercator;
+    }
     let rows = match_rows(&v.regions, labels);
     let value = |i: usize| rows.get(&i).and_then(|&row| values.get(row)).copied().filter(|x| x.is_finite());
     let range = (0..v.regions.len())
@@ -831,10 +849,47 @@ mod tests {
         maps.extend(CONTINENTS.iter().map(|c| c.0.to_string()));
         maps.extend(countries("en").into_iter().map(|c| c.0));
         for m in maps {
+            for projection in ["", "mercator"] {
+                let mut svg = String::new();
+                map_chart(&mut svg, &m, projection, &["X".into()], &[1.0], "red", true, (800.0, 450.0, 20.0));
+                assert!(svg.contains("<path"), "{m}");
+                assert!(!svg.contains("NaN") && !svg.contains("inf"), "{m}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_world_can_be_drawn_in_mercator() {
+        let world = view("world");
+        let ratio = |p: Projection| {
+            let points = world.regions.iter().flat_map(|r| r.polys.iter().flatten().flatten());
+            let [x0, x1, y0, y1] = projected_bounds(points.filter_map(|&q| p.project(q))).unwrap();
+            assert!([x0, x1, y0, y1].iter().all(|v| v.is_finite()));
+            (x1 - x0) / (y1 - y0)
+        };
+        // Without Antarctica, Equal Earth is about 2.27 times as wide as it
+        // is tall; Mercator, stretched toward the poles, about 1.5.
+        let (equal, mercator) = (ratio(Projection::EqualEarth), ratio(Projection::Mercator));
+        assert!((2.2..2.35).contains(&equal), "{equal}");
+        assert!((1.4..1.75).contains(&mercator), "{mercator}");
+        // Near the poles nothing runs off to infinity.
+        for lat in [-90.0, 90.0] {
+            let (x, y) = Projection::Mercator.project((180.0, lat)).unwrap();
+            assert!(x.is_finite() && y.is_finite());
+        }
+        let labels: Vec<String> = vec!["Brazil".into(), "Japan".into()];
+        let draw = |map: &str, projection: &str| {
             let mut svg = String::new();
-            map_chart(&mut svg, &m, &["X".into()], &[1.0], "red", true, (800.0, 450.0, 20.0));
-            assert!(svg.contains("<path"), "{m}");
-            assert!(!svg.contains("NaN") && !svg.contains("inf"), "{m}");
+            map_chart(&mut svg, map, projection, &labels, &[1.0, 2.0], "red", true, (800.0, 450.0, 20.0));
+            svg
+        };
+        for map in ["world", ""] {
+            assert_ne!(draw(map, "mercator"), draw(map, ""), "{map}");
+            assert_eq!(draw(map, "anything else"), draw(map, ""), "{map}");
+        }
+        // Continents and countries keep their own projection.
+        for map in ["europe", "south-america", "BRA", "USA"] {
+            assert_eq!(draw(map, "mercator"), draw(map, ""), "{map}");
         }
     }
 }

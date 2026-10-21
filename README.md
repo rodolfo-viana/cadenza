@@ -16,7 +16,7 @@ See **[live demo](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-n
 **Editing**
 - Slides built from 12 layouts (title, section, two columns, quote, big number, code…), with text,
   shapes, images, video, tables, charts, code, equations and diagrams.
-- Charts edited in a data grid and rendered as crisp SVG: column, bar and area (stacked or not), line, dot plot, streamgraph, pie, donut, treemap, parliament, scatterplot, heatmap, candlestick, Sankey diagram, network graph and maps (the world, a continent, or a country's states or provinces).
+- Charts edited in a data grid and rendered as crisp SVG: column, bar and area (stacked or not), line, dot plot, streamgraph, pie, donut, treemap, parliament, scatterplot, heatmap, candlestick, Sankey diagram, network graph and maps (the world in the Equal Earth or Mercator projection, a continent, or a country's states or provinces).
 - Charts from data: paste cells from a spreadsheet or open a CSV file, see every chart the data can make, and insert one.
 - Error bars (±, − and + amounts, or lower and upper ends), value axes with ends of your own, axis titles, reference lines and point shapes.
 - Code blocks with syntax highlighting, line numbers and step-by-step line highlights.

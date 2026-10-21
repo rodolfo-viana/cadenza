@@ -1996,6 +1996,12 @@
   ]
  },
  {
+  "key": "Equal Earth",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Equation",
   "files": [
    "inspector.js",
@@ -2037,6 +2043,12 @@
   "key": "Europe",
   "files": [
    "charts.js"
+  ]
+ },
+ {
+  "key": "Every country in its true size",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -3366,6 +3378,12 @@
   ]
  },
  {
+  "key": "Mercator",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Middle",
   "files": [
    "panels.js"
@@ -4285,6 +4303,12 @@
   "key": "Progress bar",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Projection",
+  "files": [
+   "panels.js"
   ]
  },
  {
@@ -5520,6 +5544,12 @@
   "key": "The copied media is no longer available. Copy the content again.",
   "files": [
    "clipboard.rs"
+  ]
+ },
+ {
+  "key": "The familiar web map: shapes kept, lands near the poles enlarged",
+  "files": [
+   "panels.js"
   ]
  },
  {

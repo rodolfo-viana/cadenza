@@ -955,6 +955,10 @@ pub struct ChartContent {
     /// Map charts: "world", a continent ("europe") or a country's code
     /// ("BRA") for its states or provinces (see maps.rs).
     pub map: String,
+    /// World maps: "" (Equal Earth, every country in its true size) or
+    /// "mercator" (the familiar web map). Continents and countries keep
+    /// projections of their own.
+    pub projection: String,
     /// Error bars of column, bar, line and dot charts: "" (none), "pm" (±
     /// an amount), "amounts" (how far below and above the value they reach)
     /// or "range" (where they end). The numbers are each series' `low` and
@@ -996,6 +1000,7 @@ impl Default for ChartContent {
             scale_color: String::new(),
             links: Vec::new(),
             map: String::new(),
+            projection: String::new(),
             error_bars: String::new(),
             axis_min: None,
             axis_max: None,
@@ -1112,6 +1117,16 @@ mod tests {
         assert_eq!(serde_json::to_value(&s).unwrap()["values"], serde_json::json!([1.5, null, 3.0]));
         // Missing values compare equal, so a chart with gaps can be saved clean.
         assert_eq!(s.clone(), s);
+    }
+
+    #[test]
+    fn world_maps_keep_their_projection() {
+        let c: ChartContent = serde_json::from_str(r#"{"chart":"map","map":"world","projection":"mercator"}"#).unwrap();
+        assert_eq!(c.projection, "mercator");
+        assert_eq!(serde_json::to_value(&c).unwrap()["projection"], "mercator");
+        // Files from before the choice are drawn in Equal Earth, as they were.
+        let older: ChartContent = serde_json::from_str(r#"{"chart":"map","map":"world"}"#).unwrap();
+        assert_eq!(older.projection, "");
     }
 
     #[test]

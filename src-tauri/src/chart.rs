@@ -250,7 +250,16 @@ pub fn chart_svg(chart: &ChartContent, w: f64, h: f64, steps: Option<SeriesSteps
         "map" => {
             let values = chart.series.first().map(|s| s.plain()).unwrap_or_default();
             let color = scale_color(chart);
-            scale = crate::maps::map_chart(&mut svg, &chart.map, &chart.labels, &values, &color, chart.show_values, (w, plot_h, f));
+            scale = crate::maps::map_chart(
+                &mut svg,
+                &chart.map,
+                &chart.projection,
+                &chart.labels,
+                &values,
+                &color,
+                chart.show_values,
+                (w, plot_h, f),
+            );
         }
         _ => axis_chart(&mut svg, chart, w, plot_h, f, steps),
     }

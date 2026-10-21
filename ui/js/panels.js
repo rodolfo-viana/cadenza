@@ -802,6 +802,18 @@ export function ChartPanel({ els }) {
         onChange=${(v) => set_({ map: v }, 'map')}
       />
     <//>`}
+    ${isMap &&
+    (ch.map || 'world') === 'world' &&
+    html`<${Row} label=${t('Projection')}>
+      <${Segmented}
+        value=${ch.projection || ''}
+        options=${[
+          { value: '', label: t('Equal Earth'), title: t('Every country in its true size') },
+          { value: 'mercator', label: t('Mercator'), title: t('The familiar web map: shapes kept, lands near the poles enlarged') },
+        ]}
+        onChange=${(v) => v !== (ch.projection || '') && set_({ projection: v }, 'projection')}
+      />
+    <//>`}
     ${hint && html`<${Hint}>${hint}</${Hint}>`}
     ${isMap && unmatched.length > 0 && html`<${Hint}>${t('Not on this map: {names}', { names: unmatched.join(', ') })}</${Hint}>`}
     ${isMap && repeated.length > 0 && html`<${Hint}>${t('Already in an earlier row, so left out: {names}', { names: repeated.join(', ') })}</${Hint}>`}
