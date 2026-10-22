@@ -2,6 +2,68 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## 0.3.4 — 2026-10-22
+
+World maps can use the Mercator projection, and menus, dialogs and the inspector work from the keyboard. Unsaved work, saved files and exports are kept safer, and this version fixes many problems found in test passes on Linux and Windows.
+
+### New
+
+- World maps have a Projection setting: Equal Earth, as before (every country in its true size), or Mercator, the familiar web map.
+- Menus work from the keyboard: the arrow keys open and leave submenus (mirrored in Arabic), and the focus goes back where it was when a menu closes.
+- Dialogs start at their first field, keep Tab inside and give the focus back when they close. Escape in a menu inside a dialog closes just the menu.
+- The toolbar's Shape picker works from the keyboard: arrow keys, Home and End, Enter to insert, Escape to close.
+- Clicking a label in the inspector puts the cursor in its field, and menus and dialogs say what they are to screen readers.
+
+### Changes
+
+- A presentation's custom CSS styles only its slides in the editor, so a rule in someone else's presentation can't hide or restyle Cadenza's own controls. Shows and exports use it as before.
+- To export a website again, pick the earlier export's index.html: its files are replaced and any others in the folder are kept. An export that fails leaves the earlier one as it was.
+- Exporting a presentation whose media or font files are missing is refused, as saving is, instead of leaving them out.
+- A large video or a download that arrives after you moved to another slide, or while you type, goes to the slide it was picked for without taking you there, and a note says where.
+- Large images and videos are copied a piece at a time, so they no longer fill memory or hold up other windows.
+- Picking a Google font embeds every script it covers (Arabic, Devanagari, Bengali…) and every part of Chinese, Japanese and Korean fonts, so text in those scripts uses the font.
+- Chart labels show small values with two significant digits and tiny or huge ones in scientific notation, instead of 0 or long strings of digits. Slices under half a percent show their share.
+- Pie and donut value labels that would cover one another are left out.
+- Open Recent tells presentations with the same name apart by their folders.
+
+### Fixes
+
+- Titles, headings and quotes were set in the body font (Paper's and Forest's serif headings, Mono's monospace), and customizing a built-in theme started from the default fonts.
+- Values near the limits of floating point (such as 1e308) in a chart crashed Cadenza.
+- Focusing a toggle switch could scroll the whole window away; on Windows, nothing brought it back.
+- Tab in the inspector moved the selection on the canvas instead of going to the next control.
+- A rename typed in the toolbar was lost on Save, and an inspector edit that couldn't be applied let Save write the old value.
+- Adding or removing table rows or columns while typing in a cell put the table back as it was.
+- Fast arrow-key nudges moved objects less than the keys pressed.
+- A diagram whose style changed while it was being drawn showed its old source, and a click on Look or Colors right after typing in the source was lost.
+- A recovery snapshot that couldn't be written (full disk) was taken for written, so installing an update could reopen older work.
+- With two windows open after a crash, the same unsaved work could be recovered twice, or discarded while open in the other window, which deleted its media.
+- A recovery snapshot Cadenza couldn't read was deleted at once; it is now kept for 30 days.
+- Where a file system refuses to save over a file, saving deleted the old file before the new one was in place.
+- On systems without a keychain, a damaged API key file was replaced by one holding only the key being saved.
+- Installing an update could lose text still being typed in a window.
+- Markdown import cut code short at "---", "--" or "Note:" inside a code block, and kept only the first image of a slide (none on slides with code).
+- A map row labeled "-99" or "99" was colored as Somaliland or Norway.
+- The data grid of a scatterplot made with Chart from Data was empty, and Add Row replaced its points with zeros. Error bars could come from another row than their value.
+- Parliament charts with more than 2,000 seats labeled each party with its number of dots instead of its seats, and small parties could lose their dot.
+- Links that merely mention youtube.com or vimeo.com were taken for videos, when pasted or copied from the browser.
+- YouTube links of the /embed/ kind were refused as private or removed, and links typed without https:// in the Media Library did nothing.
+- A Media Library photo that finished downloading closed a dialog opened meanwhile, and its credit line ended the text being typed or went missing.
+- On Linux, the YouTube browser could crash on video pages when WebKit's DMA-BUF renderer was turned off (a common workaround on NVIDIA).
+- On Windows, a Web Page printed or saved as PDF lost its page's background.
+- On Linux, a name typed with its extension in an export's save dialog ("talk.html") got it twice, and so did Theme Builder exports.
+- The presenter display's timer started again by itself after Pause, and long notes jumped back to the top during a slide's builds.
+- `\vec` drew its arrow under the letter in the editor.
+- In the light interface theme, submenus were white text on white.
+- In Arabic, keyboard shortcuts were shown reordered, with mirrored brackets.
+- Long inspector labels (in Portuguese, for example) were cut off.
+- Undo and Redo named actions in English in every language, and Duplicate showed as "Undo Paste".
+- Unsaved work found after a crash was listed as "Untitled Presentation" in English.
+- The Shape picker ignored Escape, and the next click elsewhere only closed it.
+- A disabled menu item could be run by pointing at it and pressing Enter.
+- Dragging slides, resizing the notes or scrubbing a number could get stuck when the system cancelled the gesture.
+
+
 ## 0.3.3 — 2026-10-17
 
 Cadenza now installs new versions itself, charts get error bars, dot plots and Chart from Data, and text boxes fit their text exactly. There is no macOS version any longer.

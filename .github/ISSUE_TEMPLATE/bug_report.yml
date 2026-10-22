@@ -39,7 +39,7 @@ body:
     attributes:
       label: Cadenza version
       description: Shown in **Menu > About Cadenza**.
-      placeholder: "0.3.3"
+      placeholder: "0.3.4"
     validations:
       required: true
 
