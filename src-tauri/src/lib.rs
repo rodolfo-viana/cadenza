@@ -335,16 +335,10 @@ fn theme_apply(window: Window, state: State<AppState>, def: custom_theme::ThemeD
 #[tauri::command]
 fn theme_export(window: Window, state: State<AppState>, def: custom_theme::ThemeDef, path: String, css: bool) -> CmdResult<String> {
     let def = full_theme(&state, window.label(), def);
-    let mut target = PathBuf::from(path);
+    let target = with_extension_once(PathBuf::from(path), if css { "css" } else { custom_theme::EXTENSION });
     if css {
-        if target.extension().is_none() {
-            target.set_extension("css");
-        }
         std::fs::write(&target, custom_theme::reveal_css(&def)).map_err(err)?;
     } else {
-        if target.extension().is_none() {
-            target.set_extension(custom_theme::EXTENSION);
-        }
         custom_theme::write_file(&target, &def).map_err(err)?;
     }
     Ok(target.to_string_lossy().to_string())
@@ -505,17 +499,22 @@ fn localize_missing_media(app: &AppHandle, state: &AppState, e: anyhow::Error) -
     }
 }
 
-/// Where a presentation is saved: with its extension, once ("talk.cadenza"
-/// typed into a save dialog that keeps its own ".cadenza" gives
-/// "talk.cadenza.cadenza").
-fn presentation_path(path: PathBuf) -> PathBuf {
-    let double = format!(".{0}.{0}", package::EXTENSION);
+/// `path` with the extension `ext`, once. Save dialogs that select only the
+/// name in front of their own extension give "talk.html.html" when the
+/// extension is typed too; a name typed without one gets it.
+fn with_extension_once(path: PathBuf, ext: &str) -> PathBuf {
+    let double = format!(".{ext}.{ext}");
     match path.file_name().and_then(|n| n.to_str()) {
         None => path,
         Some(name) if name.len() > double.len() && name.to_lowercase().ends_with(&double) => path.with_extension(""),
-        Some(_) if path.extension().is_none() => path.with_extension(package::EXTENSION),
+        Some(_) if path.extension().is_none() => path.with_extension(ext),
         Some(_) => path,
     }
+}
+
+/// Where a presentation is saved: with its extension, once.
+fn presentation_path(path: PathBuf) -> PathBuf {
+    with_extension_once(path, package::EXTENSION)
 }
 
 /// Writes a crash-recovery snapshot if there are unsaved changes.
@@ -1012,15 +1011,12 @@ async fn export_html(app: AppHandle, window: Window, state: State<'_, AppState>,
     let reader = ui_reader(&app);
     let fail = |e| err(localize_missing_media(&app, &state, e));
     if single {
-        let file = if target.extension().is_none() {
-            target.with_extension("html")
-        } else {
-            target
-        };
+        let file = with_extension_once(target, "html");
         export::export_single(&deck, &assets, &file, &reader).map_err(fail)?;
         Ok(file.to_string_lossy().to_string())
     } else {
-        let index = export::export_folder(&deck, &assets, &target, &reader).map_err(fail)?;
+        let dir = export::folder_target(&target).map_err(err)?;
+        let index = export::export_folder(&deck, &assets, &dir, &reader).map_err(fail)?;
         Ok(index.to_string_lossy().to_string())
     }
 }
@@ -1097,6 +1093,7 @@ fn print_slides(webview: tauri::Webview, width: f64, height: f64) -> bool {
 /// Windows' own PDF printer only knows paper sizes.
 #[tauri::command]
 async fn print_to_pdf(webview: tauri::Webview, path: String, width: f64, height: f64) -> CmdResult<()> {
+    let path = with_extension_once(PathBuf::from(path), "pdf").to_string_lossy().to_string();
     #[cfg(windows)]
     {
         let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
@@ -1954,6 +1951,15 @@ mod tests {
         assert_eq!(p("/t/talk.cadenza.cadenza"), PathBuf::from("/t/talk.cadenza"));
         assert_eq!(p("/t/talk.v2"), PathBuf::from("/t/talk.v2"));
         assert_eq!(p("/t/.cadenza.cadenza"), PathBuf::from("/t/.cadenza.cadenza"));
+        // Exports too: the web page, theme files, CSS and PDFs.
+        let once = |s: &str, ext: &str| with_extension_once(PathBuf::from(s), ext);
+        assert_eq!(once("/t/talk.html.html", "html"), PathBuf::from("/t/talk.html"));
+        assert_eq!(once("/t/talk.HTML.html", "html"), PathBuf::from("/t/talk.HTML"));
+        assert_eq!(once("/t/talk", "html"), PathBuf::from("/t/talk.html"));
+        assert_eq!(once("/t/talk.htm", "html"), PathBuf::from("/t/talk.htm"));
+        assert_eq!(once("/t/x.cadenza-theme.cadenza-theme", "cadenza-theme"), PathBuf::from("/t/x.cadenza-theme"));
+        assert_eq!(once("/t/x.css.css", "css"), PathBuf::from("/t/x.css"));
+        assert_eq!(once("/t/deck.pdf.pdf", "pdf"), PathBuf::from("/t/deck.pdf"));
     }
 
     #[test]

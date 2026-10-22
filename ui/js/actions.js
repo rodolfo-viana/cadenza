@@ -467,7 +467,7 @@ export async function exportHtml(single) {
   if (!(await flushEdits())) return;
   const path = single
     ? await dialog.save({ title: t('Export as Single HTML File'), defaultPath: `${safeTitle()}.html`, filters: [{ name: t('Web Page'), extensions: ['html'] }] })
-    : await dialog.save({ title: t('Export as Website Folder (name the new folder)'), defaultPath: safeTitle() });
+    : await dialog.save({ title: t('Export as Website Folder (name a new folder, or pick the index.html of an earlier export)'), defaultPath: safeTitle() });
   if (!path) return;
   try {
     set({ busy: t('Exporting…') });

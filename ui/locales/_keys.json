@@ -1803,7 +1803,8 @@
   "key": "Duplicate",
   "files": [
    "commands.js",
-   "themebuilder.js"
+   "themebuilder.js",
+   "ops.rs"
   ]
  },
  {
@@ -2096,7 +2097,7 @@
   ]
  },
  {
-  "key": "Export as Website Folder (name the new folder)",
+  "key": "Export as Website Folder (name a new folder, or pick the index.html of an earlier export)",
   "files": [
    "actions.js"
   ]
@@ -5813,6 +5814,12 @@
   "key": "This font has too many files to embed",
   "files": [
    "webfonts.rs"
+  ]
+ },
+ {
+  "key": "This is a file, not a folder. Type a name for a new folder, or pick the index.html of an earlier export.",
+  "files": [
+   "export.rs"
   ]
  },
  {

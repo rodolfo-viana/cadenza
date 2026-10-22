@@ -155,8 +155,30 @@ fn move_into(from: &Path, to: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Refused as a website folder: a file that isn't an earlier export's page.
+fn not_a_folder() -> anyhow::Error {
+    anyhow::anyhow!("This is a file, not a folder. Type a name for a new folder, or pick the index.html of an earlier export.")
+}
+
+/// Where a website export picked as `path` goes. Save dialogs open a folder
+/// rather than choose it, so an earlier export is picked by its
+/// `index.html`: the export goes to that folder again. Any other file is
+/// refused rather than replaced by a folder.
+pub fn folder_target(path: &Path) -> anyhow::Result<PathBuf> {
+    if !path.is_file() {
+        return Ok(path.to_path_buf());
+    }
+    match path.parent() {
+        Some(dir) if path.file_name().is_some_and(|n| n == "index.html") && dir.join("lib").is_dir() => Ok(dir.to_path_buf()),
+        _ => Err(not_a_folder()),
+    }
+}
+
 /// Exports to a folder; returns the path of `index.html`.
 pub fn export_folder(deck: &Deck, assets_dir: &Path, dir: &Path, read: UiReader) -> anyhow::Result<PathBuf> {
+    if dir.is_file() {
+        return Err(not_a_folder());
+    }
     if let Some(missing) = MissingMedia::find(deck, assets_dir) {
         return Err(MissingMedia { export: true, ..missing }.into());
     }
@@ -430,6 +452,40 @@ mod tests {
         assert!(html.contains("data:image/png;base64,UE5H"));
         assert!(html.contains("data:font/woff2;base64,Rk9OVA=="));
         assert!(html.contains("/* vendor/reveal/reveal.js */"));
+    }
+
+    #[test]
+    fn an_earlier_exports_page_picks_its_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let assets = dir.path().join("a");
+        fs::create_dir_all(&assets).unwrap();
+        fs::write(assets.join("abc.png"), b"PNG").unwrap();
+        let site = dir.path().join("site");
+        export_folder(&deck(), &assets, &site, &fake_ui).unwrap();
+        fs::write(site.join("README.txt"), b"mine").unwrap();
+        // Save dialogs open a folder instead of choosing it: the earlier
+        // export is picked by its page, and the export goes there again.
+        let target = folder_target(&site.join("index.html")).unwrap();
+        assert_eq!(target, site);
+        export_folder(&deck(), &assets, &target, &fake_ui).unwrap();
+        assert!(site.join("index.html").is_file() && site.join("lib").is_dir());
+        assert_eq!(fs::read(site.join("README.txt")).unwrap(), b"mine");
+        // Any other file is refused and stays as it was, also a page that
+        // isn't an export (no libraries beside it).
+        let other = dir.path().join("notes.txt");
+        fs::write(&other, b"keep").unwrap();
+        let web = dir.path().join("web");
+        fs::create_dir_all(&web).unwrap();
+        fs::write(web.join("index.html"), b"<p>mine</p>").unwrap();
+        for file in [&other, &web.join("index.html")] {
+            assert!(folder_target(file).is_err());
+            assert!(export_folder(&deck(), &assets, file, &fake_ui).is_err());
+        }
+        assert_eq!(fs::read(&other).unwrap(), b"keep");
+        assert_eq!(fs::read(web.join("index.html")).unwrap(), b"<p>mine</p>");
+        // New and existing folders are taken as they are.
+        assert_eq!(folder_target(&dir.path().join("new")).unwrap(), dir.path().join("new"));
+        assert_eq!(folder_target(&site).unwrap(), site);
     }
 
     #[test]
