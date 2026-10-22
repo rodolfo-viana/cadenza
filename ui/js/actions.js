@@ -31,14 +31,28 @@ import { fileExt, fileName, textToHtml, bounds, unionBounds, isBlankHtml } from 
 // Inserting elements
 // ---------------------------------------------------------------------------
 
-/** Adds an element of a kind (and variant: shape id, chart type, text role). */
-export async function insert(kind, variant = '', props = null, target = { docId: state.doc?.docId, slideId: state.slideId }) {
+/**
+ * Adds an element of a kind (and variant: shape id, chart type, text role)
+ * on `target`'s slide and selects it there. A `quiet` insert (one that
+ * finishes after the person moved on) leaves the view, the selection and
+ * any editing as they are.
+ */
+export async function insert(kind, variant = '', props = null, target = { docId: state.doc?.docId, slideId: state.slideId }, { quiet = false } = {}) {
   if (!target.docId || state.doc?.docId !== target.docId || !target.slideId) return null;
   if (!(await flushEdits())) return null;
   if (state.doc?.docId !== target.docId || !deck().slides.some((s) => s.id === target.slideId)) return null;
-  set({ editing: null, editingTable: null });
-  const out = await apply({ op: 'addElement', slide: target.slideId, kind, variant, props }, { docId: target.docId });
+  if (!quiet) set({ editing: null, editingTable: null });
+  const op = { op: 'addElement', slide: target.slideId, kind, variant, props };
+  const out = await apply(op, { docId: target.docId, navigate: !quiet, select: !quiet });
   return out?.created?.[0] || null;
+}
+
+/**
+ * Whether the person moved on from `target` (another slide, or typing)
+ * while something for it was being imported or downloaded.
+ */
+function movedOn(target) {
+  return state.slideId !== (target.slideId ?? target.slide) || !!state.editing || !!state.editingTable;
 }
 
 /** Inserts a text box with the caret in it, ready for typing. */
@@ -97,7 +111,13 @@ export async function insertAsset(asset, at = null, offset = 0, extra = {}, targ
     name: kind === 'image' ? N_('Image') : N_('Video'),
     content,
   };
-  return insert(kind, '', props, target);
+  // A large file or a download takes a while: if the person moved on
+  // meanwhile, it goes in without taking them back (a Backspace meant for
+  // their text would delete it), and a note says where it went.
+  const quiet = movedOn(target);
+  const id = await insert(kind, '', props, target, { quiet });
+  if (id && quiet) toast(t('Added to slide {n}', { n: deck().slides.findIndex((s) => s.id === target.slideId) + 1 }));
+  return id;
 }
 
 export async function importPaths(paths, at = null) {
@@ -144,13 +164,13 @@ export async function insertWebPage() {
   await insert('embed', '', { name: N_('Web Page'), content: { kind: 'embed', url: u } });
 }
 
-/** Replaces the image of an image element (or fills a placeholder). */
 /** Imports a file; `target` is the presentation and slide the action started on. */
 async function importFor(path) {
   const target = { docId: state.doc?.docId, slide: state.slideId };
   return { target, asset: await invoke('asset_import_file', { path, docId: target.docId }) };
 }
 
+/** Replaces the image of an image element (or fills a placeholder). */
 export async function replaceImage(el) {
   const path = await dialog.open({ title: t('Choose Image'), multiple: false, filters: [{ name: t('Images'), extensions: IMAGE_EXTS }] });
   if (!path) return;
@@ -161,7 +181,7 @@ export async function replaceImage(el) {
       // Placeholders keep their frame; images fill it.
       patch.content.fit = 'cover';
     }
-    await apply({ op: 'updateElements', slide: target.slide, updates: [{ id: el.id, patch }] }, { docId: target.docId });
+    await apply({ op: 'updateElements', slide: target.slide, updates: [{ id: el.id, patch }] }, { docId: target.docId, navigate: !movedOn(target) });
   } catch (e) {
     toast(String(e), 'error');
   }
@@ -172,7 +192,7 @@ export async function replaceVideo(el) {
   if (!path) return;
   try {
     const { target, asset: a } = await importFor(path);
-    await apply({ op: 'updateElements', slide: target.slide, updates: [{ id: el.id, patch: { content: { src: a.name } } }] }, { docId: target.docId });
+    await apply({ op: 'updateElements', slide: target.slide, updates: [{ id: el.id, patch: { content: { src: a.name } } }] }, { docId: target.docId, navigate: !movedOn(target) });
   } catch (e) {
     toast(String(e), 'error');
   }

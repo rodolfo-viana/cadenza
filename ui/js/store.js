@@ -251,7 +251,7 @@ export function updateWindowTitle() {
 // Ingesting views from Rust
 // ---------------------------------------------------------------------------
 
-function ingest(view, { navigate = true } = {}) {
+function ingest(view, { navigate = true, select = true } = {}) {
   const prev = state.doc;
   const sameDoc = prev?.docId === view.docId;
   if (sameDoc && view.revision != null && prev.revision != null && view.revision <= prev.revision) return false;
@@ -271,7 +271,7 @@ function ingest(view, { navigate = true } = {}) {
 
   let selection = slideId === state.slideId ? state.selection.filter((id) => elIds.includes(id)) : [];
   const createdEls = (outcome?.created || []).filter((id) => elIds.includes(id));
-  if (createdEls.length) selection = createdEls;
+  if (createdEls.length && select) selection = createdEls;
 
   let selectedSlides = state.selectedSlides.filter((id) => ids.includes(id));
   const createdSlides = (outcome?.created || []).filter((id) => ids.includes(id));
@@ -319,6 +319,8 @@ let failures = 0;
  * Applies an operation in Rust. Operations are serialized; `coalesce` merges
  * consecutive operations with the same key into one undo step, and
  * `track: false` makes none (derived data, such as measured heights).
+ * By default the view goes to the slide the operation changed and selects
+ * what it created; `navigate: false` and `select: false` leave them be.
  * `op` may be a function, called when the operation's turn comes, so it
  * reads the document as the operations before it left it; it returns null
  * to skip. Resolves with the outcome, or null when the operation failed or

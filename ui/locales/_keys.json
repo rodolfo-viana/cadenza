@@ -146,6 +146,12 @@
   ]
  },
  {
+  "key": "Added to slide {n}",
+  "files": [
+   "actions.js"
+  ]
+ },
+ {
   "key": "Added “{name}” to My Themes",
   "files": [
    "themebuilder.js"
