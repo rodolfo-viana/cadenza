@@ -228,10 +228,14 @@ export function displayName(d = state.doc) {
   return d.fileName;
 }
 
+/** A presentation's title as shown: Rust names new ones in English. */
+export function shownTitle(title) {
+  return title === 'Untitled Presentation' ? t('Untitled Presentation') : title;
+}
+
 /** The deck title, with the default title of new presentations in the interface language. */
 export function deckTitle() {
-  const title = state.doc?.deck.title || '';
-  return title === 'Untitled Presentation' ? t('Untitled Presentation') : title;
+  return shownTitle(state.doc?.deck.title || '');
 }
 
 export function updateWindowTitle() {

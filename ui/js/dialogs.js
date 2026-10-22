@@ -161,7 +161,7 @@ function Shortcuts() {
       ${Object.entries(groups).map(
         ([g, cmds]) => html`<div class="sc-group">
           <h4>${t(g)}</h4>
-          ${cmds.map((c) => html`<div class="sc-row"><span>${t(c.label)}</span><kbd>${keyLabel(c.keys[0])}</kbd></div>`)}
+          ${cmds.map((c) => html`<div class="sc-row"><span>${t(c.label)}</span><kbd dir="ltr">${keyLabel(c.keys[0])}</kbd></div>`)}
         </div>`,
       )}
       <div class="sc-group">
@@ -294,7 +294,7 @@ function Palette() {
             <${Icon} name=${it.icon || 'chevron-right'} size=${16} />
             <span class="pi-label">${it.label}</span>
             <span class="pi-group">${it.group}</span>
-            ${it.keys && html`<kbd>${keyLabel(it.keys)}</kbd>`}
+            ${it.keys && html`<kbd dir="ltr">${keyLabel(it.keys)}</kbd>`}
           </div>`,
         )}
         ${!items.length && html`<div class="palette-empty">${t('No matches')}</div>`}

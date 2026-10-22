@@ -1142,6 +1142,10 @@ export function DiagramPanel({ els }) {
     const a = svgAspect(d.svgLight || d.svgDark);
     if (a) patchAll([el], { h: Math.max(20, Math.round(el.w / a)) }, null);
   };
+  // Over the source field, not above the controls: leaving the field starts
+  // a drawing, and the click that left it (on Look, say) must still find
+  // its button.
+  const rendering = busy && html`<div class="diagram-busy"><span class="spinner small" /> ${t('Rendering…')}</div>`;
   return html`<${Section} title=${t('Diagram')} id="diagram">
     <${Row} label=${t('Template')}>
       <${Select}
@@ -1150,10 +1154,10 @@ export function DiagramPanel({ els }) {
         onChange=${(v) => v !== '' && update({ source: DIAGRAM_TEMPLATES[Number(v)][1] })}
       />
     <//>
-    <div ref=${ref}>
+    <div ref=${ref} class="diagram-source">
       <${TextField} multiline mono rows=${12} live value=${d.source} onChange=${(v, live) => update({ source: v }, live)} />
+      ${rendering}
     </div>
-    ${busy && html`<div class="ihint"><span class="spinner small" /> ${t('Rendering…')}</div>`}
     ${error && html`<pre class="diagram-error">${error}</pre>`}
     <${Hint}>
       ${t('Write Mermaid syntax: flowcharts, sequence, class, state, ER, Gantt, pie, mindmaps, timelines and more.')} <a href="#" onClick=${(e) => { e.preventDefault(); opener.openUrl('https://mermaid.js.org/intro/'); }}>${t('Learn more')}</a>

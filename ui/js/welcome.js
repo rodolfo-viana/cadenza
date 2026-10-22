@@ -2,7 +2,7 @@
 
 import { html, useEffect, useState } from './lib.js';
 import { Icon } from './icons.js';
-import { state, useStore, newDocument, openDialog, openPath, recover, discardRecovery, refreshRecoverable, settings, openModal, refreshRecent } from './store.js';
+import { state, useStore, newDocument, openDialog, openPath, recover, discardRecovery, refreshRecoverable, settings, openModal, refreshRecent, shownTitle } from './store.js';
 import { invoke } from './api.js';
 import { Segmented } from './controls.js';
 import { cardFromDef } from './themebuilder.js';
@@ -71,7 +71,7 @@ export function Welcome() {
         <div class="recover-head"><${Icon} name="history" size=${16} />${t('Unsaved work found')}</div>
         ${info.recoverable.map(
           (r) => html`<div class="recover-item">
-            <div><b>${r.title || t('Untitled')}</b><small>${tn('{n} slide', '{n} slides', r.slides)} · ${timeAgo(r.savedAt)}</small></div>
+            <div><b>${shownTitle(r.title) || t('Untitled')}</b><small>${tn('{n} slide', '{n} slides', r.slides)} · ${timeAgo(r.savedAt)}</small></div>
             <div class="row-inline">
               <button class="btn btn-sm btn-primary" onClick=${() => recover(r.sessionId)}>${t('Recover')}</button>
               <button class="btn btn-sm btn-ghost" onClick=${() => discardRecovery(r.sessionId)}>${t('Discard')}</button>

@@ -183,7 +183,7 @@ function MenuList({ items, x, y, alignRight, flipX, onDone, depth = 0, keyboard 
       >
         <span class="menu-check">${it.checked ? html`<${Icon} name="check" size=${14} />` : it.icon ? html`<${Icon} name=${it.icon} size=${15} />` : null}</span>
         <span class="menu-label" id=${labelId} style=${it.style}>${it.label}</span>
-        ${it.keys && html`<span class="menu-keys">${keyLabel(it.keys)}</span>`}
+        ${it.keys && html`<span class="menu-keys" dir="ltr">${keyLabel(it.keys)}</span>`}
         ${it.children && html`<${Icon} name="chevron-right" size=${14} class="menu-sub" />`}
         ${open &&
         it.children &&
