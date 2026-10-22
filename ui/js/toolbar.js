@@ -7,7 +7,7 @@ import { ToolButton, showMenuAt } from './ui.js';
 import { item, COMMANDS } from './commands.js';
 import * as A from './actions.js';
 import { ShapeGlyph } from './panels.js';
-import { cls, fileName } from './util.js';
+import { cls, fileName, recentLabels } from './util.js';
 import { t, isRtl } from './i18n.js';
 import { CHART_ICONS, chartSample } from './charts.js';
 
@@ -17,6 +17,7 @@ const cmd = item;
 
 function appMenu() {
   const recent = (state.info.recent || []).slice(0, 8);
+  const labels = recentLabels(recent);
   return [
     cmd('file.new', { label: t('New Presentation…') }),
     cmd('file.newWindow'),
@@ -25,7 +26,7 @@ function appMenu() {
       label: t('Open Recent'),
       icon: 'history',
       disabled: !recent.length,
-      children: recent.map((r) => ({ label: r.name, run: () => import('./store.js').then((m) => m.openPath(r.path)) })),
+      children: recent.map((r, i) => ({ label: labels[i], run: () => import('./store.js').then((m) => m.openPath(r.path)) })),
     },
     '-',
     cmd('file.save'),

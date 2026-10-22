@@ -51,12 +51,15 @@ pub enum Op {
         #[serde(default)]
         props: Option<Value>,
     },
-    /// Inserts copies of elements (paste), offset by `offset` pixels.
+    /// Inserts copies of elements (paste), offset by `offset` pixels; a
+    /// `duplicate` is named so in the undo history.
     InsertElements {
         slide: String,
         elements: Vec<Element>,
         #[serde(default)]
         offset: f64,
+        #[serde(default)]
+        duplicate: bool,
     },
     UpdateElements {
         slide: String,
@@ -294,7 +297,12 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             s.elements.push(el);
             Ok(outcome(insert_label(&kind), Some(slide), vec![id]))
         }
-        Op::InsertElements { slide, elements, offset } => {
+        Op::InsertElements {
+            slide,
+            elements,
+            offset,
+            duplicate,
+        } => {
             let s = find_slide(deck, &slide)?;
             let existing_links: Vec<String> = s.elements.iter().map(|e| e.link.clone()).collect();
             let mut created = Vec::new();
@@ -312,7 +320,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                 created.push(el.id.clone());
                 s.elements.push(el);
             }
-            Ok(outcome("Paste", Some(slide), created))
+            Ok(outcome(if duplicate { n_("Duplicate") } else { n_("Paste") }, Some(slide), created))
         }
         Op::UpdateElements { slide, updates } => {
             let s = find_slide(deck, &slide)?;
@@ -794,6 +802,27 @@ mod tests {
         assert_eq!(mover.build.order, 1);
         assert_eq!(chart.build.order, 2);
         assert_eq!(mover.build.path_order, 3 + series, "the path comes after every series step");
+    }
+
+    #[test]
+    fn duplicates_and_pastes_are_named_apart() {
+        let mut d = deck3();
+        let slide = d.slides[0].id.clone();
+        let elements = d.slides[0].elements.clone();
+        let insert = |d: &mut Deck, duplicate: bool| {
+            let op = Op::InsertElements {
+                slide: slide.clone(),
+                elements: elements.clone(),
+                offset: 24.0,
+                duplicate,
+            };
+            apply(d, op).unwrap().label
+        };
+        assert_eq!(insert(&mut d, true), "Duplicate");
+        assert_eq!(insert(&mut d, false), "Paste");
+        // Pastes sent without the flag (older pages) are pastes.
+        let op: Op = serde_json::from_value(json!({"op": "insertElements", "slide": slide, "elements": []})).unwrap();
+        assert_eq!(apply(&mut d, op).unwrap().label, "Paste");
     }
 
     #[test]

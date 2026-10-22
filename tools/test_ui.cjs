@@ -678,6 +678,17 @@ test('links are told from searches, and video links by their host', async () => 
   }
 });
 
+test('recent files with the same name are told apart by their folders', async () => {
+  const U = await standalone('util.js', { 'i18n.js': { t: (s) => s, language: () => 'en' } }, { navigator: { platform: 'Linux' } });
+  const file = (folder, name) => ({ name, folder, path: `${folder}/${name}.cadenza` });
+  assert.deepEqual(
+    U.recentLabels([file('/home/r/Desktop', 'talk'), file('/home/r/QA', 'everything'), file('/home/r/Downloads', 'everything'), file('/home/r/a/x', 'deck'), file('/home/r/b/x', 'deck')]),
+    ['talk', 'everything — QA', 'everything — Downloads', 'deck — a/x', 'deck — b/x'],
+  );
+  const win = { name: 'talk', folder: 'C:\\Users\\r\\Desktop', path: 'C:\\Users\\r\\Desktop\\talk.cadenza' };
+  assert.deepEqual(U.recentLabels([win, { ...win, folder: 'D:\\Talks', path: 'D:\\Talks\\talk.cadenza' }]), ['talk — Desktop', 'talk — Talks']);
+});
+
 const teleprompter = () => standalone('teleprompter.js', { 'i18n.js': { t: (s) => s }, 'icon-data.js': { ICONS: {} } });
 
 test('the teleprompter box stays inside the presenter display', async () => {

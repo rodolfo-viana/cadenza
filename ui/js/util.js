@@ -84,6 +84,25 @@ export function isVideoLink(url) {
   return false;
 }
 
+/**
+ * Menu labels for recent files: the name, and for a name that repeats, as
+ * much of the file's folder as tells them apart ("talk — Desktop").
+ */
+export function recentLabels(recent) {
+  const sep = (r) => (r.folder.includes('\\') && !r.folder.includes('/') ? '\\' : '/');
+  const parts = (r) => r.folder.split(/[\\/]/).filter(Boolean);
+  return recent.map((r) => {
+    const others = recent.filter((o) => o.name === r.name && o.path !== r.path);
+    if (!others.length) return r.name;
+    const mine = parts(r);
+    for (let k = 1; k <= mine.length; k++) {
+      const tail = mine.slice(-k).join(sep(r));
+      if (others.every((o) => parts(o).slice(-k).join(sep(r)) !== tail)) return `${r.name} — ${tail}`;
+    }
+    return `${r.name} — ${r.folder}`;
+  });
+}
+
 /** Whether rich text shows no characters, only spaces (parsed inert: nothing runs or loads). */
 export function isBlankHtml(html) {
   const tpl = document.createElement('template');

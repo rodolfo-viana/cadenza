@@ -185,6 +185,7 @@ impl Clipboard {
                 slide: target.context("No slide is selected")?,
                 elements: copied.slides.remove(0).elements,
                 offset,
+                duplicate: false,
             },
             Selection::Slides { .. } => Op::InsertSlides {
                 after: target,

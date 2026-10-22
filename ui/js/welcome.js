@@ -50,10 +50,11 @@ export function Welcome() {
   const recent = info.recent || [];
   const create = (id = theme) => newDocument(id, aspect);
   // Another window may have recovered or discarded unsaved work meanwhile.
+  // Not on focus: the click that focuses the window would land on whatever
+  // moved under the pointer. A card that went stale is refused when used
+  // (the window that has it comes forward), and the list refreshes then.
   useEffect(() => {
     refreshRecoverable();
-    addEventListener('focus', refreshRecoverable);
-    return () => removeEventListener('focus', refreshRecoverable);
   }, []);
   const groups = [
     ['Cadenza', t('Cadenza themes')],

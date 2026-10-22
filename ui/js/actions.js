@@ -235,7 +235,7 @@ export async function deleteSelection() {
 export async function duplicateSelection() {
   const els = selectedElements();
   if (!els.length) return;
-  await apply({ op: 'insertElements', slide: state.slideId, elements: els, offset: 24 });
+  await apply({ op: 'insertElements', slide: state.slideId, elements: els, offset: 24, duplicate: true });
 }
 
 export const arrange = (action) =>
