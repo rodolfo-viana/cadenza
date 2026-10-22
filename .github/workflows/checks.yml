@@ -13,7 +13,9 @@ permissions:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    # The Ubuntu release Cadenza is developed on. A newer one comes in when
+    # this is changed, not when GitHub moves ubuntu-latest.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -23,7 +25,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev
 
       # Pinned to v1 (on the action's master branch), which takes the
       # toolchain as an input; @stable would pick it from the ref instead.
