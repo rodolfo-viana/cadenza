@@ -9,7 +9,7 @@ import { state, set, apply, closeModal, toast, currentSlide, deck } from './stor
 import { Modal, Button } from './ui.js';
 import { Toggle } from './controls.js';
 import * as A from './actions.js';
-import { cls, escapeHtml } from './util.js';
+import { cls, escapeHtml, linkOf } from './util.js';
 import { t, N_ } from './i18n.js';
 
 // [where to get a key, service name, what the key is called]
@@ -110,7 +110,7 @@ function BrowseCard({ provider, onKey }) {
   </div>`;
 }
 
-const isLink = (q) => /^https?:\/\/\S+$/i.test(q.trim());
+const isLink = (q) => !!linkOf(q);
 
 /** Asks for an API key inline. */
 export function KeyPrompt({ name, onSaved, compact }) {
@@ -196,7 +196,8 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
 
   async function search(cursor = null) {
     const q = query.trim();
-    if (isLink(q)) {
+    const link = linkOf(q);
+    if (link) {
       // A video link, or a link to an image (or a page that shows one).
       const my = ++seq.current;
       setLoading(true);
@@ -204,7 +205,7 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
       setItems([]);
       setNext(null);
       try {
-        const item = await invoke(tab === 'videos' ? 'media_oembed' : 'media_link', { url: q });
+        const item = await invoke(tab === 'videos' ? 'media_oembed' : 'media_link', { url: link });
         if (my === seq.current) setPreview(item);
       } catch (e) {
         if (my !== seq.current) return;

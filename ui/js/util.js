@@ -52,6 +52,38 @@ export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+/**
+ * The web address in `text`, if it is one: with its scheme, or a site and a
+ * path typed without it ("youtu.be/…", "example.org/photo.jpg").
+ */
+export function linkOf(text) {
+  const s = text.trim();
+  if (/^https?:\/\/\S+$/i.test(s)) return s;
+  return /^(?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?\/\S*$/i.test(s) ? 'https://' + s.replace(/^\/\//, '') : null;
+}
+
+/**
+ * Whether `url` is a YouTube or Vimeo video, read like render.rs's
+ * video_embed: by its host (not a mention elsewhere in the address) and
+ * with a video in it.
+ */
+export function isVideoLink(url) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+  const on = (domain) => u.hostname === domain || u.hostname.endsWith('.' + domain);
+  const path = u.pathname.split('/').filter(Boolean);
+  const id = (s) => /^[\w-]+$/.test(s || '');
+  if (on('youtu.be')) return id(path[0]);
+  if (on('youtube.com')) return id(u.searchParams.get('v')) || (['embed', 'shorts'].includes(path[0]) && id(path[1]));
+  if (on('vimeo.com')) return /^\d+$/.test((path[0] === 'video' ? path[1] : path[0]) || '');
+  return false;
+}
+
 /** Whether rich text shows no characters, only spaces (parsed inert: nothing runs or loads). */
 export function isBlankHtml(html) {
   const tpl = document.createElement('template');

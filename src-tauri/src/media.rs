@@ -426,12 +426,35 @@ fn html_unescape(s: &str) -> String {
 }
 
 /// Preview information for a YouTube or Vimeo link (no key needed).
+/// The provider of a video link and the oEmbed address that describes it.
+/// YouTube's oEmbed knows watch pages, not every kind of link (an /embed/
+/// one gets a 404), so it is asked about the video's watch page. Vimeo keeps
+/// the link itself (unlisted videos need its hash).
+fn oembed_endpoint(link: &str) -> Option<(&'static str, String)> {
+    match crate::render::video_embed(link)? {
+        ("youtube", id) => Some((
+            "youtube",
+            format!(
+                "https://www.youtube.com/oembed?format=json&url={}",
+                enc(&format!("https://www.youtube.com/watch?v={id}"))
+            ),
+        )),
+        ("vimeo", _) => {
+            let full = if link.contains("://") {
+                link.to_string()
+            } else {
+                format!("https://{}", link.trim_start_matches('/'))
+            };
+            Some(("vimeo", format!("https://vimeo.com/api/oembed.json?url={}", enc(&full))))
+        }
+        _ => None,
+    }
+}
+
 pub fn oembed(link: &str) -> anyhow::Result<MediaItem> {
     let link = link.trim();
-    let (provider, endpoint) = match crate::render::video_embed(link) {
-        Some(("youtube", _)) => ("youtube", format!("https://www.youtube.com/oembed?format=json&url={}", enc(link))),
-        Some(("vimeo", _)) => ("vimeo", format!("https://vimeo.com/api/oembed.json?url={}", enc(link))),
-        _ => bail!("Paste a YouTube or Vimeo link"),
+    let Some((provider, endpoint)) = oembed_endpoint(link) else {
+        bail!("Paste a YouTube or Vimeo link")
     };
     let v = get_json(&endpoint, &[]).context("This video is private, removed or cannot be embedded")?;
     Ok(MediaItem {
@@ -872,6 +895,30 @@ mod tests {
             Some(("//cdn.x.org/a.png".into(), String::new()))
         );
         assert_eq!(page_image("<title>None</title>"), None);
+    }
+
+    #[test]
+    fn video_links_are_described_by_their_watch_page() {
+        let watch = format!(
+            "https://www.youtube.com/oembed?format=json&url={}",
+            enc("https://www.youtube.com/watch?v=abc_123")
+        );
+        for link in [
+            "https://www.youtube.com/embed/abc_123",
+            "https://www.youtube.com/shorts/abc_123",
+            "https://youtu.be/abc_123?t=4",
+            "m.youtube.com/watch?v=abc_123",
+            "https://www.youtube.com/watch?v=abc_123&list=x",
+        ] {
+            assert_eq!(oembed_endpoint(link), Some(("youtube", watch.clone())), "{link}");
+        }
+        let vimeo = |l: &str| format!("https://vimeo.com/api/oembed.json?url={}", enc(l));
+        assert_eq!(
+            oembed_endpoint("https://vimeo.com/76979871/abcdef"),
+            Some(("vimeo", vimeo("https://vimeo.com/76979871/abcdef")))
+        );
+        assert_eq!(oembed_endpoint("vimeo.com/76979871"), Some(("vimeo", vimeo("https://vimeo.com/76979871"))));
+        assert_eq!(oembed_endpoint("https://notyoutube.com/watch?v=abc_123"), None);
     }
 
     #[test]

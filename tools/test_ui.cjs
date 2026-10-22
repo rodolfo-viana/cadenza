@@ -646,6 +646,38 @@ test('a presentation’s own CSS is kept to the slides in the editor', async () 
   }
 });
 
+test('links are told from searches, and video links by their host', async () => {
+  const U = await standalone('util.js', { 'i18n.js': { t: (s) => s, language: () => 'en' } }, { navigator: { platform: 'Linux' }, URL });
+  assert.equal(U.linkOf(' https://example.org/a.jpg '), 'https://example.org/a.jpg');
+  assert.equal(U.linkOf('youtu.be/abc_123'), 'https://youtu.be/abc_123');
+  assert.equal(U.linkOf('m.youtube.com/watch?v=abc'), 'https://m.youtube.com/watch?v=abc');
+  assert.equal(U.linkOf('//vimeo.com/76979871'), 'https://vimeo.com/76979871');
+  for (const search of ['lighthouse', 'red fox', 'AC/DC', 'example.org', 'ftp://example.org/a']) assert.equal(U.linkOf(search), null, search);
+
+  for (const video of [
+    'https://www.youtube.com/watch?v=abc_123',
+    'https://m.youtube.com/watch?feature=share&v=abc',
+    'https://youtu.be/abc_123?t=4',
+    'https://www.youtube.com/embed/abc',
+    'https://www.youtube.com/shorts/abc',
+    'https://vimeo.com/76979871',
+    'https://player.vimeo.com/video/76979871?h=1',
+  ]) {
+    assert.ok(U.isVideoLink(video), video);
+  }
+  for (const other of [
+    'https://example.com/article?ref=youtube.com',
+    'https://notyoutube.com/watch?v=abc',
+    'https://youtube.com.example.org/watch?v=abc',
+    'https://www.youtube.com/@channel',
+    'https://vimeo.com/channels/staffpicks',
+    'ftp://youtube.com/watch?v=abc',
+    'not a link',
+  ]) {
+    assert.ok(!U.isVideoLink(other), other);
+  }
+});
+
 const teleprompter = () => standalone('teleprompter.js', { 'i18n.js': { t: (s) => s }, 'icon-data.js': { ICONS: {} } });
 
 test('the teleprompter box stays inside the presenter display', async () => {

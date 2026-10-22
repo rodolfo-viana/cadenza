@@ -25,7 +25,7 @@ import {
 } from './store.js';
 import { t, N_ } from './i18n.js';
 import { chartSteps } from './charts.js';
-import { fileExt, fileName, textToHtml, bounds, unionBounds, isBlankHtml } from './util.js';
+import { fileExt, fileName, textToHtml, bounds, unionBounds, isBlankHtml, isVideoLink } from './util.js';
 
 // ---------------------------------------------------------------------------
 // Inserting elements
@@ -436,7 +436,9 @@ async function pasteData(files, text, target, docId) {
     if (asset && state.doc?.docId === docId) await insertAsset(asset, null, 0, {}, { docId, slideId: target });
     return;
   }
-  if (/^https?:\/\/\S+$/i.test(txt) && /youtube\.com|youtu\.be|vimeo\.com/i.test(txt)) {
+  // Only a link to a video itself (a page that merely mentions youtube.com
+  // in its address would be an empty, unplayable video).
+  if (/^https?:\/\/\S+$/i.test(txt) && isVideoLink(txt)) {
     await insert('video', '', { name: N_('Video'), content: { kind: 'video', src: txt, autoplay: false } }, { docId, slideId: target });
     return;
   }
