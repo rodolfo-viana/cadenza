@@ -1055,6 +1055,12 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
     let (cx, cy) = (w / 2.0, h / 2.0);
     let r = (w.min(h) / 2.0 - f * 0.5).max(4.0);
     let hole = if chart.chart == "donut" { r * 0.58 } else { 0.0 };
+    let labels = if chart.show_values {
+        let lr = if hole > 0.0 { (r + hole) / 2.0 } else { r * 0.62 };
+        pie_labels(&values, total, (cx, cy), lr, f * 0.85)
+    } else {
+        Vec::new()
+    };
     let mut angle = -std::f64::consts::FRAC_PI_2;
     let mut slice = 0;
     for (i, v) in values.iter().enumerate() {
@@ -1138,17 +1144,12 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
                 esc(&color)
             );
         }
-        if chart.show_values {
-            let mid = angle + sweep / 2.0;
-            let lr = if hole > 0.0 { (r + hole) / 2.0 } else { r * 0.62 };
-            let pct = v / total * 100.0;
-            // Whole percents, but a slice too thin for one still shows its share.
-            let text = if pct < 0.5 { fmt_value(pct) } else { num(pct.round()) };
+        if let Some(Some((x, y, text))) = labels.get(i) {
             let _ = write!(
                 svg,
-                r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-weight="600" style="fill:#fff" font-size="{}">{}%</text>"#,
-                num(cx + lr * mid.cos()),
-                num(cy + lr * mid.sin()),
+                r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-weight="600" style="fill:#fff" font-size="{}">{}</text>"#,
+                num(*x),
+                num(*y),
                 num(f * 0.85),
                 text
             );
@@ -1156,6 +1157,44 @@ fn pie_chart(svg: &mut String, chart: &ChartContent, w: f64, h: f64, f: f64, ste
         close_step(svg, steps);
         angle += sweep;
     }
+}
+
+/// The share labels of a pie's slices (by value index), at `lr` from the
+/// center, in text of `size`. Labels that would cover one another are left
+/// out, the larger slices' first kept: thin neighboring slices would
+/// otherwise pile their labels up into a blot.
+fn pie_labels(values: &[f64], total: f64, (cx, cy): (f64, f64), lr: f64, size: f64) -> Vec<Option<(f64, f64, String)>> {
+    let mut angle = -std::f64::consts::FRAC_PI_2;
+    let mut labels: Vec<Option<(f64, f64, String)>> = Vec::with_capacity(values.len());
+    for v in values {
+        if *v <= 0.0 {
+            labels.push(None);
+            continue;
+        }
+        let sweep = v / total * std::f64::consts::TAU;
+        let mid = angle + sweep / 2.0;
+        let pct = v / total * 100.0;
+        // Whole percents, but a slice too thin for one still shows its share.
+        let text = if pct < 0.5 { fmt_value(pct) } else { num(pct.round()) };
+        labels.push(Some((cx + lr * mid.cos(), cy + lr * mid.sin(), format!("{text}%"))));
+        angle += sweep;
+    }
+    let mut order: Vec<usize> = (0..values.len()).filter(|&i| labels[i].is_some()).collect();
+    order.sort_by(|&a, &b| values[b].total_cmp(&values[a]).then(a.cmp(&b)));
+    // Boxes of the labels kept so far (left, top, right, bottom), from an
+    // estimate of the bold text's width.
+    let mut placed: Vec<[f64; 4]> = Vec::new();
+    let mut keep = vec![false; values.len()];
+    for i in order {
+        let Some((x, y, text)) = &labels[i] else { continue };
+        let (hw, hh) = (text.chars().count() as f64 * size * 0.31 + size * 0.15, size * 0.6);
+        let b = [x - hw, y - hh, x + hw, y + hh];
+        if placed.iter().all(|p| b[2] <= p[0] || p[2] <= b[0] || b[3] <= p[1] || p[3] <= b[1]) {
+            placed.push(b);
+            keep[i] = true;
+        }
+    }
+    labels.into_iter().zip(keep).map(|(label, kept)| label.filter(|_| kept)).collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -2935,6 +2974,41 @@ mod tests {
         };
         let svg = chart_svg(&pie, 800.0, 450.0, None);
         assert!(svg.contains(">100%<") && svg.contains(">0.4%<"), "a thin slice is not 0%: {svg}");
+    }
+
+    #[test]
+    fn pie_labels_never_cover_one_another() {
+        // Thin slices side by side: their labels would land on one another.
+        let values = [96.0, 0.3, 0.2, 0.4, 3.0];
+        for chart in ["pie", "donut"] {
+            let pie = ChartContent {
+                chart: chart.into(),
+                series: vec![series(&values)],
+                labels: (0..values.len()).map(|i| format!("s{i}")).collect(),
+                show_values: true,
+                ..Default::default()
+            };
+            let svg = chart_svg(&pie, 800.0, 450.0, None);
+            let at: Vec<(f64, f64, String)> = svg
+                .split("<text x=\"")
+                .skip(1)
+                .filter(|t| t.contains("%</text>"))
+                .map(|t| {
+                    let x: f64 = t.split('"').next().unwrap().parse().unwrap();
+                    let y: f64 = t.split("y=\"").nth(1).unwrap().split('"').next().unwrap().parse().unwrap();
+                    let text = t.split('>').nth(1).unwrap().split('<').next().unwrap().to_string();
+                    (x, y, text)
+                })
+                .collect();
+            assert!(at.iter().any(|l| l.2 == "96%"), "the large slice keeps its label: {at:?}");
+            assert!(at.len() < values.len(), "{chart}: some thin labels are left out: {at:?}");
+            for (k, a) in at.iter().enumerate() {
+                for b in &at[k + 1..] {
+                    let apart = (a.0 - b.0).abs() > (a.2.len() + b.2.len()) as f64 * 4.0 || (a.1 - b.1).abs() > 12.0;
+                    assert!(apart, "{chart}: {a:?} covers {b:?}");
+                }
+            }
+        }
     }
 
     #[test]

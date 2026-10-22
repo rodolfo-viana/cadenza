@@ -824,7 +824,7 @@ export function Canvas() {
         </div>
         ${settings().showGrid && html`<div class="grid-overlay" style=${{ backgroundSize: `${(settings().gridSize || 40) * scale}px ${(settings().gridSize || 40) * scale}px` }} />`}
       </div>
-      <div class="overlay" style=${{ left: frameX + 'px', top: frameY + 'px', width: W * scale + 'px', height: H * scale + 'px' }}>
+      <div class="canvas-overlay" style=${{ left: frameX + 'px', top: frameY + 'px', width: W * scale + 'px', height: H * scale + 'px' }}>
         ${hoverEl && html`<div class="hover-box" style=${box2screen(geom(hoverEl))} />`}
         ${selected.map((el) => {
           const g = geom(el);

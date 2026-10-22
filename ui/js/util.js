@@ -194,21 +194,38 @@ export function timeAgo(ms) {
 export const cls = (...xs) => xs.filter(Boolean).join(' ');
 
 /**
- * Keeps CSS to one part of the page: its rules go inside `@scope (root)`,
- * where `:root` stands for the scope's root. At-rules that can't be scoped
- * (@font-face, @keyframes…) stay outside, as they style nothing by
- * themselves.
+ * Positions in `text` of the characters in `chars` that are outside
+ * strings, comments and brackets.
  */
-export function scopeCss(css, root) {
-  const global = [];
-  const scoped = [];
-  const add = (rule) => {
-    if (!rule.trim()) return;
-    const head = rule.replace(/\/\*[\s\S]*?\*\//g, '').trimStart();
-    (/^@(?:-[a-z]+-)?(?:font-face|keyframes|property|counter-style|font-feature-values|import|charset|namespace)\b/i.test(head) ? global : scoped).push(rule);
-  };
-  // Top-level rules end at their closing brace (or `;` for statements),
-  // skipping strings and comments.
+function topLevelAt(text, chars) {
+  const at = [];
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2);
+      i = end < 0 ? text.length : end + 1;
+    } else if ('([{'.includes(c)) {
+      if (depth === 0 && chars.includes(c)) at.push(i);
+      depth++;
+    } else if (')]}'.includes(c)) depth = Math.max(0, depth - 1);
+    else if (depth === 0 && chars.includes(c)) at.push(i);
+  }
+  return at;
+}
+
+/**
+ * The top-level parts of `css`: rules, which end at their closing brace,
+ * and statements, which end at `;`. Strings and comments are skipped; the
+ * parts joined give `css` back.
+ */
+function cssParts(css) {
+  const parts = [];
   let depth = 0;
   let start = 0;
   let quote = null;
@@ -223,11 +240,67 @@ export function scopeCss(css, root) {
       i = end < 0 ? css.length : end + 1;
     } else if (c === '{') depth++;
     else if ((c === '}' && depth > 0 && --depth === 0) || (c === ';' && depth === 0)) {
-      add(css.slice(start, i + 1));
+      parts.push(css.slice(start, i + 1));
       start = i + 1;
     }
   }
-  add(css.slice(start));
-  const body = scoped.join('').replace(/:root\b/g, ':scope');
-  return `${global.join('')}\n@scope (${root}) {${body}\n}`;
+  if (start < css.length) parts.push(css.slice(start));
+  return parts;
+}
+
+/** A selector's leading part that stands for the page itself (html, body…). */
+const PAGE_ROOT = /^(?:html|body|:root|\.reveal-viewport)+(?![\w-])/;
+
+/**
+ * One selector, the page's root (`html`, `body`, `:root` or reveal.js'
+ * `.reveal-viewport`, as in `body .reveal h1`) made the scope's root.
+ * Whitespace and comments around it are kept.
+ */
+function scopeSelector(part) {
+  const [, lead, core, trail] = part.match(/^((?:\s|\/\*[\s\S]*?\*\/)*)([\s\S]*?)(\s*)$/);
+  let rest = core;
+  let rooted = false;
+  for (let m = rest.match(PAGE_ROOT); m; m = rest.match(PAGE_ROOT)) {
+    rooted = true;
+    rest = rest.slice(m[0].length);
+    // `html body`, `html > body`: the root again.
+    const combinator = rest.match(/^\s*>\s*|^\s+/);
+    if (!combinator || !PAGE_ROOT.test(rest.slice(combinator[0].length))) break;
+    rest = rest.slice(combinator[0].length);
+  }
+  return lead + (rooted ? ':scope' + rest : rest).replace(/:root(?![\w-])/g, ':scope') + trail;
+}
+
+/** One rule with its selectors scoped, and those of the rules inside @media, @supports…. */
+function scopeRule(rule) {
+  const [open] = topLevelAt(rule, '{');
+  const close = rule.lastIndexOf('}');
+  if (open === undefined || close < open) return rule;
+  const head = rule.slice(0, open);
+  const inner = rule.slice(open + 1, close);
+  const tail = rule.slice(close);
+  if (head.replace(/\/\*[\s\S]*?\*\//g, '').trimStart().startsWith('@')) {
+    const group = /^\s*@(?:-[a-z]+-)?(?:media|supports|container|layer|document)\b/i.test(head.replace(/\/\*[\s\S]*?\*\//g, ''));
+    return group ? head + '{' + cssParts(inner).map(scopeRule).join('') + tail : rule;
+  }
+  const cuts = [-1, ...topLevelAt(head, ','), head.length];
+  return cuts.slice(1).map((end, k) => scopeSelector(head.slice(cuts[k] + 1, end))).join(',') + '{' + inner + tail;
+}
+
+/**
+ * Keeps CSS to one part of the page: its rules go inside `@scope (root)`,
+ * and selectors that start at the page itself (`:root`, `html`, `body`,
+ * `.reveal-viewport`) start at the scope's root instead. At-rules that
+ * can't be scoped (@font-face, @keyframes…) stay outside, as they style
+ * nothing by themselves.
+ */
+export function scopeCss(css, root) {
+  const global = [];
+  const scoped = [];
+  for (const rule of cssParts(css)) {
+    if (!rule.trim()) continue;
+    const head = rule.replace(/\/\*[\s\S]*?\*\//g, '').trimStart();
+    (/^@(?:-[a-z]+-)?(?:font-face|keyframes|property|counter-style|font-feature-values|import|charset|namespace|page)\b/i.test(head) ? global : scoped).push(rule);
+  }
+  return `${global.join('')}\n@scope (${root}) {${scoped.map(scopeRule).join('')}\n}`;
 }

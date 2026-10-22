@@ -363,7 +363,7 @@ body.dragging-slides, body.dragging-slides * { cursor: grabbing !important; }
   overflow: hidden;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 18px 50px rgba(0, 0, 0, 0.38);
 }
-.overlay { position: absolute; pointer-events: none; }
+.canvas-overlay { position: absolute; pointer-events: none; }
 .hover-box { position: absolute; outline: 1px solid rgba(124, 108, 255, 0.55); pointer-events: none; }
 /* Above guides (z-index 1): a box placed on a guide keeps its handles. */
 .sel-box { position: absolute; z-index: 2; outline: 1.5px solid var(--sel); pointer-events: none; }

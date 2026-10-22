@@ -618,6 +618,32 @@ test('a presentation’s own CSS is kept to the slides in the editor', async () 
     assert(inside.includes(rule), rule);
   }
   assert(inside.trimEnd().endsWith('}') && !inside.includes(':root'));
+
+  // Selectors that start at the page itself start at the scope's root, also
+  // inside @media; values and other selectors are left as they are.
+  const page = U.scopeCss(
+    [
+      '.reveal-viewport { background: green; }',
+      'html body .reveal h1, body > .reveal .x { color: red; }',
+      'html, body { margin: 0; }',
+      '@media print { .reveal-viewport .slides { gap: 1px; } }',
+      'p::after { content: "body :root"; }',
+      '.body, .reveal-viewport-x, bodyx { color: blue; }',
+      ':is(body, .y) .z { color: pink; }',
+    ].join('\n'),
+    '.root',
+  ).split('@scope (.root) {')[1];
+  for (const rule of [
+    ':scope { background: green; }',
+    ':scope .reveal h1, :scope > .reveal .x { color: red; }',
+    ':scope, :scope { margin: 0; }',
+    '@media print { :scope .slides { gap: 1px; } }',
+    'p::after { content: "body :root"; }',
+    '.body, .reveal-viewport-x, bodyx { color: blue; }',
+    ':is(body, .y) .z { color: pink; }',
+  ]) {
+    assert(page.includes(rule), rule);
+  }
 });
 
 const teleprompter = () => standalone('teleprompter.js', { 'i18n.js': { t: (s) => s }, 'icon-data.js': { ICONS: {} } });
