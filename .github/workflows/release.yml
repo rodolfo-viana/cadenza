@@ -29,7 +29,8 @@ jobs:
   # another version than the release) and have release notes. Runs on a
   # branch only build artifacts, so they only need the two versions to agree.
   version:
-    runs-on: ubuntu-latest
+    # Pinned like checks.yml (this job needs only Python and jq).
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -151,7 +152,7 @@ jobs:
   check-updates:
     needs: build
     if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check latest.json
         env:
