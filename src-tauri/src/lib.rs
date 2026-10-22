@@ -801,25 +801,8 @@ fn media_browse(app: AppHandle, window: Window, state: State<AppState>, provider
         let _ = old.wait();
     }
     let exe = std::env::current_exe().map_err(err)?;
-    let mut cmd = std::process::Command::new(exe);
-    cmd.arg("--media-browser").arg(&provider);
     let lang = state.settings.lock().map(|s| s.language.clone()).unwrap_or_default();
-    cmd.arg("--lang").arg(lang);
-    if safe == Some(true) {
-        cmd.arg("--safe");
-    }
-    // WebKitGTK 2.52 with NVIDIA's EGL driver crashes on YouTube video pages
-    // (WebKit's own MiniBrowser crashes the same way). Mesa's EGL avoids it;
-    // without a GPU driver of its own it renders on the CPU, which is fine for
-    // picking a video. A value the user set themselves is kept.
-    #[cfg(target_os = "linux")]
-    if std::env::var_os("__EGL_VENDOR_LIBRARY_FILENAMES").is_none()
-        && let Some(mesa) = ["/usr/share/glvnd/egl_vendor.d/50_mesa.json", "/etc/glvnd/egl_vendor.d/50_mesa.json"]
-            .into_iter()
-            .find(|p| Path::new(p).exists())
-    {
-        cmd.env("__EGL_VENDOR_LIBRARY_FILENAMES", mesa);
-    }
+    let mut cmd = media_browser_command(&exe, &provider, &lang, safe == Some(true));
     let mut child = cmd
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -857,6 +840,43 @@ fn media_browse(app: AppHandle, window: Window, state: State<AppState>, provider
         }
     });
     Ok(())
+}
+
+/// Configure only the helper's environment, before GTK/WebKit starts.
+fn media_browser_command(exe: &Path, provider: &str, lang: &str, safe: bool) -> std::process::Command {
+    let mut cmd = std::process::Command::new(exe);
+    cmd.arg("--media-browser").arg(provider);
+    cmd.arg("--lang").arg(lang);
+    if safe {
+        cmd.arg("--safe");
+    }
+    // Disabling either renderer leaves WebKitGTK without a backing store,
+    // but pages such as YouTube can still enter compositing and dereference
+    // it (WebKit bug 265460). Keep compositing alive, using shared-memory
+    // buffers instead of GPU buffer sharing. Override inherited editor
+    // workarounds only in the helper, before WebKit initializes.
+    #[cfg(target_os = "linux")]
+    {
+        cmd.env("WEBKIT_DISABLE_DMABUF_RENDERER", "0")
+            .env("WEBKIT_DISABLE_COMPOSITING_MODE", "0")
+            .env("WEBKIT_DMABUF_RENDERER_FORCE_SHM", "1");
+        if safe {
+            cmd.env("LIBGL_ALWAYS_SOFTWARE", "1");
+        }
+    }
+    // WebKitGTK 2.52 with NVIDIA's EGL driver crashes on YouTube video pages
+    // (WebKit's own MiniBrowser crashes the same way). Mesa's EGL avoids it;
+    // without a GPU driver of its own it renders on the CPU, which is fine for
+    // picking a video. A value the user set themselves is kept.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("__EGL_VENDOR_LIBRARY_FILENAMES").is_none()
+        && let Some(mesa) = ["/usr/share/glvnd/egl_vendor.d/50_mesa.json", "/etc/glvnd/egl_vendor.d/50_mesa.json"]
+            .into_iter()
+            .find(|p| Path::new(p).exists())
+    {
+        cmd.env("__EGL_VENDOR_LIBRARY_FILENAMES", mesa);
+    }
+    cmd
 }
 
 fn stop_browser(app: &AppHandle, owner: &str) {
@@ -958,8 +978,9 @@ fn return_focus() {
 }
 
 /// The media browser only needs to show pages: no autoplay, no DRM, camera
-/// or WebRTC. Safe mode also turns media off entirely, which sidesteps
-/// WebKitGTK media crashes seen on some systems.
+/// or WebRTC. Safe mode also turns media and WebGL off. Its software renderer
+/// is selected in the helper command; disabling compositing here is unsafe
+/// because pages can still request a compositing backing store.
 #[cfg(target_os = "linux")]
 fn harden_browser(w: &tauri::WebviewWindow, safe: bool) {
     let _ = w.with_webview(move |wv| {
@@ -968,7 +989,6 @@ fn harden_browser(w: &tauri::WebviewWindow, safe: bool) {
             if safe {
                 settings.set_enable_media(false);
                 settings.set_enable_webgl(false);
-                settings.set_hardware_acceleration_policy(webkit2gtk::HardwareAccelerationPolicy::Never);
             }
             settings.set_media_playback_requires_user_gesture(true);
             settings.set_enable_encrypted_media(false);
@@ -1032,10 +1052,10 @@ async fn export_pdf(app: AppHandle, window: Window) -> CmdResult<()> {
     let label = format!("print-{}", window.label());
     close_and_wait(&app, &[&label]).await;
     let url = format!("present.html?doc={}&print-pdf", util::encode_uri_component(window.label()));
-    sized(window_builder(&app, &label, WebviewUrl::App(url.into())), &app, (1100.0, 800.0))
-        .title("Cadenza — Print / Export PDF")
-        .build()
-        .map_err(err)?;
+    let builder = sized(window_builder(&app, &label, WebviewUrl::App(url.into())), &app, (1100.0, 800.0));
+    #[cfg(windows)]
+    let builder = builder.initialization_script_for_all_frames(include_str!("../../ui/js/print-frames.js"));
+    builder.title("Cadenza — Print / Export PDF").build().map_err(err)?;
     Ok(())
 }
 
@@ -1926,6 +1946,27 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn media_browser_keeps_a_compositing_backing_store() {
+        for safe in [false, true] {
+            let cmd = media_browser_command(Path::new("cadenza"), "youtube", "en", safe);
+            let env: std::collections::HashMap<_, _> = cmd.get_envs().collect();
+            // Explicit values must override disabled rendering inherited from
+            // the editor. Removing media/WebGL alone does not prevent the crash.
+            let value = |key: &str| env.get(std::ffi::OsStr::new(key)).copied().flatten();
+            assert_eq!(value("WEBKIT_DISABLE_DMABUF_RENDERER"), Some(std::ffi::OsStr::new("0")));
+            assert_eq!(value("WEBKIT_DISABLE_COMPOSITING_MODE"), Some(std::ffi::OsStr::new("0")));
+            assert_eq!(value("WEBKIT_DMABUF_RENDERER_FORCE_SHM"), Some(std::ffi::OsStr::new("1")));
+            if safe {
+                assert_eq!(value("LIBGL_ALWAYS_SOFTWARE"), Some(std::ffi::OsStr::new("1")));
+            }
+            let args: Vec<_> = cmd.get_args().map(|v| v.to_str().unwrap()).collect();
+            assert_eq!(&args[..4], ["--media-browser", "youtube", "--lang", "en"]);
+            assert_eq!(args.contains(&"--safe"), safe);
+        }
+    }
 
     #[test]
     fn owner_labels() {

@@ -5,11 +5,11 @@
 import { html, useEffect, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
 import { invoke, opener } from './api.js';
-import { state, set, apply, closeModal, toast, currentSlide, deck } from './store.js';
+import { state, set, apply, closeModal, toast, deck } from './store.js';
 import { Modal, Button } from './ui.js';
 import { Toggle } from './controls.js';
 import * as A from './actions.js';
-import { cls, escapeHtml, linkOf } from './util.js';
+import { cls, escapeHtml, linkOf, isVideoLink } from './util.js';
 import { t, N_ } from './i18n.js';
 
 // [where to get a key, service name, what the key is called]
@@ -67,7 +67,7 @@ export async function checkClipboardLink() {
     return;
   }
   const link = text.trim();
-  if (!link || link === lastOffered || !/^https?:\/\/\S+$/i.test(link) || !/youtube\.com|youtu\.be|vimeo\.com/i.test(link)) return;
+  if (!link || link === lastOffered || !/^https?:\/\/\S+$/i.test(link) || !isVideoLink(link)) return;
   lastOffered = link;
   toast(t('Insert the video link you copied?'), 'info', {
     duration: 12000,
@@ -266,6 +266,7 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
     setInserting(item.id);
     // Downloads take a while: the picture goes where it was picked.
     const target = { docId: state.doc?.docId, slideId: state.slideId };
+    const modal = state.modal;
     try {
       let asset = await invoke('media_import', { url: item.url, docId: target.docId });
       // SVG files: the size their link said.
@@ -278,13 +279,13 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
             slide: target.slideId,
             updates: [{ id: replaceId, patch: { content: { src: asset.name, naturalWidth: asset.width, naturalHeight: asset.height, alt } } }],
           },
-          { docId: target.docId },
+          { docId: target.docId, navigate: false, select: false },
         );
       } else {
         const id = await A.insertAsset(asset, null, 0, { alt }, target);
-        if (credit && id) await addCredit(id, item);
+        if (credit && id) await addCredit(id, item, target);
       }
-      closeModal();
+      if (state.modal === modal) closeModal();
     } catch (e) {
       toast(String(e), 'error');
     } finally {
@@ -419,8 +420,9 @@ function attribution(it) {
   return it.title || '';
 }
 
-async function addCredit(imageId, it) {
-  const s = currentSlide();
+async function addCredit(imageId, it, target) {
+  if (state.doc?.docId !== target.docId) return;
+  const s = deck().slides.find((slide) => slide.id === target.slideId);
   const img = s?.elements.find((e) => e.id === imageId);
   if (!img) return;
   const d = deck();
@@ -432,8 +434,7 @@ async function addCredit(imageId, it) {
     w: img.w,
     h: 26,
     content: { kind: 'text', html: `<p>${link}</p>`, style: { fontSize: 14, align: 'right' } },
-  });
-  set({ selection: [imageId] });
+  }, target, { quiet: true });
 }
 
 export function openMediaLibrary(tab = 'photos', replaceId = null) {

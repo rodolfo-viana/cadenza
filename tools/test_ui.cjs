@@ -30,24 +30,25 @@ function view(id = 'document-a', revision = 1) {
   };
 }
 
-async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, quiet = false, api = {} } = {}) {
+async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, quiet = false, api = {}, globals = {} } = {}) {
   const context = vm.createContext({
-    console: quiet ? { ...console, error() {} } : console, queueMicrotask, clearTimeout,
+    console: quiet ? { ...console, error() {} } : console, queueMicrotask, clearTimeout, URL,
     setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); if (ms >= 1000) timer.unref(); return timer; },
     navigator: { platform: 'Linux' },
     CustomEvent: class { constructor(type) { this.type = type; } },
     document: { title: 'Cadenza', getElementById: () => null, addEventListener() {}, removeEventListener() {}, createRange: () => ({ selectNodeContents() {}, collapse() {} }) },
     window: { getSelection: () => ({ rangeCount: 0, removeAllRanges() {}, addRange() {} }), dispatchEvent() {} },
+    ...globals,
   });
   const stubs = {
-    'lib.js': { html() {}, useEffect() {}, useReducer() {}, useRef() {}, useState() {}, ...hooks },
+    'lib.js': { html() {}, useEffect() {}, useLayoutEffect() {}, useReducer() {}, useRef() {}, useState() {}, ...hooks },
     'api.js': {
       invoke, clipboard, importBytes, dialog: {}, opener: {}, events: { listen() {}, emit() {} },
       FILE_FILTER: [], IMAGE_EXTS: [], VIDEO_EXTS: [], currentWindow: () => ({ setTitle: async () => {} }), getAllWindows: async () => [],
       ...api,
     },
-    'i18n.js': { t: (s) => s, N_: (s) => s, setLanguage: async () => {}, language: () => 'en' },
-    'controls.js': { parseColor: () => null, toCss: (v) => v },
+    'i18n.js': { t: (s) => s, N_: (s) => s, setLanguage: async () => {}, language: () => 'en', isRtl: () => false },
+    'controls.js': { parseColor: () => null, toCss: (v) => v, Toggle() {} },
     'icons.js': { Icon() {} },
   };
   const cache = new Map();
@@ -62,7 +63,7 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
     cache.set(name, mod);
     return mod;
   }
-  for (const name of ['actions.js', 'textedit.js', 'notes.js']) {
+  for (const name of ['actions.js', 'textedit.js', 'notes.js', 'media.js']) {
     const mod = module(name);
     await mod.link((specifier) => module(path.basename(specifier)));
     await mod.evaluate();
@@ -71,6 +72,7 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
     S: module('store.js').namespace, A: module('actions.js').namespace,
     T: module('textedit.js').namespace, Notes: module('notes.js').namespace,
     Charts: module('charts.js').namespace,
+    Media: module('media.js').namespace,
   };
 }
 
@@ -1583,4 +1585,204 @@ test('presenter pauses stay paused and notes keep their scroll during builds', a
   state('s2');
   assert.equal($('notes').textContent, 'More notes');
   assert.equal($('notes').scrollTop, 0, 'another slide starts at the top of its notes');
+});
+
+/** Render the real media dialog and activate its preview's Insert button. */
+async function mediaImport({ credit = true, replace = false } = {}) {
+  const download = deferred();
+  const H = hookHarness();
+  const timers = [];
+  const backend = view();
+  backend.deck.slides[0].elements = [{ id: 'text-1', content: { kind: 'text', html: '<p>Original</p>' } }];
+  backend.deck.slides.push({ id: 'slide-2', elements: [{ id: 'text-2', content: { kind: 'text', html: '<p>Later</p>' } }] });
+  if (replace) backend.deck.slides[0].elements.push({ id: 'image-old', content: { kind: 'image', src: 'old.png' } });
+  let nextId = 0;
+  const app = await ui(async (name, args) => {
+    if (name === 'secret_status') return {};
+    if (name === 'media_link') return { id: 'photo', kind: 'image', provider: 'link', url: 'https://example.org/image.png', pageUrl: 'https://example.org/photo' };
+    if (name === 'media_import') return download.promise;
+    assert.equal(name, 'doc_apply');
+    assert.equal(args.docId, backend.docId);
+    const op = args.op;
+    const slide = backend.deck.slides.find((s) => s.id === op.slide);
+    backend.outcome = { slide: slide.id, created: [] };
+    if (op.op === 'addElement') {
+      const id = 'added-' + ++nextId;
+      slide.elements.push({ id, ...clone(op.props) });
+      backend.outcome.created = [id];
+    } else {
+      assert.equal(op.op, 'updateElements');
+      for (const { id, patch } of op.updates) {
+        const el = slide.elements.find((e) => e.id === id);
+        Object.assign(el, { ...clone(patch), content: { ...el.content, ...clone(patch.content) } });
+      }
+    }
+    backend.revision++;
+    return clone(backend);
+  }, {}, {
+    hooks: H.lib,
+    globals: {
+      localStorage: { getItem: () => credit ? '1' : '0' },
+      setTimeout: (fn, ms) => { if (ms <= 450) timers.push(fn); return fn; },
+      clearTimeout: (fn) => { const i = timers.indexOf(fn); if (i >= 0) timers.splice(i, 1); },
+    },
+  });
+  const { S, Media } = app;
+  S.openView(clone(backend));
+  Media.openMediaLibrary('photos', replace ? 'image-old' : null);
+  const inst = H.instance();
+  const render = () => H.render(inst, Media.MediaLibrary, S.state.modal.props);
+  let out = render();
+  await tick();
+  out = render();
+  attrOf(out, 'onInput')({ target: { value: 'https://example.org/image.png' } });
+  render();
+  for (const fn of timers.splice(0)) fn();
+  await tick();
+  out = render();
+  function findPreview(value) {
+    if (Array.isArray(value)) return value.map(findPreview).find(Boolean);
+    if (!value?.strings) return null;
+    if (value.values.includes('Insert Image')) return value;
+    return findPreview(value.values);
+  }
+  const preview = findPreview(out);
+  assert(preview, 'the real URL lookup rendered its image preview');
+  const inserting = attrOf(preview, 'onClick')();
+  await tick();
+  return { ...app, backend, inserting, finish: async () => {
+    download.resolve({ kind: 'image', name: 'photo.png', width: 200, height: 100 });
+    await inserting;
+    H.unmount(inst);
+  } };
+}
+
+test('a media download leaves a newer dialog and its draft open', async () => {
+  const { S, finish } = await mediaImport({ credit: false });
+  S.openModal('theme-builder', { draft: 'Unsaved theme draft' });
+  const modal = S.state.modal;
+  await finish();
+  assert.equal(S.state.modal, modal);
+});
+
+test('a credited media download preserves typing and selection on the same slide', async () => {
+  const { S, T, finish } = await mediaImport();
+  S.closeModal();
+  S.select(['text-1']);
+  const node = editText(S, T);
+  node.innerHTML = '<p>Keep typing</p>';
+  await finish();
+  assert.equal(S.state.editing, 'text-1');
+  assert.deepEqual(clone(S.state.selection), ['text-1']);
+  assert.equal(node.innerHTML, '<p>Keep typing</p>');
+  assert.equal(S.currentSlide().elements.filter((e) => e.content.kind === 'image').length, 1);
+  assert(S.currentSlide().elements.some((e) => e.content.html?.includes('Image from')));
+  await T.endAllEditing();
+});
+
+test('a media credit follows the image to its original slide after navigation', async () => {
+  const { S, finish } = await mediaImport();
+  S.closeModal();
+  S.goToSlide('slide-2');
+  await finish();
+  assert.equal(S.state.slideId, 'slide-2');
+  const origin = S.deck().slides[0];
+  assert.equal(origin.elements.filter((e) => e.content.kind === 'image').length, 1);
+  assert(origin.elements.some((e) => e.content.html?.includes('Image from')));
+  assert.equal(S.currentSlide().elements.length, 1);
+});
+
+test('a delayed online replacement preserves the new slide and its active edit', async () => {
+  const { S, T, finish } = await mediaImport({ replace: true });
+  S.closeModal();
+  S.goToSlide('slide-2');
+  S.select(['text-2']);
+  editText(S, T).innerHTML = '<p>Keep typing on the second slide</p>';
+  await finish();
+  assert.equal(S.state.slideId, 'slide-2');
+  assert.equal(S.state.editing, 'text-2');
+  assert.deepEqual(clone(S.state.selection), ['text-2']);
+  assert.equal(S.deck().slides[0].elements.find((e) => e.id === 'image-old').content.src, 'photo.png');
+  await T.endAllEditing();
+});
+
+test('an ordinary credited media import still selects its image and closes the dialog', async () => {
+  const { S, finish } = await mediaImport();
+  await finish();
+  assert.equal(S.state.modal, null);
+  assert.deepEqual(clone(S.state.selection), ['added-1']);
+  assert(S.currentSlide().elements.find((e) => e.id === 'added-2').content.html.includes('Image from'));
+});
+
+test('a media import is abandoned when its document has been replaced', async () => {
+  const { S, finish } = await mediaImport();
+  S.openView(view('document-b'));
+  S.openModal('theme-builder', { draft: 'New document' });
+  const modal = S.state.modal;
+  await finish();
+  assert.equal(S.state.doc.docId, 'document-b');
+  assert.equal(S.currentSlide().elements.length, 1);
+  assert.equal(S.state.modal, modal);
+});
+
+test('system-browser clipboard offers accept video hosts and reject misleading URLs', async () => {
+  let copied = '';
+  const { S, Media } = await ui(async () => ({}), {}, {
+    api: { opener: { openUrl() {} } },
+    globals: { window: { __TAURI__: { clipboardManager: { readText: async () => copied } } } },
+  });
+  S.openView(view());
+  Media.openInSystemBrowser('youtube');
+  for (const link of ['https://example.com/?ref=youtube.com', 'https://youtube.com.evil.example/watch?v=abc', 'https://youtube.com/', 'https://vimeo.com/watch', 'https://you\ntube.com/watch?v=abc']) {
+    copied = link;
+    await Media.checkClipboardLink();
+    assert(!S.state.toasts.some((toast) => toast.action), link);
+  }
+  for (const link of ['https://youtu.be/abc', 'https://www.youtube.com/watch?v=abc', 'https://player.vimeo.com/video/12345']) {
+    copied = link;
+    const before = S.state.toasts.length;
+    await Media.checkClipboardLink();
+    assert.equal(S.state.toasts.length, before + 1, link);
+    assert.equal(S.state.toasts.at(-1).action.label, 'Insert Video');
+  }
+});
+
+test('printing an external frame preserves its canvas colors and cleans up afterwards', () => {
+  for (const source of ['body', 'root', 'transparent', 'gradient']) {
+    const window = fakeWindow();
+    window.top = {};
+    const nodes = [];
+    const rootStyle = { backgroundColor: 'rgba(0, 0, 0, 0)', backgroundImage: 'none', background: 'transparent' };
+    const bodyStyle = { backgroundColor: 'rgb(23, 50, 77)', backgroundImage: 'none', background: 'rgb(23, 50, 77)' };
+    if (source === 'root') Object.assign(rootStyle, { backgroundColor: 'rgb(255, 255, 255)', background: 'rgb(255, 255, 255)' });
+    if (source === 'transparent') bodyStyle.background = 'transparent';
+    if (source === 'gradient') Object.assign(rootStyle, { backgroundImage: 'linear-gradient(red, blue)', background: 'linear-gradient(red, blue)' });
+    const docRoot = { appendChild: (node) => nodes.push(node) };
+    const body = {};
+    const before = clone([rootStyle, bodyStyle]);
+    const document = { documentElement: docRoot, body, createElement: (tag) => ({
+      tag, style: {}, setAttribute() {}, remove() { nodes.splice(nodes.indexOf(this), 1); },
+    }) };
+    const code = fs.readFileSync(path.join(root, 'print-frames.js'), 'utf8');
+    vm.runInNewContext(code, { window, document, getComputedStyle: (el) => el === docRoot ? rootStyle : bodyStyle });
+    assert.equal(nodes.length, 0, 'screen content is untouched');
+    window.dispatch('beforeprint');
+    assert.equal(nodes.length, 2);
+    const layer = nodes.find((node) => node.tag === 'div');
+    const expected = source === 'root' || source === 'gradient' ? rootStyle.background : bodyStyle.background;
+    assert(layer.style.cssText.includes('background:' + expected + '!important'), source);
+    assert(nodes.find((node) => node.tag === 'style').textContent.includes('print-color-adjust:exact'));
+    window.dispatch('beforeprint');
+    assert.equal(nodes.length, 2, 'repeated printing does not accumulate layers');
+    window.dispatch('afterprint');
+    assert.equal(nodes.length, 0);
+    assert.deepEqual([rootStyle, bodyStyle], before, 'the author’s backgrounds are not modified');
+  }
+});
+
+test('the frame printing workaround leaves the top-level presentation alone', () => {
+  const window = fakeWindow();
+  window.top = window;
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'print-frames.js'), 'utf8'), { window });
+  assert.deepEqual(window.listeners, {});
 });

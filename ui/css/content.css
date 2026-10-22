@@ -212,8 +212,8 @@
 
 .reveal .cz-video-box img { object-fit: cover; }
 
-/* Printed (on Windows), a web page leaves out its own background, and dark
-   text would land on a dark slide: it gets the white of a browser page. */
+/* Transparent web pages get the white backing of an ordinary browser page,
+   so dark text remains readable on a dark slide. */
 @media print {
   .reveal .cz-embed-box iframe { background: #fff; }
 }
