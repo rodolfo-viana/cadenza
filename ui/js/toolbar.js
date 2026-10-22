@@ -8,7 +8,7 @@ import { item, COMMANDS } from './commands.js';
 import * as A from './actions.js';
 import { ShapeGlyph } from './panels.js';
 import { cls, fileName } from './util.js';
-import { t } from './i18n.js';
+import { t, isRtl } from './i18n.js';
 import { CHART_ICONS, chartSample } from './charts.js';
 
 /** A menu item for a command, with its (English) label translated. */
@@ -240,26 +240,71 @@ function showShapePicker(anchor) {
   set({ shapePicker: { x: r.left, y: r.bottom + 4 } });
 }
 
+/** Shapes in a row of the picker (see .shape-picker in app.css). */
+const PICKER_COLUMNS = 7;
+
+/**
+ * The Shape button's grid of shapes. It works like a menu: the arrow keys
+ * move through it (mirrored in RTL), Enter or Space inserts, Escape closes
+ * it and gives the focus back, and a click elsewhere closes it and still
+ * does what it was for.
+ */
 export function ShapePicker() {
   const st = useStore();
-  if (!st.shapePicker) return null;
-  const close = () => set({ shapePicker: null });
-  return html`<div class="picker-backdrop" onMouseDown=${close}>
-    <div class="shape-picker" style=${{ left: st.shapePicker.x + 'px', top: st.shapePicker.y + 'px' }} onMouseDown=${(e) => e.stopPropagation()}>
-      ${st.info.shapes.map(
-        (s) => html`<button
-          type="button"
-          class="shape-opt"
-          title=${t(s.name)}
-          onClick=${() => {
-            close();
-            A.insert('shape', s.id);
-          }}
-        >
-          <${ShapeGlyph} id=${s.id} />
-        </button>`,
-      )}
-    </div>
+  const ref = useRef();
+  const open = !!st.shapePicker;
+  useEffect(() => {
+    if (!open) return;
+    const before = document.activeElement;
+    const close = (back) => {
+      set({ shapePicker: null });
+      if (back && before?.isConnected) before.focus();
+    };
+    const onDown = (e) => {
+      if (!ref.current?.contains(e.target)) close(false);
+    };
+    const onKey = (e) => {
+      const list = [...(ref.current?.querySelectorAll('.shape-opt') || [])];
+      const at = list.indexOf(document.activeElement);
+      const [forward, back] = isRtl() ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft'];
+      const steps = { [forward]: 1, [back]: -1, ArrowDown: PICKER_COLUMNS, ArrowUp: -PICKER_COLUMNS };
+      let next = null;
+      if (e.key === 'Escape') close(true);
+      else if (e.key === 'Tab') return close(false);
+      else if (e.key in steps) next = at < 0 ? 0 : Math.min(list.length - 1, Math.max(0, at + steps[e.key]));
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = list.length - 1;
+      // Other keys work as usual: Enter and Space press the focused shape.
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (next !== null) list[next]?.focus();
+    };
+    window.addEventListener('mousedown', onDown, true);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('mousedown', onDown, true);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
+  if (!open) return null;
+  return html`<div class="shape-picker" ref=${ref} role="menu" aria-label=${t('Shape')} style=${{ left: st.shapePicker.x + 'px', top: st.shapePicker.y + 'px' }}>
+    ${st.info.shapes.map(
+      (s) => html`<button
+        type="button"
+        class="shape-opt"
+        role="menuitem"
+        tabindex="-1"
+        title=${t(s.name)}
+        aria-label=${t(s.name)}
+        onClick=${() => {
+          set({ shapePicker: null });
+          A.insert('shape', s.id);
+        }}
+      >
+        <${ShapeGlyph} id=${s.id} />
+      </button>`,
+    )}
   </div>`;
 }
 

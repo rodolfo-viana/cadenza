@@ -1366,22 +1366,28 @@ test('in right-to-left languages Left opens a submenu and Right goes back', asyn
 /** A Modal rendered by hand over fake elements. */
 async function modal({ storeState = { menu: null }, focusCaller = false } = {}) {
   const { U, H, window, document } = await uiModule({ store: { state: storeState } });
-  const el = (name, more = {}) => ({ name, tabIndex: 0, disabled: false, getClientRects: () => [{}], focus() { document.activeElement = this; }, ...more });
+  const el = (name, more = {}) => ({
+    name, tag: 'button', tabIndex: 0, disabled: false, getClientRects: () => [{}], focus() { document.activeElement = this; },
+    matches(sel) { return sel.split(',').some((s) => s.trim() === this.tag); },
+    ...more,
+  });
   const editor = { previousElementSibling: null, inert: false };
   const before = el('canvas', { isConnected: true });
   document.activeElement = before;
-  const field = el('field');
-  const other = el('other');
+  // A section's toggle comes before the first field (as in the Theme Builder).
+  const section = el('section');
+  const field = el('field', { tag: 'input' });
+  const other = el('other', { tag: 'input' });
   const cancel = el('cancel');
   const close = el('close');
-  const inside = [close, field, other, cancel];
+  const inside = [close, section, field, other, cancel];
   let popover = null;
   const dialog = {
     name: 'dialog', parentElement: { previousElementSibling: editor },
     contains: (x) => x === dialog || inside.includes(x),
     querySelectorAll: () => inside,
     querySelector: (sel) => sel === '.popover' ? popover
-      : sel.includes('modal-body') ? { querySelectorAll: () => [field, other] }
+      : sel.includes('modal-body') ? { querySelectorAll: () => [section, field, other] }
       : sel.includes('modal-foot') ? { querySelectorAll: () => [cancel] } : null,
     focus() { document.activeElement = this; },
   };
@@ -1399,7 +1405,7 @@ async function modal({ storeState = { menu: null }, focusCaller = false } = {}) 
 test('a dialog takes the focus, keeps Tab inside and gives the focus back', async () => {
   const d = await modal();
   assert.equal(attrOf(d.out, 'aria-labelledby'), attrOf(d.out, 'id'), 'the title names the dialog');
-  assert.equal(d.document.activeElement, d.field, 'the first field of the body gets the focus');
+  assert.equal(d.document.activeElement, d.field, 'the first field of the body gets the focus, not the button before it');
   assert.equal(d.editor.inert, true, 'the page behind is out of reach');
   d.document.activeElement = d.cancel;
   assert.ok(d.key('Tab').defaultPrevented);

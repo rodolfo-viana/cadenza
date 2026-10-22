@@ -8,7 +8,7 @@ import { commandForKey } from './commands.js';
 import * as A from './actions.js';
 import { canvasApi, finishPath, cancelPath } from './canvas.js';
 import { beginTextEdit, endAllEditing } from './textedit.js';
-import { combo, isTyping, fileExt } from './util.js';
+import { combo, isTyping, isControl, fileExt } from './util.js';
 import { IMAGE_EXTS, VIDEO_EXTS } from './api.js';
 import { subscribe } from './store.js';
 import { ensureDiagrams } from './diagrams.js';
@@ -32,6 +32,12 @@ listen('cz-media-browser-closed', (e) => {
   });
 });
 window.addEventListener('focus', () => setTimeout(checkClipboardLink, 200));
+
+// The window itself never scrolls (its panels do): a focused control that
+// sits outside a scrolled panel would otherwise move the whole interface.
+window.addEventListener('scroll', () => {
+  if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+});
 
 // Report unexpected errors to the terminal.
 const report = (level, msg) => invoke('ui_log', { level, message: String(msg).slice(0, 4000) }).catch(() => {});
@@ -78,6 +84,9 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   const typing = isTyping(e.target);
+  // A control of the interface (a button, toggle, slider…) has the keyboard:
+  // Tab moves on to the next one rather than through the slide's objects.
+  const control = isControl(e.target);
 
   // Clipboard: route through a hidden editable so copy/paste events fire
   // even when nothing editable has focus (WebKitGTK needs this).
@@ -97,6 +106,8 @@ window.addEventListener('keydown', (e) => {
 
   const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
   const base = e.key in arrows ? e.key : null;
+  // Sliders and radio buttons move with the arrow keys themselves.
+  if (base && e.target.matches?.('input[type=range], input[type=radio]')) return;
   if (base && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     if (state.selection.length && state.focus === 'canvas') {
@@ -116,7 +127,7 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (e.key === 'Tab' && state.focus === 'canvas') {
+  if (e.key === 'Tab' && state.focus === 'canvas' && !control) {
     const slide = state.doc.deck.slides.find((s) => s.id === state.slideId);
     if (!slide?.elements.length) return;
     e.preventDefault();

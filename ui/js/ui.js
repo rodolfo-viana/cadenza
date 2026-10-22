@@ -304,11 +304,13 @@ export function Modal({ title, onClose, children, footer, width = 520, class: ex
         behind.push(el);
       }
     }
-    // After the caller's own effects, which may focus a field.
+    // After the caller's own effects, which may focus a field. A field comes
+    // before the buttons ahead of it (a section's toggle, say).
     const timer = setTimeout(() => {
       if (dialog.contains(document.activeElement)) return;
-      const first =
-        dialog.querySelector('[autofocus]') || tabbable(dialog.querySelector(':scope > .modal-body'))[0] || tabbable(dialog.querySelector(':scope > .modal-foot'))[0];
+      const body = tabbable(dialog.querySelector(':scope > .modal-body'));
+      const field = body.find((el) => el.matches('input, select, textarea, [contenteditable]'));
+      const first = dialog.querySelector('[autofocus]') || field || body[0] || tabbable(dialog.querySelector(':scope > .modal-foot'))[0];
       (first || dialog).focus();
     });
     return () => {

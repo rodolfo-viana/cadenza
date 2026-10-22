@@ -82,6 +82,13 @@ export function isTyping(target) {
   return false;
 }
 
+/** Whether a control of the interface outside the slide canvas (a button, toggle, slider…) has the keyboard. */
+export function isControl(target) {
+  const el = target || document.activeElement;
+  if (!el?.matches || el === document.body || el.closest('.canvas-wrap')) return false;
+  return el.matches('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+}
+
 const CODE_KEYS = {
   BracketLeft: '[',
   BracketRight: ']',

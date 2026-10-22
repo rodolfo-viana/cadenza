@@ -501,7 +501,8 @@ body.dragging .uguide { pointer-events: none; }
 }
 .tab:hover { background: var(--hover); color: var(--text); }
 .tab.active { background: var(--panel-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border-strong); }
-.inspector-body { flex: 1; overflow-y: auto; padding-bottom: 60px; }
+/* Positioned: absolutely placed bits of its controls scroll with it. */
+.inspector-body { position: relative; flex: 1; overflow-y: auto; padding-bottom: 60px; }
 .insp-title { display: flex; flex-direction: column; gap: 2px; padding: 14px 14px 8px; font-weight: 600; font-size: 13.5px; }
 .insp-title .muted { font-weight: 400; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .isec { border-top: 1px solid var(--border); }
@@ -780,7 +781,9 @@ input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 .segmented.full button { padding: 0 4px; }
 .segmented button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-.toggle { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; }
+/* Positioned, so the hidden checkbox stays inside its panel: focusing one
+   placed outside a scrolled panel would scroll the whole window. */
+.toggle { position: relative; display: inline-flex; align-items: center; gap: 9px; cursor: pointer; }
 .toggle input { position: absolute; opacity: 0; pointer-events: none; }
 .toggle-track { position: relative; width: 32px; height: 18px; border-radius: 99px; background: var(--active); transition: background 0.15s; flex: none; }
 .toggle-thumb { position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
@@ -902,9 +905,9 @@ input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 .menu-heading { padding: 6px 10px 2px; font-size: 11px; font-weight: 600; color: var(--muted); }
 .submenu-anchor { position: absolute; }
 
-.picker-backdrop { position: fixed; inset: 0; z-index: 2500; }
 .shape-picker {
   position: fixed;
+  z-index: 2500;
   display: grid;
   grid-template-columns: repeat(7, 38px);
   gap: 4px;
