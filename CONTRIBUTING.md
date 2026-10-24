@@ -141,7 +141,39 @@ into every language, but please say so in the description. To add a language, ad
 - **Map data** (`src-tauri/maps`) is built from [Natural Earth](https://www.naturalearthdata.com)
   by `tools/gen_maps.py`; its header says which files to download. It needs Node.js (mapshaper).
 
+## Branches and release cycles
+
+`main` holds reviewed work for the next release. Features, fixes and documentation are developed
+on short-lived branches, committed and pushed there, then merged into `main` through pull requests
+when ready. There is no long-lived `dev` branch. A version tag records the exact commit shipped in
+each release, so `main` can move ahead of the latest published version.
+
+Start each change from an up-to-date `main`, using a descriptive branch name such as
+`feature/slide-transitions`, `fix/pdf-backgrounds` or `docs/release-workflow`:
+
+```sh
+git switch main
+git pull --ff-only origin main
+git switch -c feature/slide-transitions
+# Make the change and run the relevant checks.
+git add <changed-files>
+git commit -m "Add slide transitions"
+git push -u origin feature/slide-transitions
+```
+
+Open a pull request targeting `main`. Keep subsequent commits on the same branch and push them to
+update the pull request. Merge after review and passing checks; merging a feature does not publish
+a release. Once merged, the branch can be deleted and the next change starts from the updated
+`main`.
+
+Every change up to a release's tagged commit is included in that release. Work intended for a later
+release stays on its branch until ready to merge. Several merged pull requests can accumulate on
+`main` before maintainers prepare a release.
+
 ## Pull requests
+
+Pull requests target `main` and contain one reviewable change. Use the description to record the
+user-visible result and validation; maintainers use these descriptions when assembling release notes.
 
 - Keep each pull request focused on one change, and explain what it changes and why.
 - Include a screenshot or short recording for visible changes.
@@ -159,12 +191,38 @@ into every language, but please say so in the description. To add a language, ad
 
 ## Releases
 
-Maintainers release a version by updating `version` in both `src-tauri/tauri.conf.json` and
-`src-tauri/Cargo.toml`, committing, and pushing a matching tag (`git tag -a v0.2.0 -m "Cadenza 0.2.0"`
-and `git push origin v0.2.0`). GitHub Actions then builds the Linux and Windows installers and
-attaches them to a draft release to review and publish. Its notes are the version's section of
-`CHANGELOG.md` (`## 0.2.0 — date`); the workflow stops before building if that section is missing or
-the tag and the two versions differ.
+A release collects the work merged into `main` since the previous version tag. Feature and fix pull
+requests leave version numbers and `CHANGELOG.md` alone; these are updated together in a release
+preparation pull request. The preparation branch is temporary, like a feature branch.
+
+For example, to prepare `0.3.5` after `v0.3.4`:
+
+1. Create `release/0.3.5` from the current `main`. Review the merged pull requests and
+   `git log --oneline v0.3.4..main` to identify the changes being released.
+2. Update `version` in `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, along with Cadenza's
+   package version in `src-tauri/Cargo.lock`. Add `## 0.3.5 — YYYY-MM-DD` to `CHANGELOG.md` with the
+   release date and the collected changes.
+3. Commit and push the preparation branch, then open a pull request into `main`. Run the checks
+   above and test the release's changes in the Linux and Windows apps before merging it.
+4. After merging and checking the resulting `main` commit, tag that exact commit and push the tag:
+
+   ```sh
+   git fetch origin
+   git tag -a v0.3.5 <tested-main-commit> -m "Cadenza 0.3.5"
+   git push origin v0.3.5
+   ```
+
+   Use the tested commit's SHA, even if newer work has since reached `main`. The tag fixes the release
+   contents; later commits belong to a subsequent release.
+5. Wait for the Release workflow to build both platforms and validate `latest.json`. Review the
+   draft release's notes and installers, test the packaged apps, and publish the draft when ready.
+   Start the next cycle with new branches from `main`.
+
+Pushing the version tag triggers `.github/workflows/release.yml`. It builds the Linux and Windows
+installers and attaches them to a draft GitHub release, using the matching `CHANGELOG.md` section as
+its notes. The workflow stops before building if that section is missing or the tag and the two
+version files differ. A manual workflow run on a branch builds artifacts for testing without creating
+a release. Published version tags are kept unchanged; corrections ship under a new version.
 
 Installed copies update themselves from the latest published release. The workflow builds with
 `src-tauri/tauri.updater.conf.json`, which signs every installer and adds `latest.json` to the

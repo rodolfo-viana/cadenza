@@ -1,6 +1,8 @@
 <!--
-Thanks for contributing! Keep the pull request to one change. Leave CHANGELOG.md and the version
-numbers alone: they're updated when a release is made.
+Thanks for contributing! Open the pull request from your feature, fix or documentation branch into
+main, and keep it to one change. Leave CHANGELOG.md and version numbers alone unless this is the
+release preparation pull request. Explain the user-visible result below so it can be included in
+the next release's notes. See CONTRIBUTING.md for the branch and release cycle.
 -->
 
 ## What this changes

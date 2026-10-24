@@ -127,9 +127,10 @@ root:
 npx @tauri-apps/cli@2 build
 ```
 
-The packages are written to `src-tauri/target/release/bundle/`. Pushing a version tag such as
-`v0.2.0` makes GitHub Actions build the Linux and Windows installers and attach them to a draft
-release.
+The packages are written to `src-tauri/target/release/bundle/`. Features and fixes reach `main`
+through pull requests and are collected into versioned releases. Pushing a version tag such as
+`v0.3.5` makes GitHub Actions build the Linux and Windows installers and attach them to a draft
+release. See the [branch and release cycle](CONTRIBUTING.md#branches-and-release-cycles).
 
 ## Contributing
 
