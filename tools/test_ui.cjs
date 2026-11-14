@@ -1587,6 +1587,88 @@ test('presenter pauses stay paused and notes keep their scroll during builds', a
   assert.equal($('notes').scrollTop, 0, 'another slide starts at the top of its notes');
 });
 
+/** Exercise media searches through the real component's controls and effects. */
+async function mediaSearch() {
+  const H = hookHarness();
+  const timers = new Set();
+  const requests = [];
+  const app = await ui(async (name, args) => {
+    if (name === 'secret_status') return {};
+    assert(['media_search', 'media_link', 'media_oembed'].includes(name));
+    const result = deferred();
+    requests.push({ name, args, ...result });
+    return result.promise;
+  }, {}, {
+    hooks: H.lib,
+    globals: {
+      localStorage: { getItem: () => null },
+      setTimeout: (fn) => { timers.add(fn); return fn; },
+      clearTimeout: (fn) => timers.delete(fn),
+    },
+  });
+  const inst = H.instance();
+  const render = () => H.render(inst, app.Media.MediaLibrary, { tab: 'photos' });
+  const templates = (out) => Array.isArray(out) ? out.flatMap(templates) : out?.strings ? [out, ...templates(out.values)] : [];
+  const flush = () => { for (const fn of [...timers]) { timers.delete(fn); fn(); } };
+  render();
+  await tick();
+  render();
+  render();
+  flush();
+  return {
+    requests, render, flush,
+    input(value) { attrOf(render(), 'onInput')({ target: { value } }); render(); },
+    choose(label) {
+      const button = templates(render()).find((x) => x.values.includes(label) && attrOf(x, 'onClick'));
+      assert(button, `media control exists: ${label}`);
+      attrOf(button, 'onClick')();
+      render();
+      render();
+    },
+    text: () => JSON.stringify(render()),
+    loading: () => templates(render()).some((x) => x.strings.join('').includes('class="spinner"')),
+    unmount: () => H.unmount(inst),
+  };
+}
+
+for (const change of ['clear query', 'switch tab', 'switch provider', 'edit query before debounce']) {
+  test(`media search discards stale results after ${change}`, async () => {
+    const search = await mediaSearch();
+    search.input('first search');
+    search.flush();
+    assert.equal(search.requests.length, 1);
+    assert(search.loading());
+    if (change === 'clear query') search.input('');
+    if (change === 'switch tab') search.choose('Videos');
+    if (change === 'switch provider') search.choose('Pexels');
+    if (change === 'edit query before debounce') search.input('second search');
+    // The old request finishes before a replacement request is made, or
+    // while the new tab/provider cannot search without an API key.
+    search.requests[0].resolve({ items: [{ id: 'old-photo', title: 'STALE PHOTO', provider: 'openverse', kind: 'image' }], next: 'old-page' });
+    await tick();
+    assert(!search.text().includes('STALE PHOTO'), 'an old request must not repopulate the new search');
+    assert.equal(search.loading(), false, 'the obsolete request must not leave a spinner');
+    search.unmount();
+  });
+}
+
+test('clearing a media URL lookup discards its late preview and error', async () => {
+  for (const reject of [false, true]) {
+    const search = await mediaSearch();
+    search.input('https://example.org/image.png');
+    search.flush();
+    assert.equal(search.requests[0].name, 'media_link');
+    search.input('');
+    search.flush();
+    if (reject) search.requests[0].reject('STALE ERROR');
+    else search.requests[0].resolve({ title: 'STALE PREVIEW', kind: 'image', url: 'https://example.org/image.png' });
+    await tick();
+    assert(!/STALE (PREVIEW|ERROR)/.test(search.text()), 'a cleared address must not show its old result');
+    assert.equal(search.loading(), false);
+    search.unmount();
+  }
+});
+
 /** Render the real media dialog and activate its preview's Insert button. */
 async function mediaImport({ credit = true, replace = false } = {}) {
   const download = deferred();

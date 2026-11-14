@@ -168,6 +168,16 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
   const sentinel = useRef();
   const searchRef = useRef();
   const seq = useRef(0);
+  // Invalidate on the input event, before either rendering or the debounce.
+  const changeSearch = (setter, value) => {
+    ++seq.current;
+    setLoading(false);
+    setItems([]);
+    setNext(null);
+    setPreview(null);
+    setError(null);
+    setter(value);
+  };
 
   const loadKeys = () => invoke('secret_status').then(setKeys).catch(() => setKeys({}));
   useEffect(() => {
@@ -242,19 +252,22 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
 
   // Search as you type (debounced); trending/popular when empty.
   useEffect(() => {
+    ++seq.current;
+    setLoading(false);
     const timer = setTimeout(() => search(null), query.trim() ? 450 : 0);
-    return () => clearTimeout(timer);
-  }, [query, provider, needsKey]);
+    return () => { ++seq.current; clearTimeout(timer); };
+  }, [query, provider, needsKey, tab]);
 
   // Infinite scroll.
   useEffect(() => {
     if (!sentinel.current || !next) return;
+    const generation = seq.current;
     const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting) && !loading) search(next);
+      if (generation === seq.current && entries.some((e) => e.isIntersecting) && !loading) search(next);
     });
     io.observe(sentinel.current);
     return () => io.disconnect();
-  }, [next, loading, items.length]);
+  }, [next, loading, items.length, query, provider, needsKey, tab]);
 
   async function insertItem(item) {
     if (inserting) return;
@@ -298,7 +311,7 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
     <div class="media-top">
       <div class="media-tabs">
         ${TABS.map(
-          (x) => html`<button type="button" class=${cls('media-tab', tab === x.id && 'active')} onClick=${() => setTab(x.id)}>
+          (x) => html`<button type="button" class=${cls('media-tab', tab === x.id && 'active')} onClick=${() => tab !== x.id && changeSearch(setTab, x.id)}>
             <${Icon} name=${x.icon} size=${16} />${t(x.label)}
           </button>`,
         )}
@@ -309,12 +322,12 @@ export function MediaLibrary({ tab: initialTab = 'photos', replaceId = null }) {
           ref=${searchRef}
           placeholder=${tab === 'videos' ? t('Search YouTube or paste a YouTube/Vimeo link…') : tab === 'gifs' ? t('Search GIFs or paste a link to one…') : t('Search photos or paste a link to an image…')}
           value=${query}
-          onInput=${(e) => setQuery(e.target.value)}
+          onInput=${(e) => changeSearch(setQuery, e.target.value)}
         />
       </div>
       <div class="media-providers">
         ${current.providers.map(
-          ([id, label]) => html`<button type="button" class=${cls('chip', provider === id && 'active')} onClick=${() => setProvider(id)}>
+          ([id, label]) => html`<button type="button" class=${cls('chip', provider === id && 'active')} onClick=${() => provider !== id && changeSearch(setProvider, id)}>
             ${label}
           </button>`,
         )}
