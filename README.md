@@ -29,7 +29,9 @@ See **[live demo](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-n
 **Design**
 - 22 themes: 8 made for Cadenza plus the classic reveal.js themes.
 - A Theme Builder to make your own and share it as a `.cadenza-theme` file (fonts included) or export
-  it as reveal.js CSS.
+  it as reveal.js CSS. Customize paragraph alignment, line spacing, space before/after and indents,
+  plus bullet and numbering styles, spacing, color and size independently at nine list levels.
+  See [Theme Builder](docs/theme-builder.md) for inheritance and existing presentations.
 - Google Fonts: every family is searchable offline, and the fonts you pick are embedded in the
   presentation, so it looks the same on any computer.
 - Builds (step-by-step animations), slide transitions and Magic Move (reveal.js auto-animate).

@@ -3,9 +3,9 @@
 import { html, useEffect, useMemo, useRef, useState } from './lib.js';
 import { Icon } from './icons.js';
 import { invoke, dialog } from './api.js';
-import { state, set, closeModal, toast, ingestView, openMenu, deck } from './store.js';
+import { state, set, closeModal, toast, ingestView, openMenu, deck, flushEdits } from './store.js';
 import { Modal, Button } from './ui.js';
-import { Row, Section, Hint, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField } from './controls.js';
+import { Row, Section, Hint, NumberField, Slider, Select, Segmented, Toggle, TextField, ColorField, FontField } from './controls.js';
 import { escapeHtml } from './util.js';
 import { t, N_ } from './i18n.js';
 
@@ -56,11 +56,13 @@ export async function openThemeBuilder(start = null) {
   set({ modal: { type: 'themeBuilder', props: { def: JSON.parse(JSON.stringify(def)) } }, menu: null });
 }
 
-export async function applyCustomTheme(def) {
+export async function applyCustomTheme(def, resetParagraphs = false) {
   try {
-    ingestView(await invoke('theme_apply', { def }), { navigate: false });
+    ingestView(await invoke('theme_apply', { def, resetParagraphs }), { navigate: false });
+    return true;
   } catch (e) {
     toast(String(e), 'error');
+    return false;
   }
 }
 
@@ -152,18 +154,31 @@ function previewDoc(p, width) {
       .cz-placeholder{display:none}</style></head><body>${slides}</body></html>`;
 }
 
-function Preview({ def }) {
+export function Preview({ def, tab = 'theme' }) {
   const [p, setP] = useState(null);
+  const [error, setError] = useState('');
   const ref = useRef();
   const key = JSON.stringify(def);
   useEffect(() => {
-    const timer = setTimeout(() => invoke('theme_preview', { def }).then(setP).catch(() => {}), 120);
-    return () => clearTimeout(timer);
+    let current = true;
+    const timer = setTimeout(() => {
+      setError('');
+      invoke('theme_preview', { def }).then((preview) => {
+        if (current) setP(preview);
+      }).catch((e) => { if (current) setError(String(e)); });
+    }, 120);
+    return () => { current = false; clearTimeout(timer); };
   }, [key]);
   const width = 470;
-  const doc = useMemo(() => (p ? previewDoc(p, width) : ''), [p]);
+  const doc = useMemo(() => {
+    if (!p) return '';
+    const first = tab === 'lists' ? 4 : tab === 'paragraphs' ? 3 : 0;
+    const slides = p.slides[first] ? [p.slides[first], ...p.slides.filter((_, i) => i !== first)] : p.slides;
+    return previewDoc({ ...p, slides }, width);
+  }, [p, tab]);
   const height = p ? Math.ceil((p.height * width) / p.width) * p.slides.length + 14 * (p.slides.length - 1) + 8 : 600;
-  return html`<iframe ref=${ref} class="tb-preview" title=${t('Theme preview')} srcdoc=${doc} style=${{ width: width + 6 + 'px', height: height + 'px' }} />`;
+  return html`${error && html`<p role="alert" class="tb-error">${t('Could not update the preview.')} ${error}</p>`}
+    <iframe ref=${ref} class="tb-preview" title=${t('Theme preview')} srcdoc=${doc} style=${{ width: width + 6 + 'px', height: height + 'px' }} />`;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,16 +196,75 @@ const WEIGHT_NAMES = {
 };
 const WEIGHTS = [300, 400, 500, 600, 700, 800, 900].map((w) => ({ value: String(w), label: WEIGHT_NAMES[w] }));
 
+function ParagraphFields({ value, onChange }) {
+  return html`<${Section} title=${t('Paragraphs')} id="tb-paragraphs">
+    <${Row} label=${t('Alignment')}><${Select} value=${value.align} options=${[
+      { value: 'left', label: t('Left') }, { value: 'center', label: t('Center') },
+      { value: 'right', label: t('Right') }, { value: 'justify', label: t('Justify') },
+    ]} onChange=${(align) => onChange({ align })} /><//>
+    <${Row} label=${t('Line spacing')}><${NumberField} value=${value.lineHeight} min=${0.8} max=${4} step=${0.05}
+      onChange=${(lineHeight) => onChange({ lineHeight })} /><//>
+    ${[
+      ['spaceBefore', t('Space before'), 0, 5], ['spaceAfter', t('Space after'), 0, 5],
+      ['indentLeft', t('Left indent'), 0, 10], ['indentRight', t('Right indent'), 0, 10], ['firstLine', t('First line indent'), -5, 10],
+    ].map(([field, label, min, max]) => html`<${Row} label=${label}><${NumberField} value=${value[field]} min=${min} max=${max} step=${0.05}
+      unit="em" onChange=${(v) => onChange({ [field]: v })} /><//>`)}
+    <${Hint}>${t('Distances in em scale with the text size. A negative first line indent creates a hanging indent.')}</${Hint}>
+  <//>`;
+}
+
+function ListFields({ value, level, onLevel, onChange, onPreset }) {
+  return html`<${Section} title=${t('Bullets & numbering')} id="tb-lists">
+    <${Row} label=${t('Presets')}><div class="row-inline">
+      <${Button} size="sm" label=${t('Classic')} onClick=${() => onPreset('classic')} />
+      <${Button} size="sm" label=${t('Outline')} onClick=${() => onPreset('outline')} />
+      <${Button} size="sm" label=${t('Minimal')} onClick=${() => onPreset('minimal')} />
+    </div><//>
+    <${Hint}>${t('Presets change the marker styles at every level. Spacing and colors stay.')}</${Hint}>
+    <${Row} label=${t('List level')}><${Select} value=${String(level)} options=${Array.from({ length: 9 }, (_, i) => ({
+      value: String(i), label: t('Level {number}', { number: i + 1 }),
+    }))} onChange=${(v) => onLevel(Number(v))} /><//>
+    <div key=${level}>
+      <${Row} label=${t('Bullet style')}><${Select} value=${value.bullet} options=${[
+        ['disc', `●  ${t('Filled circle')}`], ['circle', `○  ${t('Hollow circle')}`], ['square', `■  ${t('Square')}`],
+        ['dash', `–  ${t('Dash')}`], ['arrow', `→  ${t('Arrow')}`], ['check', `✓  ${t('Check mark')}`], ['none', t('None')],
+      ].map(([value, label]) => ({ value, label }))} onChange=${(bullet) => onChange({ bullet })} /><//>
+      <${Row} label=${t('Numbering style')}><${Select} value=${value.numbering} options=${[
+        ['decimal', '1, 2, 3'], ['decimal-leading-zero', '01, 02, 03'], ['lower-alpha', 'a, b, c'],
+        ['upper-alpha', 'A, B, C'], ['lower-roman', 'i, ii, iii'], ['upper-roman', 'I, II, III'],
+      ].map(([value, label]) => ({ value, label }))} onChange=${(numbering) => onChange({ numbering })} /><//>
+      <${Row} label=${t('List indent')}><${NumberField} value=${value.indent} min=${0.5} max=${8} step=${0.05} unit="em"
+        onChange=${(indent) => onChange({ indent })} /><//>
+      <${Row} label=${t('Item spacing')}><${NumberField} value=${value.spacing} nullable placeholder=${t('Automatic')}
+        min=${0} max=${5} step=${0.05} unit="em" onChange=${(spacing) => onChange({ spacing })} /><//>
+      <${Row} label=${t('Marker color')}><${ColorField} value=${value.markerColor} noneLabel=${t('Same as text')}
+        onChange=${(markerColor) => onChange({ markerColor })} /><//>
+      <${Row} label=${t('Marker size')}><${Slider} value=${value.markerSize} min=${0.5} max=${2} step=${0.05} unit="em"
+        onChange=${(markerSize) => onChange({ markerSize })} /><//>
+    </div>
+    <${Hint}>${t('Each level has its own settings. Indent is relative to its parent. Automatic item spacing is half the paragraph spacing.')}</${Hint}>
+  <//>`;
+}
+
 export function ThemeBuilder({ def: initial }) {
   const [def, setDef] = useState(initial);
-  const upd = (patch) => setDef((d) => ({ ...d, ...patch }));
-  const setPal = (i, c) => upd({ palette: def.palette.map((x, j) => (j === i ? c : x)) });
+  const draft = useRef(def);
+  const [tab, setTab] = useState('theme');
+  const [level, setLevel] = useState(0);
+  const [resetParagraphs, setResetParagraphs] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const upd = (patch) => { draft.current = { ...draft.current, ...patch }; setDef(draft.current); };
+  const paragraph = (patch) => upd({ paragraphs: { ...draft.current.paragraphs, ...patch } });
+  const list = (patch) => upd({ lists: draft.current.lists.map((value, i) => i === level ? { ...value, ...patch } : value) });
+  const setPal = (i, c) => upd({ palette: draft.current.palette.map((x, j) => (j === i ? c : x)) });
   const hasDoc = !!state.doc;
   const weights = WEIGHTS.map((w) => ({ ...w, label: t(w.label) }));
 
   const save = async () => {
+    if (!(await flushEdits())) return null;
     try {
-      const saved = await invoke('theme_save', { def });
+      const saved = await invoke('theme_save', { def: draft.current });
+      draft.current = saved;
       setDef(saved);
       await refreshUserThemes();
       toast(t('Saved “{name}” to My Themes', { name: saved.name }), 'success');
@@ -213,36 +287,44 @@ export function ThemeBuilder({ def: initial }) {
   return html`<${Modal}
     title=${html`<span class="tb-title"><${Icon} name="swatch-book" size=${18} /> ${t('Theme Builder')}</span>`}
     width=${1060}
-    onClose=${closeModal}
+    onClose=${() => { if (!busy) closeModal(); }}
     class="tb-modal"
     footer=${html`
-      <${Button} icon="download" label=${t('Export')} onClick=${(e) => {
+      <${Button} icon="download" label=${t('Export')} disabled=${busy} onClick=${(e) => {
         const r = e.currentTarget.getBoundingClientRect();
         openMenu(r.left, r.top - 90, [
-          { label: t('Theme File (.cadenza-theme)…'), icon: 'download', run: () => exportTheme(def) },
-          { label: t('reveal.js CSS…'), icon: 'file-code-2', run: () => exportTheme(def, true) },
+          { label: t('Theme File (.cadenza-theme)…'), icon: 'download', run: async () => { if (await flushEdits()) await exportTheme(draft.current); } },
+          { label: t('reveal.js CSS…'), icon: 'file-code-2', run: async () => { if (await flushEdits()) await exportTheme(draft.current, true); } },
         ]);
       }} />
       <span class="spacer" />
-      <${Button} label=${t('Cancel')} onClick=${closeModal} />
-      <${Button} icon="save" label=${t('Save to My Themes')} onClick=${save} />
+      <${Button} label=${t('Cancel')} disabled=${busy} onClick=${closeModal} />
+      <${Button} icon="save" label=${t('Save to My Themes')} disabled=${busy} onClick=${async () => { setBusy(true); try { await save(); } finally { setBusy(false); } }} />
       ${hasDoc &&
       html`<${Button}
         variant="primary"
         icon="check"
         label=${t('Apply to Presentation')}
+        disabled=${busy}
         onClick=${async () => {
-          const saved = await save();
-          if (saved) {
-            await applyCustomTheme(saved);
-            closeModal();
-          }
+          setBusy(true);
+          try {
+            const saved = await save();
+            if (saved && await applyCustomTheme(saved, resetParagraphs)) closeModal();
+          } finally { setBusy(false); }
         }}
       />`}
     `}
   >
     <div class="tb">
       <div class="tb-form">
+        <nav class="tb-nav" aria-label=${t('Theme settings')}>
+          ${[
+            ['theme', t('Theme')], ['type', t('Typography')], ['paragraphs', t('Paragraphs')], ['lists', t('Lists')], ['colors', t('Colors')],
+          ].map(([value, label]) => html`<button type="button" disabled=${busy} aria-pressed=${tab === value} onClick=${() => setTab(value)}>${label}</button>`)}
+        </nav>
+        <fieldset class="tb-fields" key=${tab} disabled=${busy}>
+        ${tab === 'theme' && html`
         <${Section} title=${t('Theme')} id="tb-basics">
           <${Row} label=${t('Name')}><${TextField} value=${def.name} onChange=${(v) => upd({ name: v })} /><//>
           <${Row} label=${t('Author')}><${TextField} value=${def.author} placeholder=${t('Your name')} onChange=${(v) => upd({ author: v })} /><//>
@@ -264,15 +346,28 @@ export function ThemeBuilder({ def: initial }) {
           html`<${Row} label=${t('To')}><${ColorField} value=${def.background2} allowNone=${false} onChange=${(v) => upd({ background2: v })} /><//>
             <${Row} label=${t('Angle')}><${Slider} value=${def.gradientAngle} min=${0} max=${360} unit="°" onChange=${(v) => upd({ gradientAngle: v })} /><//>`}
         <//>
+        `}
+        ${tab === 'type' && html`
         <${Section} title=${t('Typography')} id="tb-type">
           <${Row} label=${t('Headings')}><${FontField} value=${def.headingFont} placeholder=${t('System sans-serif')} onChange=${(v) => upd({ headingFont: v })} /><//>
           <${Row} label=${t('Body text')}><${FontField} value=${def.bodyFont} placeholder=${t('System sans-serif')} onChange=${(v) => upd({ bodyFont: v })} /><//>
-          <${Row} label=${t('Weight')}><${Select} value=${String(def.headingWeight)} options=${weights} onChange=${(v) => upd({ headingWeight: Number(v) })} /><//>
+          <${Row} label=${t('Heading weight')}><${Select} value=${String(def.headingWeight)} options=${weights} onChange=${(v) => upd({ headingWeight: Number(v) })} /><//>
+          <${Row} label=${t('Body weight')}><${Select} value=${String(def.bodyWeight)} options=${weights} onChange=${(v) => upd({ bodyWeight: Number(v) })} /><//>
+          <${Row} label=${t('Heading line spacing')}><${Slider} value=${def.headingLineHeight} min=${0.8} max=${4} step=${0.05} onChange=${(v) => upd({ headingLineHeight: v })} /><//>
           <${Row} label=${t('Tracking')}><${Slider} value=${def.headingLetterSpacing} min=${-0.1} max=${0.3} step=${0.005} format=${3} unit="em" onChange=${(v) => upd({ headingLetterSpacing: v })} /><//>
           <${Row}><${Toggle} value=${def.headingUppercase} label=${t('Uppercase headings')} onChange=${(v) => upd({ headingUppercase: v })} /><//>
-          <${Row} label=${t('Base size')}><${Slider} value=${def.baseSize} min=${16} max=${64} unit="px" onChange=${(v) => upd({ baseSize: v })} /><//>
+          <${Row} label=${t('reveal.js base size')}><${Slider} value=${def.baseSize} min=${16} max=${64} unit="px" onChange=${(v) => upd({ baseSize: v })} /><//>
+          <${Hint}>${t('Text box sizes are set by the layout or the Format panel.')}</${Hint}>
           ${!hasDoc && html`<${Hint}>${t('Open a presentation to pick Google Fonts here.')}</${Hint}>`}
         <//>
+        `}
+        ${tab === 'paragraphs' && html`<${ParagraphFields} value=${def.paragraphs} onChange=${paragraph} />`}
+        ${tab === 'lists' && html`<${ListFields} value=${def.lists[level]} level=${level} onLevel=${setLevel} onChange=${list}
+          onPreset=${(preset) => upd({ lists: draft.current.lists.map((value, i) => ({ ...value,
+            bullet: preset === 'minimal' ? 'dash' : ['disc', 'circle', 'square'][i % 3],
+            numbering: preset === 'outline' ? ['decimal', 'lower-alpha', 'lower-roman'][i % 3] : 'decimal',
+          })) })} />`}
+        ${tab === 'colors' && html`
         <${Section} title=${t('Colors')} id="tb-colors">
           <${Row} label=${t('Headings')}><${ColorField} value=${def.headingColor} allowNone=${false} onChange=${(v) => upd({ headingColor: v })} /><//>
           <${Row} label=${t('Text')}><${ColorField} value=${def.textColor} allowNone=${false} onChange=${(v) => upd({ textColor: v })} /><//>
@@ -285,10 +380,18 @@ export function ThemeBuilder({ def: initial }) {
             ${def.palette.map((c, i) => html`<${ColorField} value=${c} allowNone=${false} label=${t('Color {number}', { number: i + 1 })} onChange=${(v) => setPal(i, v)} />`)}
           </div>
         <//>
+        `}
+        ${hasDoc && html`<div class="tb-adoption">
+          <${Toggle} value=${resetParagraphs} label=${t('Use theme paragraph settings in existing text boxes')} onChange=${setResetParagraphs} />
+          <${Hint}>${resetParagraphs
+            ? t('Applying resets alignment, line spacing and paragraph spacing in all text boxes. Fonts and inline formatting stay. You can undo this.')
+            : t('Existing text boxes keep their own formatting. New text follows the theme.')}</${Hint}>
+        </div>`}
+        </fieldset>
       </div>
       <div class="tb-preview-wrap">
         <div class="tb-preview-label">${t('Live preview')}</div>
-        <${Preview} def=${def} />
+        <${Preview} def=${def} tab=${tab} />
       </div>
     </div>
   <//>`;

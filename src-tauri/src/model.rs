@@ -650,7 +650,7 @@ pub struct TextStyle {
     pub upright: bool,
     /// Empty = from the theme.
     pub color: String,
-    /// "left", "center", "right" or "justify".
+    /// Empty = theme; otherwise "left", "center", "right" or "justify".
     pub align: String,
     /// "top", "middle" or "bottom".
     pub valign: String,
@@ -660,8 +660,10 @@ pub struct TextStyle {
     pub letter_spacing: f64,
     /// "", "none", "uppercase", "lowercase" or "capitalize".
     pub transform: String,
-    /// Space after paragraphs, in em.
-    pub paragraph_spacing: f64,
+    /// Space after paragraphs, in em. None = theme. Old numeric values remain
+    /// explicit overrides; omit inherited values so old readers can open them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paragraph_spacing: Option<f64>,
     /// Grow the box vertically to fit the text.
     pub auto_height: bool,
     /// "none", "soft", "hard" or "glow".
@@ -678,12 +680,12 @@ impl Default for TextStyle {
             italic: false,
             upright: false,
             color: String::new(),
-            align: "left".into(),
+            align: String::new(),
             valign: "top".into(),
             line_height: 0.0,
             letter_spacing: 0.0,
             transform: String::new(),
-            paragraph_spacing: 0.4,
+            paragraph_spacing: None,
             auto_height: true,
             shadow: "none".into(),
         }

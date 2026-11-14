@@ -93,6 +93,13 @@ pub enum Op {
     UpdateDeck {
         patch: Value,
     },
+    /// Applying the theme and adopting its paragraph defaults is one undo step.
+    ApplyTheme {
+        theme: Box<crate::custom_theme::ThemeDef>,
+        fonts: Vec<crate::webfonts::WebFont>,
+        #[serde(default)]
+        reset_paragraphs: bool,
+    },
     /// Changes the slide size, scaling content to fit.
     ResizeDeck {
         width: u32,
@@ -399,6 +406,28 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             *deck = updated;
             Ok(outcome(label, None, vec![]))
         }
+        Op::ApplyTheme {
+            mut theme,
+            fonts,
+            reset_paragraphs,
+        } => {
+            theme.normalize();
+            deck.theme = theme.id.clone();
+            deck.custom_theme = Some(*theme);
+            deck.web_fonts = fonts;
+            if reset_paragraphs {
+                for slide in &mut deck.slides {
+                    for el in &mut slide.elements {
+                        if let Content::Text(text) = &mut el.content {
+                            text.text.style.align.clear();
+                            text.text.style.line_height = 0.0;
+                            text.text.style.paragraph_spacing = None;
+                        }
+                    }
+                }
+            }
+            Ok(outcome("Change Theme", None, vec![]))
+        }
         Op::ResizeDeck { width, height } => {
             let (ow, oh) = (deck.width as f64, deck.height as f64);
             let (nw, nh) = (width.clamp(320, 7680) as f64, height.clamp(240, 4320) as f64);
@@ -663,6 +692,86 @@ mod tests {
 
     fn ids(d: &Deck) -> Vec<String> {
         d.slides.iter().map(|s| s.id.clone()).collect()
+    }
+
+    #[test]
+    fn theme_application_preserves_overrides_and_reset_is_one_undo_step() {
+        let mut d = deck3();
+        for slide in &mut d.slides {
+            let text = slide.elements[1].content.text_mut().unwrap();
+            text.style.align = "right".into();
+            text.style.line_height = 1.7;
+            text.style.paragraph_spacing = Some(0.0);
+            text.html = "<p><strong>Keep inline formatting</strong></p>".into();
+        }
+        let before = d.clone();
+        let mut theme = crate::custom_theme::ThemeDef::default();
+        theme.paragraphs.space_after = 0.9;
+        theme.lists[0].spacing = Some(0.7);
+        apply(
+            &mut d,
+            Op::ApplyTheme {
+                theme: Box::new(theme.clone()),
+                fonts: vec![],
+                reset_paragraphs: false,
+            },
+        )
+        .unwrap();
+        assert_eq!(d.slides, before.slides, "applying a theme preserves explicit formatting");
+        theme.lists[0].spacing = None;
+        let preserved = d.clone();
+        let out = apply(
+            &mut d,
+            Op::ApplyTheme {
+                theme: Box::new(theme),
+                fonts: vec![],
+                reset_paragraphs: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            d.custom_theme.as_ref().unwrap().lists[0].spacing,
+            None,
+            "automatic replaces an explicit list gap"
+        );
+        for (slide, old) in d.slides.iter().zip(&before.slides) {
+            let text = slide.elements[1].content.text().unwrap();
+            let previous = old.elements[1].content.text().unwrap();
+            assert_eq!(text.style.align, "");
+            assert_eq!(text.style.line_height, 0.0);
+            assert_eq!(text.style.paragraph_spacing, None);
+            assert_eq!(text.style.font_size, previous.style.font_size);
+            assert_eq!(text.html, previous.html);
+        }
+        let reset = d.clone();
+        let mut history = History::default();
+        history.record(preserved.clone(), &d, &out, None);
+        history.undo(&mut d).unwrap();
+        assert_eq!(d, preserved);
+        assert!(history.undo(&mut d).is_none());
+        history.redo(&mut d).unwrap();
+        assert_eq!(d, reset);
+        assert_eq!(serde_json::from_str::<Deck>(&serde_json::to_string(&d).unwrap()).unwrap(), d);
+    }
+
+    #[test]
+    fn a_text_box_can_reset_an_explicit_zero_paragraph_gap() {
+        let mut d = deck3();
+        let slide = d.slides[0].id.clone();
+        let id = d.slides[0].elements[1].id.clone();
+        d.slides[0].elements[1].content.text_mut().unwrap().style.paragraph_spacing = Some(0.0);
+        apply(
+            &mut d,
+            Op::UpdateElements {
+                slide,
+                updates: vec![ElementPatch {
+                    id,
+                    patch: json!({"content":{"style":{"paragraphSpacing":null,"align":"","lineHeight":0}}}),
+                }],
+            },
+        )
+        .unwrap();
+        assert_eq!(d.slides[0].elements[1].content.text().unwrap().style.paragraph_spacing, None);
     }
 
     #[test]

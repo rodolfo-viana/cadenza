@@ -48,6 +48,12 @@
   ]
  },
  {
+  "key": "A theme gives every paragraph a consistent rhythm. Line spacing controls the distance between lines of text.",
+  "files": [
+   "layouts.rs"
+  ]
+ },
+ {
   "key": "A {link} and {bold} words",
   "files": [
    "layouts.rs"
@@ -298,6 +304,12 @@
   ]
  },
  {
+  "key": "Alignment",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "All",
   "files": [
    "controls.js"
@@ -420,6 +432,12 @@
   ]
  },
  {
+  "key": "Applying resets alignment, line spacing and paragraph spacing in all text boxes. Fonts and inline formatting stay. You can undo this.",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Area",
   "files": [
    "chart.rs"
@@ -438,6 +456,7 @@
   "key": "Arrow",
   "files": [
    "panels.js",
+   "themebuilder.js",
    "shapes.rs"
   ]
  },
@@ -482,6 +501,12 @@
   "key": "Auto-advance",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Automatic",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -547,12 +572,6 @@
   ]
  },
  {
-  "key": "Base size",
-  "files": [
-   "themebuilder.js"
-  ]
- },
- {
   "key": "Big Image",
   "files": [
    "layouts.rs"
@@ -605,6 +624,12 @@
   "key": "Body Text",
   "files": [
    "toolbar.js"
+  ]
+ },
+ {
+  "key": "Body weight",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -741,9 +766,22 @@
   ]
  },
  {
+  "key": "Bullet style",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Bulleted list",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Bullets & numbering",
+  "files": [
+   "themebuilder.js",
+   "layouts.rs"
   ]
  },
  {
@@ -947,7 +985,8 @@
   "key": "Center",
   "files": [
    "inspector.js",
-   "panels.js"
+   "panels.js",
+   "themebuilder.js"
   ]
  },
  {
@@ -1041,6 +1080,12 @@
   "key": "Check for Updates…",
   "files": [
    "commands.js"
+  ]
+ },
+ {
+  "key": "Check mark",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -1144,7 +1189,8 @@
  {
   "key": "Classic",
   "files": [
-   "panels.js"
+   "panels.js",
+   "themebuilder.js"
   ]
  },
  {
@@ -1406,6 +1452,12 @@
   ]
  },
  {
+  "key": "Could not update the preview.",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Could not write the PDF",
   "files": [
    "lib.rs"
@@ -1482,6 +1534,12 @@
   "files": [
    "dialogs.js",
    "panels.js",
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Dash",
+  "files": [
    "themebuilder.js"
   ]
  },
@@ -1640,6 +1698,12 @@
   "key": "Dissolve (fade)",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Distances in em scale with the text size. A negative first line indent creates a hanging indent.",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -1842,6 +1906,12 @@
   "key": "Each cell is colored by its value.",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Each level has its own settings. Indent is relative to its parent. Automatic item spacing is half the paragraph spacing.",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -2059,6 +2129,12 @@
   ]
  },
  {
+  "key": "Existing text boxes keep their own formatting. New text follows the theme.",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Expected binary data",
   "files": [
    "lib.rs"
@@ -2217,9 +2293,21 @@
   ]
  },
  {
+  "key": "Filled circle",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Find Photo Online…",
   "files": [
    "canvas.js"
+  ]
+ },
+ {
+  "key": "First line indent",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -2597,6 +2685,18 @@
   ]
  },
  {
+  "key": "Heading line spacing",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Heading weight",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Headings",
   "files": [
    "inspector.js",
@@ -2691,6 +2791,12 @@
   "key": "Highlighting",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Hollow circle",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -2996,6 +3102,12 @@
   ]
  },
  {
+  "key": "Item spacing",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Item {n}",
   "files": [
    "charts.js"
@@ -3010,7 +3122,8 @@
  {
   "key": "Justify",
   "files": [
-   "panels.js"
+   "panels.js",
+   "themebuilder.js"
   ]
  },
  {
@@ -3079,13 +3192,20 @@
   "key": "Left",
   "files": [
    "inspector.js",
-   "panels.js"
+   "panels.js",
+   "themebuilder.js"
   ]
  },
  {
   "key": "Left column",
   "files": [
    "slideview.js"
+  ]
+ },
+ {
+  "key": "Left indent",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -3104,6 +3224,13 @@
   "key": "Letter spacing (em)",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Level {number}",
+  "files": [
+   "themebuilder.js",
+   "layouts.rs"
   ]
  },
  {
@@ -3148,7 +3275,8 @@
  {
   "key": "Line spacing",
   "files": [
-   "teleprompter.js"
+   "teleprompter.js",
+   "themebuilder.js"
   ]
  },
  {
@@ -3183,6 +3311,24 @@
  },
  {
   "key": "Links",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "List indent",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "List level",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Lists",
   "files": [
    "themebuilder.js"
   ]
@@ -3354,6 +3500,18 @@
   ]
  },
  {
+  "key": "Marker color",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Marker size",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Math uses LaTeX, typeset with KaTeX.",
   "files": [
    "panels.js"
@@ -3400,6 +3558,12 @@
   "key": "Mindmap",
   "files": [
    "diagrams.js"
+  ]
+ },
+ {
+  "key": "Minimal",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -3659,7 +3823,8 @@
   "files": [
    "charts.js",
    "inspector.js",
-   "panels.js"
+   "panels.js",
+   "themebuilder.js"
   ]
  },
  {
@@ -3732,6 +3897,12 @@
   "key": "Numbered list",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Numbering style",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -4000,7 +4171,8 @@
  {
   "key": "Outline",
   "files": [
-   "panels.js"
+   "panels.js",
+   "themebuilder.js"
   ]
  },
  {
@@ -4038,6 +4210,13 @@
   "key": "Paragraph",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Paragraphs",
+  "files": [
+   "themebuilder.js",
+   "layouts.rs"
   ]
  },
  {
@@ -4280,6 +4459,18 @@
   "key": "Presenting",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "Presets",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Presets change the marker styles at every level. Spacing and colors stay.",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -4567,6 +4758,12 @@
   ]
  },
  {
+  "key": "reveal.js base size",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "reveal.js CSS…",
   "files": [
    "themebuilder.js"
@@ -4576,13 +4773,20 @@
   "key": "Right",
   "files": [
    "inspector.js",
-   "panels.js"
+   "panels.js",
+   "themebuilder.js"
   ]
  },
  {
   "key": "Right column",
   "files": [
    "slideview.js"
+  ]
+ },
+ {
+  "key": "Right indent",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -4629,6 +4833,12 @@
  },
  {
   "key": "Same as accent",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Same as text",
   "files": [
    "themebuilder.js"
   ]
@@ -5181,9 +5391,27 @@
   ]
  },
  {
+  "key": "Space after",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Space after each paragraph",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Space before",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Space before and after separates ideas. Indentation and alignment help organize the text on each slide.",
+  "files": [
+   "layouts.rs"
   ]
  },
  {
@@ -5225,7 +5453,8 @@
  {
   "key": "Square",
   "files": [
-   "charts.js"
+   "charts.js",
+   "themebuilder.js"
   ]
  },
  {
@@ -5489,6 +5718,18 @@
   "key": "Text Box",
   "files": [
    "commands.js"
+  ]
+ },
+ {
+  "key": "Text box sizes are set by the layout or the Format panel.",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Text boxes can follow the theme or keep their own formatting.",
+  "files": [
+   "layouts.rs"
   ]
  },
  {
@@ -5784,6 +6025,12 @@
   "key": "theme preview::link",
   "files": [
    "layouts.rs"
+  ]
+ },
+ {
+  "key": "Theme settings",
+  "files": [
+   "themebuilder.js"
   ]
  },
  {
@@ -6139,6 +6386,18 @@
   ]
  },
  {
+  "key": "Use theme paragraph settings",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
+  "key": "Use theme paragraph settings in existing text boxes",
+  "files": [
+   "themebuilder.js"
+  ]
+ },
+ {
   "key": "Use this chart",
   "files": [
    "datachart.js"
@@ -6264,12 +6523,6 @@
   "key": "Web Page…",
   "files": [
    "commands.js"
-  ]
- },
- {
-  "key": "Weight",
-  "files": [
-   "themebuilder.js"
   ]
  },
  {

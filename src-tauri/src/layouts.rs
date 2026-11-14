@@ -83,10 +83,9 @@ pub fn text(role: &str, placeholder: &str, size: f64, align: &str) -> Element {
     t.text.placeholder = placeholder.into();
     t.text.style.role = role.into();
     t.text.style.font_size = size;
-    t.text.style.align = align.into();
-    if role == "title" || role == "heading" {
-        t.text.style.line_height = 1.1;
-    }
+    // Left was the incidental default; centered title/quote layouts keep
+    // their intentional alignment while other boxes inherit the theme.
+    t.text.style.align = if align == "left" { String::new() } else { align.into() };
     Element {
         name: role_name(role).into(),
         content: Content::Text(t),
@@ -351,6 +350,56 @@ pub fn sample_slides(width: u32, height: u32, text: &dyn Fn(&str) -> String) -> 
     }
     quote.elements.push(shape);
     vec![title, content, quote]
+}
+
+/// Builder previews also exercise paragraphs and every supported list level.
+/// Gallery previews keep the original compact three-slide set.
+pub fn theme_sample_slides(width: u32, height: u32, translate: &dyn Fn(&str) -> String) -> Vec<Slide> {
+    let mut slides = sample_slides(width, height, translate);
+    let p = |s: String| format!("<p>{}</p>", crate::util::esc(&s));
+    let set_html = |el: &mut Element, html: String| {
+        if let Some(text) = el.content.text_mut() {
+            text.html = html;
+        }
+    };
+    let mut paragraphs = new_slide("title-content", width, height);
+    set_html(&mut paragraphs.elements[0], p(crate::tr(&translate, "Paragraphs")));
+    set_html(
+        &mut paragraphs.elements[1],
+        format!(
+            "{}{}{}",
+            p(crate::tr(
+                &translate,
+                "A theme gives every paragraph a consistent rhythm. Line spacing controls the distance between lines of text."
+            )),
+            p(crate::tr(
+                &translate,
+                "Space before and after separates ideas. Indentation and alignment help organize the text on each slide."
+            )),
+            p(crate::tr(&translate, "Text boxes can follow the theme or keep their own formatting.")),
+        ),
+    );
+    slides.push(paragraphs);
+    let mut lists = new_slide("two-column", width, height);
+    set_html(&mut lists.elements[0], p(crate::tr(&translate, "Bullets & numbering")));
+    for (col, tag) in ["ul", "ol"].iter().enumerate() {
+        let mut html = String::new();
+        for i in 0..crate::custom_theme::LIST_LEVELS {
+            let label = crate::tr(&translate, "Level {number}").replace("{number}", &(i + 1).to_string());
+            html.push_str(&format!("<{tag}><li>{}", crate::util::esc(&label)));
+        }
+        html.push_str(&format!("</li></{tag}>").repeat(crate::custom_theme::LIST_LEVELS));
+        set_html(&mut lists.elements[col + 1], html);
+        if let Some(text) = lists.elements[col + 1].content.text_mut() {
+            text.style.font_size = Frame {
+                w: width as f64,
+                h: height as f64,
+            }
+            .font(26.0);
+        }
+    }
+    slides.push(lists);
+    slides
 }
 
 #[cfg(test)]

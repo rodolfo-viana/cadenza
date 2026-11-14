@@ -177,6 +177,7 @@ export function TextPanel({ els, title = t('Text') }) {
       <${Segmented}
         value=${align}
         options=${[
+          { value: '', icon: 'swatch-book', title: t('Theme default') },
           { value: 'left', icon: 'text-align-start', title: t('Left') },
           { value: 'center', icon: 'text-align-center', title: t('Center') },
           { value: 'right', icon: 'text-align-end', title: t('Right') },
@@ -204,8 +205,9 @@ export function TextPanel({ els, title = t('Text') }) {
       </div>
     <//>
     <${Row} label=${t('Paragraph')}>
-      <${NumberField} value=${ps ?? 0.4} step=${0.05} min=${0} max=${5} unit="em" title=${t('Space after each paragraph')} onChange=${(v, live) => setStyle({ paragraphSpacing: v }, 'ps', live)} />
+      <${NumberField} value=${ps ?? null} nullable placeholder=${t('Theme default')} step=${0.05} min=${0} max=${5} unit="em" title=${t('Space after each paragraph')} onChange=${(v, live) => setStyle({ paragraphSpacing: v }, 'ps', live)} />
     <//>
+    <${Row}><${Button} icon="swatch-book" label=${t('Use theme paragraph settings')} onClick=${() => setStyle({ align: '', lineHeight: 0, paragraphSpacing: null })} /><//>
     <${Row} label=${t('Case')}>
       <${Select}
         value=${transform ?? ''}

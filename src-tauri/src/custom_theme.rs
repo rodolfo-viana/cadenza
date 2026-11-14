@@ -5,6 +5,7 @@
 //! self-contained; when a theme is applied to a presentation those fonts are
 //! converted into presentation assets.
 
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -20,6 +21,112 @@ const FORMAT: u32 = 1;
 
 /// The reveal.js rule set every theme shares (from reveal.js' "simple").
 const TEMPLATE: &str = include_str!("../../ui/vendor/reveal/theme/simple.css");
+
+/// Paragraph defaults. Distances use em so they follow each text box's size.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ParagraphStyle {
+    pub line_height: f64,
+    pub space_before: f64,
+    pub space_after: f64,
+    pub indent_left: f64,
+    pub indent_right: f64,
+    pub first_line: f64,
+    pub align: String,
+}
+
+impl Default for ParagraphStyle {
+    fn default() -> Self {
+        Self {
+            line_height: 1.25,
+            space_before: 0.0,
+            space_after: 0.4,
+            indent_left: 0.0,
+            indent_right: 0.0,
+            first_line: 0.0,
+            align: "left".into(),
+        }
+    }
+}
+
+/// One nesting level, shared by bulleted and numbered lists.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ListLevel {
+    pub bullet: String,
+    pub numbering: String,
+    pub indent: f64,
+    /// None = half the text box's paragraph spacing, as in older themes.
+    pub spacing: Option<f64>,
+    /// Empty = the text color; size is relative to the list item's text.
+    pub marker_color: String,
+    pub marker_size: f64,
+}
+
+impl Default for ListLevel {
+    fn default() -> Self {
+        Self {
+            bullet: "disc".into(),
+            numbering: "decimal".into(),
+            indent: 1.25,
+            spacing: None,
+            marker_color: String::new(),
+            marker_size: 1.0,
+        }
+    }
+}
+
+pub const LIST_LEVELS: usize = 9;
+
+pub fn default_list_levels() -> Vec<ListLevel> {
+    (0..LIST_LEVELS)
+        .map(|i| ListLevel {
+            bullet: match i {
+                0 => "disc",
+                1 => "square",
+                _ => "circle",
+            }
+            .into(),
+            ..Default::default()
+        })
+        .collect()
+}
+
+fn finite(value: f64, min: f64, max: f64, fallback: f64) -> f64 {
+    if value.is_finite() { value.clamp(min, max) } else { fallback }
+}
+
+impl ParagraphStyle {
+    fn normalize(&mut self) {
+        self.line_height = finite(self.line_height, 0.8, 4.0, 1.25);
+        self.space_before = finite(self.space_before, 0.0, 5.0, 0.0);
+        self.space_after = finite(self.space_after, 0.0, 5.0, 0.4);
+        self.indent_left = finite(self.indent_left, 0.0, 10.0, 0.0);
+        self.indent_right = finite(self.indent_right, 0.0, 10.0, 0.0);
+        self.first_line = finite(self.first_line, -5.0, 10.0, 0.0);
+        if !matches!(self.align.as_str(), "left" | "center" | "right" | "justify") {
+            self.align = "left".into();
+        }
+    }
+}
+
+impl ListLevel {
+    fn normalize(&mut self) {
+        if !matches!(self.bullet.as_str(), "disc" | "circle" | "square" | "dash" | "arrow" | "check" | "none") {
+            self.bullet = "disc".into();
+        }
+        if !matches!(
+            self.numbering.as_str(),
+            "decimal" | "decimal-leading-zero" | "lower-alpha" | "upper-alpha" | "lower-roman" | "upper-roman"
+        ) {
+            self.numbering = "decimal".into();
+        }
+        self.indent = finite(self.indent, 0.5, 8.0, 1.25);
+        self.spacing = self.spacing.map(|v| finite(v, 0.0, 5.0, 0.2));
+        self.marker_size = finite(self.marker_size, 0.5, 2.0, 1.0);
+        self.marker_color = css_value(&self.marker_color).to_string();
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
@@ -45,6 +152,10 @@ pub struct ThemeDef {
     pub heading_font: String,
     pub body_font: String,
     pub heading_weight: u16,
+    pub body_weight: u16,
+    pub heading_line_height: f64,
+    pub paragraphs: ParagraphStyle,
+    pub lists: Vec<ListLevel>,
     pub heading_uppercase: bool,
     /// em
     pub heading_letter_spacing: f64,
@@ -82,6 +193,10 @@ impl Default for ThemeDef {
             heading_font: String::new(),
             body_font: String::new(),
             heading_weight: 700,
+            body_weight: 400,
+            heading_line_height: 1.12,
+            paragraphs: ParagraphStyle::default(),
+            lists: default_list_levels(),
             heading_uppercase: false,
             heading_letter_spacing: -0.02,
             base_size: 34.0,
@@ -125,6 +240,16 @@ impl ThemeDef {
             self.palette.push(self.accent.clone());
         }
         self.heading_weight = self.heading_weight.clamp(100, 900);
+        self.body_weight = self.body_weight.clamp(100, 900);
+        self.heading_line_height = finite(self.heading_line_height, 0.8, 4.0, 1.12);
+        self.paragraphs.normalize();
+        self.lists.truncate(LIST_LEVELS);
+        for level in default_list_levels().into_iter().skip(self.lists.len()) {
+            self.lists.push(level);
+        }
+        for level in &mut self.lists {
+            level.normalize();
+        }
         self.base_size = if self.base_size.is_finite() { self.base_size.clamp(12.0, 96.0) } else { 34.0 };
         self.heading_letter_spacing = if self.heading_letter_spacing.is_finite() {
             self.heading_letter_spacing.clamp(-0.2, 0.5)
@@ -157,7 +282,7 @@ impl ThemeDef {
         let link = color(&self.link_color, accent);
         let root = format!(
             ":root{{--r-background:{bg};--r-background-color:{bg};--r-main-font:{body};--r-main-font-size:{size}px;--r-main-color:{text};\
---r-block-margin:20px;--r-heading-margin:0 0 20px 0;--r-heading-font:{hfont};--r-heading-color:{heading};--r-heading-line-height:1.12;\
+--r-block-margin:20px;--r-heading-margin:0 0 20px 0;--r-heading-font:{hfont};--r-heading-color:{heading};--r-heading-line-height:{hlh};\
 --r-heading-letter-spacing:{ls}em;--r-heading-text-transform:{transform};--r-heading-text-shadow:none;--r-heading-font-weight:{weight};\
 --r-heading1-text-shadow:none;--r-heading1-size:2.5em;--r-heading2-size:1.6em;--r-heading3-size:1.3em;--r-heading4-size:1em;\
 --r-code-font:{MONO};--r-link-color:{link};--r-link-color-dark:{link};--r-link-color-hover:{link};\
@@ -168,6 +293,7 @@ impl ThemeDef {
             ls = crate::util::num(self.heading_letter_spacing),
             transform = if self.heading_uppercase { "uppercase" } else { "none" },
             weight = self.heading_weight,
+            hlh = crate::util::num(finite(self.heading_line_height, 0.8, 4.0, 1.12)),
         );
         let mut css = strip_imports(TEMPLATE);
         css = replace_block(&css, ":root{", &root);
@@ -188,6 +314,77 @@ impl ThemeDef {
             css.push_str(
                 "section.has-dark-background,section.has-dark-background h1,section.has-dark-background h2,section.has-dark-background h3{color:#fff}",
             );
+        }
+        css.push_str(&self.text_css());
+        css
+    }
+
+    /// Text rules are part of the reveal.js export too. Cadenza consumes the
+    /// variables in content.css; ordinary reveal slides use the rules below.
+    fn text_css(&self) -> String {
+        let mut p = self.paragraphs.clone();
+        p.normalize();
+        let mut css = format!(
+            ":root{{--cz-body-weight:{};--cz-body-line-height:{};--cz-paragraph-before:{}em;--cz-paragraph-after:{}em;--cz-paragraph-left:{}em;--cz-paragraph-right:{}em;--cz-paragraph-first:{}em;--cz-paragraph-align:{}}}",
+            self.body_weight.clamp(100, 900),
+            crate::util::num(p.line_height),
+            crate::util::num(p.space_before),
+            crate::util::num(p.space_after),
+            crate::util::num(p.indent_left),
+            crate::util::num(p.indent_right),
+            crate::util::num(p.first_line),
+            p.align,
+        );
+        css.push_str(".reveal{font-weight:var(--cz-body-weight);line-height:var(--cz-body-line-height)}\
+.reveal .slides section{line-height:var(--cz-body-line-height)}\
+.reveal .slides section>p{line-height:var(--cz-body-line-height);margin:var(--cz-paragraph-before) var(--cz-paragraph-right) var(--cz-paragraph-after) var(--cz-paragraph-left);text-indent:var(--cz-paragraph-first);text-align:var(--cz-paragraph-align)}");
+        // Count list ancestors, including mixed ul/ol nesting. execCommand
+        // can indent as ul > ul instead of ul > li > ul; both must work while
+        // editing, not just after saving. Deeper selectors win in the cascade.
+        let defaults = default_list_levels();
+        for (i, default) in defaults.iter().enumerate() {
+            let mut level = self.lists.get(i).unwrap_or(default).clone();
+            level.normalize();
+            for (root, first) in [(".reveal .cz-text:where(:not(.cz-el))", " "), (".reveal .slides section", " > ")] {
+                let (parent, child) = if i == 0 {
+                    (root.to_string(), first)
+                } else {
+                    (format!("{root}{first}:is(ul,ol){}", " :is(ul,ol)".repeat(i - 1)), " ")
+                };
+                let selector = format!("{parent}{child}:is(ul,ol)");
+                let gap = level
+                    .spacing
+                    .map(|v| format!("{}em", crate::util::num(v)))
+                    .unwrap_or_else(|| "calc(var(--cz-ps,var(--cz-paragraph-after,0.4em)) * 0.5)".into());
+                let _ = write!(
+                    css,
+                    "{selector}{{--cz-list-gap:{gap};padding-left:{}em;list-style-position:outside}}",
+                    crate::util::num(level.indent)
+                );
+                // Ordinary reveal slides do not load content.css. Remove the
+                // template's root 1em and nested 40px margins there as well.
+                if parent.starts_with(".reveal .slides section") {
+                    let margin = if i == 0 { "0 0 var(--cz-paragraph-after)" } else { "var(--cz-list-gap) 0 0" };
+                    let _ = write!(css, "{selector}{{display:block;margin:{margin};text-align:var(--cz-paragraph-align)}}");
+                }
+                let bullet = match level.bullet.as_str() {
+                    "dash" => "'–  '",
+                    "arrow" => "'→  '",
+                    "check" => "'✓  '",
+                    v => v,
+                };
+                let _ = write!(
+                    css,
+                    "{parent}{child}ul{{list-style-type:{bullet}}}{parent}{child}ol:not([type]){{list-style-type:{}}}",
+                    level.numbering
+                );
+                let _ = write!(
+                    css,
+                    "{selector} > li{{margin-bottom:var(--cz-list-gap)}}{selector} > li:last-child{{margin-bottom:0}}{selector} > li::marker{{color:{};font-size:{}em}}",
+                    color(&level.marker_color, "currentColor"),
+                    crate::util::num(level.marker_size)
+                );
+            }
         }
         css
     }
@@ -430,7 +627,71 @@ mod tests {
         assert!(css.contains(".reveal-viewport{background:linear-gradient(160deg"));
         assert!(!css.contains("@import"));
         assert!(css.contains(".reveal h1"));
-        assert!(css.ends_with("{color:#1f2937}"));
+        assert!(css.contains("{color:#1f2937}"));
+    }
+
+    #[test]
+    fn paragraph_and_list_settings_survive_theme_files_and_css_export() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut def = ThemeDef::default();
+        def.paragraphs.align = "justify".into();
+        def.paragraphs.space_before = 0.3;
+        def.paragraphs.space_after = 0.9;
+        def.paragraphs.first_line = -0.4;
+        def.lists[1].numbering = "lower-alpha".into();
+        def.lists[1].bullet = "check".into();
+        def.lists[1].spacing = Some(0.65);
+        def.lists[1].marker_color = "#eabc12".into();
+        def.lists[1].marker_size = 1.4;
+        def.normalize();
+        let path = dir.path().join("theme.cadenza-theme");
+        write_file(&path, &def).unwrap();
+        let loaded = read_file(&path).unwrap();
+        assert_eq!(loaded, def);
+        let css = reveal_css(&loaded);
+        assert!(css.contains("--cz-paragraph-align:justify"));
+        assert!(css.contains("--cz-paragraph-first:-0.4em"));
+        assert!(css.contains("list-style-type:'✓  '"));
+        assert!(css.contains(" :is(ul,ol) ol:not([type]){list-style-type:lower-alpha}"));
+        assert!(css.contains("--cz-list-gap:0.65em"));
+        assert!(css.contains("::marker{color:#eabc12;font-size:1.4em}"));
+        // The exported theme must override reveal's explicit paragraph line
+        // height and list margins even without Cadenza's content stylesheet.
+        assert!(css.contains("section>p{line-height:var(--cz-body-line-height)"));
+        assert!(css.contains(".reveal .slides section > :is(ul,ol){display:block;margin:0 0 var(--cz-paragraph-after)"));
+        assert!(css.contains(".reveal .slides section > :is(ul,ol) :is(ul,ol){display:block;margin:var(--cz-list-gap) 0 0"));
+    }
+
+    #[test]
+    fn older_themes_receive_safe_defaults_and_invalid_values_are_bounded() {
+        let legacy: ThemeDef = serde_json::from_str(r##"{"format":1,"name":"Old","accent":"#abcdef"}"##).unwrap();
+        assert_eq!(legacy.paragraphs, ParagraphStyle::default());
+        assert_eq!(legacy.lists.len(), LIST_LEVELS);
+        assert!(legacy.lists.iter().all(|l| l.spacing.is_none()));
+        let mut def = legacy;
+        def.paragraphs.line_height = f64::NAN;
+        def.paragraphs.space_before = -40.0;
+        def.paragraphs.indent_right = f64::INFINITY;
+        def.paragraphs.align = "left;}body{display:none".into();
+        def.lists = vec![ListLevel {
+            bullet: "url(https://example.org)".into(),
+            numbering: "x;}body{color:red".into(),
+            indent: -10.0,
+            spacing: Some(200.0),
+            marker_size: f64::INFINITY,
+            marker_color: "red;</style><script>".into(),
+        }];
+        def.normalize();
+        assert_eq!(def.paragraphs.line_height, 1.25);
+        assert_eq!(def.paragraphs.space_before, 0.0);
+        assert_eq!(def.paragraphs.indent_right, 0.0);
+        assert_eq!(def.lists.len(), LIST_LEVELS);
+        assert_eq!(def.lists[0].indent, 0.5);
+        assert_eq!(def.lists[0].spacing, Some(5.0));
+        let css = def.css();
+        for unsafe_text in ["<script>", "display:none", "https://example.org", "NaN", "Infinity"] {
+            assert!(!css.contains(unsafe_text));
+        }
     }
 
     #[test]

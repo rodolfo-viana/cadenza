@@ -1587,6 +1587,110 @@ test('presenter pauses stay paused and notes keep their scroll during builds', a
   assert.equal($('notes').scrollTop, 0, 'another slide starts at the top of its notes');
 });
 
+function templatesIn(out) {
+  return Array.isArray(out) ? out.flatMap(templatesIn) : out?.strings ? [out, ...templatesIn(out.values)] : [];
+}
+
+async function themeHarness(invoke, flush = async () => true) {
+  const H = hookHarness();
+  const timers = new Set();
+  const closed = [];
+  const errors = [];
+  const T = await standalone('themebuilder.js', {
+    'lib.js': H.lib, 'icons.js': { Icon() {} },
+    'api.js': { invoke, dialog: {} },
+    'store.js': {
+      state: { doc: {}, info: {} }, set() {}, closeModal: () => closed.push(true),
+      toast: (message, kind) => errors.push({ message, kind }), ingestView() {}, openMenu() {}, deck() {}, flushEdits: flush,
+    },
+    'ui.js': { Modal() {}, Button() {} },
+    'controls.js': Object.fromEntries(['Row', 'Section', 'Hint', 'NumberField', 'Slider', 'Select', 'Segmented', 'Toggle', 'TextField', 'ColorField', 'FontField'].map((name) => [name, () => {}])),
+    'util.js': { escapeHtml: (s) => s }, 'i18n.js': { t: (s) => s, N_: (s) => s },
+  }, {
+    setTimeout: (fn) => { timers.add(fn); return fn; }, clearTimeout: (fn) => timers.delete(fn),
+    document: { documentElement: {} }, getComputedStyle: () => ({ getPropertyValue: () => '' }),
+  });
+  const def = {
+    id: 'custom-test', name: 'Original', author: '', dark: true, palette: ['#abc'],
+    paragraphs: { lineHeight: 1.25, spaceBefore: 0, spaceAfter: 0.4, align: 'left' },
+    lists: Array.from({ length: 9 }, () => ({ bullet: 'disc', numbering: 'decimal', indent: 1.25, spacing: null, markerColor: '', markerSize: 1 })),
+  };
+  const inst = H.instance();
+  return {
+    T, H, def, closed, errors,
+    render: () => H.render(inst, T.ThemeBuilder, { def }),
+    flushTimers: () => { for (const fn of [...timers]) { timers.delete(fn); fn(); } },
+    control(out, label) {
+      const item = templatesIn(out).find((x) => attrOf(x, 'label') === label);
+      assert(item, `theme control exists: ${label}`);
+      return item;
+    },
+  };
+}
+
+test('theme saving flushes the focused field and a failed apply keeps the draft open', async () => {
+  const calls = [];
+  let commitField;
+  const h = await themeHarness(async (name, args) => {
+    calls.push({ name, args: clone(args || {}) });
+    if (name === 'theme_save') return args.def;
+    if (name === 'themes_user') return [];
+    if (name === 'theme_apply') throw new Error('Apply failed');
+    throw new Error(name);
+  }, async () => { commitField(); return true; });
+  let out = h.render();
+  commitField = () => attrOf(h.control(out, 'Name'), 'onChange')('Last typed name');
+  await attrOf(h.control(out, 'Apply to Presentation'), 'onClick')();
+  assert.equal(calls.find((c) => c.name === 'theme_save').args.def.name, 'Last typed name');
+  assert.equal(calls.find((c) => c.name === 'theme_apply').args.resetParagraphs, false);
+  assert.equal(h.closed.length, 0);
+  out = h.render();
+  assert.equal(attrOf(h.control(out, 'Name'), 'value'), 'Last typed name');
+  assert.equal(attrOf(h.control(out, 'Apply to Presentation'), 'disabled'), false);
+  assert(h.errors.some((e) => e.kind === 'error' && e.message.includes('Apply failed')));
+});
+
+test('theme apply honors the explicit paragraph reset and aborts if flushing fails', async () => {
+  for (const canFlush of [false, true]) {
+    const calls = [];
+    const h = await themeHarness(async (name, args) => {
+      calls.push({ name, args });
+      if (name === 'theme_save') return args.def;
+      if (name === 'themes_user') return [];
+      if (name === 'theme_apply') return {};
+      throw new Error(name);
+    }, async () => canFlush);
+    attrOf(h.control(h.render(), 'Use theme paragraph settings in existing text boxes'), 'onChange')(true);
+    await attrOf(h.control(h.render(), 'Apply to Presentation'), 'onClick')();
+    assert.equal(h.closed.length, canFlush ? 1 : 0);
+    if (canFlush) assert.equal(calls.find((c) => c.name === 'theme_apply').args.resetParagraphs, true);
+    else assert.equal(calls.length, 0);
+  }
+});
+
+test('theme previews discard late responses and show current errors', async () => {
+  const requests = [];
+  const h = await themeHarness(async (name) => {
+    assert.equal(name, 'theme_preview');
+    const pending = deferred();
+    requests.push(pending);
+    return pending.promise;
+  });
+  const inst = h.H.instance();
+  const render = (name) => h.H.render(inst, h.T.Preview, { def: { name } });
+  const preview = (html) => ({ width: 1280, height: 720, css: '', slides: [{ classes: '', html }] });
+  render('old'); h.flushTimers();
+  render('new'); h.flushTimers();
+  requests[1].resolve(preview('CURRENT PREVIEW')); await tick();
+  requests[0].resolve(preview('STALE PREVIEW')); await tick();
+  const doc = attrOf(render('new'), 'srcdoc');
+  assert(doc.includes('CURRENT PREVIEW') && !doc.includes('STALE PREVIEW'));
+  render('broken'); h.flushTimers();
+  requests[2].reject(new Error('Preview failed')); await tick();
+  assert(JSON.stringify(render('broken')).includes('Preview failed'));
+  h.H.unmount(inst);
+});
+
 /** Exercise media searches through the real component's controls and effects. */
 async function mediaSearch() {
   const H = hookHarness();

@@ -493,10 +493,10 @@ fn text_css(t: &TextStyle) -> String {
         css.push_str("font-style:normal;");
     }
     match t.align.as_str() {
-        "center" | "right" | "justify" => {
+        "left" | "center" | "right" | "justify" => {
             let _ = write!(css, "text-align:{};", t.align);
         }
-        _ => css.push_str("text-align:left;"),
+        _ => {}
     }
     if t.line_height > 0.0 {
         let _ = write!(css, "line-height:{};", num(t.line_height));
@@ -507,7 +507,9 @@ fn text_css(t: &TextStyle) -> String {
     if matches!(t.transform.as_str(), "none" | "uppercase" | "lowercase" | "capitalize") {
         let _ = write!(css, "text-transform:{};", t.transform);
     }
-    let _ = write!(css, "--cz-ps:{}em;", num(t.paragraph_spacing.clamp(0.0, 5.0)));
+    if let Some(spacing) = t.paragraph_spacing {
+        let _ = write!(css, "--cz-ps:{}em;", num(spacing.clamp(0.0, 5.0)));
+    }
     match t.shadow.as_str() {
         "soft" => css.push_str("text-shadow:0 2px 10px rgba(0,0,0,0.45);"),
         "hard" => css.push_str("text-shadow:3px 3px 0 rgba(0,0,0,0.55);"),
@@ -1241,6 +1243,21 @@ mod tests {
         let deck = deck_with(Content::Text(t));
         assert!(slide_for_editor(&deck, &deck.slides[0], &ctx(Mode::Editor)).html.contains("Add title"));
         assert!(!sections(&deck, &ctx(Mode::Show)).contains("cz-el"));
+    }
+
+    #[test]
+    fn text_inherits_paragraphs_but_keeps_explicit_legacy_defaults() {
+        let inherited = TextStyle::default();
+        let css = text_css(&inherited);
+        assert!(!css.contains("--cz-ps:") && !css.contains("text-align:") && !css.contains("line-height:"));
+        let legacy: TextStyle = serde_json::from_str(r#"{"paragraphSpacing":0.4,"align":"left","lineHeight":1.1}"#).unwrap();
+        let css = text_css(&legacy);
+        assert!(css.contains("--cz-ps:0.4em;") && css.contains("text-align:left;") && css.contains("line-height:1.1;"));
+        let zero: TextStyle = serde_json::from_str(r#"{"paragraphSpacing":0}"#).unwrap();
+        assert!(text_css(&zero).contains("--cz-ps:0em;"));
+        let saved = serde_json::to_string(&inherited).unwrap();
+        assert!(!saved.contains("paragraphSpacing"));
+        assert_eq!(serde_json::from_str::<TextStyle>(&saved).unwrap(), inherited);
     }
 
     #[test]

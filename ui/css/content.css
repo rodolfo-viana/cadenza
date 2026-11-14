@@ -66,7 +66,9 @@
 .reveal .cz-text:where(:not(.cz-el)) {
   width: 100%;
   font-family: var(--r-main-font);
-  line-height: 1.25;
+  line-height: var(--cz-body-line-height, 1.25);
+  font-weight: var(--cz-body-weight, inherit);
+  text-align: var(--cz-paragraph-align, left);
   overflow-wrap: break-word;
   word-wrap: break-word;
   white-space: normal;
@@ -75,25 +77,25 @@
 
 .reveal .cz-text:where(:not(.cz-el)) p,
 .reveal .cz-text:where(:not(.cz-el)) div {
-  margin: 0 0 var(--cz-ps, 0.4em);
+  margin: var(--cz-paragraph-before, 0em) var(--cz-paragraph-right, 0em) var(--cz-ps, var(--cz-paragraph-after, 0.4em)) var(--cz-paragraph-left, 0em);
+  text-indent: var(--cz-paragraph-first, 0em);
   line-height: inherit;
 }
 
 .reveal .cz-text:where(:not(.cz-el)) ul,
 .reveal .cz-text:where(:not(.cz-el)) ol {
   display: block;
-  margin: 0 0 var(--cz-ps, 0.4em);
+  margin: 0 0 var(--cz-ps, var(--cz-paragraph-after, 0.4em));
   padding: 0 0 0 1.25em;
   text-align: inherit;
 }
 
 .reveal .cz-text:where(:not(.cz-el)) li {
-  margin: 0 0 calc(var(--cz-ps, 0.4em) * 0.5);
+  margin: 0 0 var(--cz-list-gap, calc(var(--cz-ps, var(--cz-paragraph-after, 0.4em)) * 0.5));
 }
 
-.reveal .cz-text:where(:not(.cz-el)) li > ul,
-.reveal .cz-text:where(:not(.cz-el)) li > ol {
-  margin: calc(var(--cz-ps, 0.4em) * 0.5) 0 0;
+.reveal .cz-text:where(:not(.cz-el)) :is(ul, ol) :is(ul, ol) {
+  margin: var(--cz-list-gap, calc(var(--cz-ps, var(--cz-paragraph-after, 0.4em)) * 0.5)) 0 0;
 }
 
 .reveal .cz-text:where(:not(.cz-el)) > :last-child,
@@ -119,7 +121,7 @@
 
 .reveal .cz-text:where(:not(.cz-el)) blockquote {
   width: auto;
-  margin: 0 0 var(--cz-ps, 0.4em);
+  margin: 0 0 var(--cz-ps, var(--cz-paragraph-after, 0.4em));
   padding: 0 0 0 0.8em;
   border-left: 0.12em solid var(--cz-accent, currentColor);
   background: none;

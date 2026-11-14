@@ -238,7 +238,7 @@ fn doc_new(window: Window, state: State<AppState>, theme: Option<String>, aspect
     let deck = layouts::starter_deck(&theme, w, h);
     let mut doc = Document::new(&state.sessions_root, deck).map_err(err)?;
     if let Some(def) = custom_theme::find(&state.config_dir, &theme) {
-        apply_theme_to(&mut doc, def).map_err(err)?;
+        apply_theme_to(&mut doc, def, false).map_err(err)?;
         doc.reset_baseline();
     }
     install_doc(&state, window.label(), doc)
@@ -302,7 +302,7 @@ fn theme_delete(state: State<AppState>, id: String) -> CmdResult<()> {
     custom_theme::delete(&state.config_dir, &id).map_err(err)
 }
 
-fn apply_theme_to(doc: &mut Document, def: custom_theme::ThemeDef) -> anyhow::Result<ops::OpOutcome> {
+fn apply_theme_to(doc: &mut Document, def: custom_theme::ThemeDef, reset_paragraphs: bool) -> anyhow::Result<ops::OpOutcome> {
     let dir = doc.assets_dir();
     let fonts = custom_theme::extract_fonts(&def, &|bytes: &[u8]| document::store_asset(&dir, bytes, "woff2"))?;
     let mut web_fonts = doc.deck.web_fonts.clone();
@@ -312,22 +312,23 @@ fn apply_theme_to(doc: &mut Document, def: custom_theme::ThemeDef) -> anyhow::Re
     }
     let mut def = def;
     def.fonts.clear();
-    let id = def.id.clone();
-    // The patch carries the complete definition, so it replaces any previous
-    // custom theme (arrays and fields alike) in a single undo step.
+    // Replace the complete definition, including optional defaults, rather
+    // than merging them with settings from the previous custom theme.
     doc.apply(
-        Op::UpdateDeck {
-            patch: json!({ "customTheme": def, "theme": id, "webFonts": web_fonts }),
+        Op::ApplyTheme {
+            theme: Box::new(def),
+            fonts: web_fonts,
+            reset_paragraphs,
         },
         None,
     )
 }
 
 #[tauri::command]
-fn theme_apply(window: Window, state: State<AppState>, def: custom_theme::ThemeDef) -> CmdResult<DocView> {
+fn theme_apply(window: Window, state: State<AppState>, def: custom_theme::ThemeDef, reset_paragraphs: Option<bool>) -> CmdResult<DocView> {
     let def = full_theme(&state, window.label(), def);
     state.with_doc(window.label(), |doc| {
-        let out = apply_theme_to(doc, def)?;
+        let out = apply_theme_to(doc, def, reset_paragraphs.unwrap_or(false))?;
         Ok(doc.view(false, Some(out)))
     })
 }
@@ -380,7 +381,7 @@ fn theme_preview(app: AppHandle, window: Window, state: State<AppState>, def: cu
             deck.web_fonts.push(f);
         }
     }
-    deck.slides = layouts::sample_slides(deck.width, deck.height, &text);
+    deck.slides = layouts::theme_sample_slides(deck.width, deck.height, &text);
     let assets = doc.map(|d| d.assets_dir()).unwrap_or_default();
     let url = move |name: &str| document::file_url(&assets.join(name));
     let ctx = Ctx {
