@@ -98,6 +98,21 @@ await test('painter preserves effective font and stroke sizes across group scale
   const patch=P.formatPatch({contentScale:0.5,content:{kind:'text',html:'target',style:{}}},snapshot);
   equal(patch.content.style.fontSize,80);equal(patch.style.borderWidth,12);assert(patch.content.html.includes('80px'));
 });
+await test('painter preserves transparent boxes and theme-filled shapes across kinds',()=>{
+  const text={style:{fill:''},content:{kind:'text',html:'source',style:{}}};
+  const shape={style:{fill:''},content:{kind:'shape',shape:'rect',text:{html:'target',style:{}}}};
+  const fixture=document.createElement('div'); fixture.style.setProperty('--cz-accent','rgb(12, 34, 56)');
+  fixture.innerHTML='<svg><path d="M0 0h10v10H0z"/></svg><div></div>'; document.getElementById('fixture').append(fixture);
+  const path=fixture.querySelector('path'), box=fixture.querySelector('div');
+  path.style.fill=P.formatPatch(shape,P.formatSnapshot(text)).style.fill;
+  equal(getComputedStyle(path).fill,'rgba(0, 0, 0, 0)');
+  box.style.background=P.formatPatch(text,P.formatSnapshot(shape)).style.fill;
+  equal(getComputedStyle(box).backgroundColor,'rgb(12, 34, 56)');
+  equal(text.style.fill,''); equal(shape.style.fill,'');
+  equal(P.formatSnapshot({...shape,style:{fill:'#f00'}}).box.fill,'#f00');
+  assert(!P.formatSnapshot(text,{'font-size':'20px'}).box);
+  fixture.remove();
+});
 await test('image painter copies effects but never crop/source/fit/flips',()=>{
   const source={style:{borderWidth:5},content:{kind:'image',src:'original.png',crop:{x:0,w:0.5},fit:'cover',flipX:true,brightness:130}};
   const patch=P.formatPatch(source,P.formatSnapshot(source)); equal(patch.content,{brightness:130}); equal(patch.style,{borderWidth:5});

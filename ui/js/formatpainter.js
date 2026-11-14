@@ -26,9 +26,14 @@ const pick = (source, keys) => Object.fromEntries(keys.filter((k) => source && s
 const rich = (el) => (['text', 'shape'].includes(el?.content.kind) ? S.richOf(el) : null);
 
 export function formatSnapshot(el, characters = null) {
+  const box = characters ? null : pick(el.style, BOX);
+  // Empty fill means transparent for boxes, but the theme accent for shapes.
+  // Resolve that default before copying between kinds so the appearance stays
+  // the same instead of inheriting the destination's different default.
+  if (box?.fill === '') box.fill = el.content.kind === 'shape' && el.content.shape !== 'line' ? 'var(--cz-accent, #6366f1)' : 'transparent';
   return {
     scale: el.contentScale || 1,
-    box: characters ? null : pick(el.style, BOX),
+    box,
     text: rich(el) ? (characters ? {} : pick(rich(el).style, TEXT)) : null,
     image: el.content.kind === 'image' ? pick(el.content, IMAGE) : null,
     characters,

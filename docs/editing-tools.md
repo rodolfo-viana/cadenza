@@ -25,6 +25,8 @@ The scope is explicit:
 
 Text selections do not copy box decoration or paragraph defaults. Incompatible destinations receive only supported properties. The brush stores a snapshot, so changing the source afterwards does not change the copied format. It preserves destination content, links, animations, position, dimensions, auto-height setting, media source, crop, fit and flips. Auto-height boxes can naturally become taller when their text formatting changes.
 
+Default fills retain their appearance across object types: a text box without a background paints a transparent shape, and a shape using the theme accent paints that accent onto a text box.
+
 ## Visual image cropping
 
 Select a loaded image and choose **Format → Image → Crop Image**, use its context menu, or double-click it. The dialog displays the unrotated, unflipped original image. Drag the selected area to pan or drag its corner handles to resize. Choose Free, 1:1, 4:3, 16:9 or Original Ratio; the ratio refers to source pixels, not normalized coordinates. Numerical percentage fields provide keyboard control.
@@ -60,4 +62,4 @@ python3 -m http.server 8876 --bind 127.0.0.1
 
 The browser runner starts its own local server and isolated Chromium/Chrome profile and exits unsuccessfully if any check fails. CI runs it too. For interactive inspection, open `http://127.0.0.1:8876/tools/test_editing.html` with the manual server above running and require zero failures. Rust checks need the system libraries listed in CONTRIBUTING.md.
 
-The November 2026 verification also exercised the actual Linux/WebKitGTK app with an isolated profile: multi-slide replacement and Undo, the visible painter state and application, group resize, and crop Apply/Undo/Redo on a flipped image. Windows/WebView2 interaction remains unverified in this session; no Windows VM was available. No release was created.
+The November 2026 verification exercised the actual Linux/WebKitGTK and Windows/WebView2 apps with isolated profiles. The Windows follow-up covered multi-slide replacement with notes and a single Undo, one-time/repeated painting, group resize/rotation and individual selection, crop Apply/Undo/Redo on a flipped image, and save/reopen. It exposed and fixed the default-fill mismatch when painting between text boxes and shapes. See [Windows verification](windows-editing-verification.md) for the environment, results and reproduction notes. No release was created.

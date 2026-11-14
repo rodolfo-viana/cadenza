@@ -65,7 +65,7 @@ Implemented as a visual source-region editor. Existing Fill, Fit, Stretch and nu
 - [x] Support aspect-ratio constraints and resetting the crop without modifying the original asset.
 - [x] Keep existing image settings compatible and preserve the crop in saved files and exports.
 - [x] Verify the Linux interaction, including Apply/Undo/Redo and keyboard controls.
-- [ ] Verify the interaction on Windows/WebView2 (no VM was available in this session).
+- [x] Verify the interaction on Windows/WebView2, including ratio, drag, reset and Apply/Undo/Redo; see [Windows verification](docs/windows-editing-verification.md).
 
 ## Stacking order: bring forward and send backward
 
@@ -81,5 +81,5 @@ This feature already exists: **Bring to Front**, **Bring Forward**, **Send Backw
 Use the existing Rust operations and shared renderer so editing, presenting and exporting remain consistent.
 
 - [ ] Cover changed behavior with focused tests, including old-file compatibility where the document model changes.
-- [ ] Exercise the actual app on Linux and the Windows VM, including save/reopen and Undo/Redo.
+- [x] Exercise these four editing tools in the actual app on Linux and the Windows VM, including save/reopen and Undo/Redo.
 - [ ] Update interface translations, documentation and relevant screenshots.
