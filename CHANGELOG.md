@@ -2,6 +2,18 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## 0.3.5 — 2026-11-14
+
+The Theme Builder now has separate Theme, Typography, Paragraphs, Lists and Colors sections, with previews of paragraphs and all nine list levels.
+
+- Set paragraph alignment, line spacing, space before/after, left/right indents and first-line or hanging indents.
+- Customize bullets, numbering, indentation, item spacing, marker color and marker size at each list level, or start from Classic, Outline and Minimal presets.
+- Set body font weight and heading line spacing. Settings travel with theme files, presentations and reveal.js exports.
+- Existing text boxes retain explicit formatting. Choose to adopt theme paragraph settings across a presentation in one undoable action, or reset a selected text box from the Format panel.
+- Saving a theme commits the field being edited. Failed application keeps the builder open, and late preview responses cannot replace a newer preview.
+- Changing a media search, provider or tab discards earlier results, previews and errors immediately.
+- Update Rust dependencies, including rustls 0.23.46 for four Dependabot advisories, and refresh the pinned CI actions.
+
 ## 0.3.4 — 2026-10-22
 
 World maps can use the Mercator projection, and menus, dialogs and the inspector work from the keyboard. Unsaved work, saved files and exports are kept safer, and this version fixes many problems found in test passes on Linux and Windows.
