@@ -9,13 +9,23 @@
 // text styles and layout. Only the native document transport is replaced.
 const calls = [];
 let backend;
+function mergeDocumentPatch(target, patch) {
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      throw new Error('Unsafe document patch key: ' + key);
+    }
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if (!Object.hasOwn(target, key) || !target[key] || typeof target[key] !== 'object' || Array.isArray(target[key])) target[key] = {};
+      mergeDocumentPatch(target[key], value);
+    } else target[key] = value;
+  }
+}
 window.__TAURI__ = { core: { invoke: async (name, args) => {
   calls.push({ name, args });
   if (name === 'doc_apply') {
     for (const u of args.op.updates || []) {
       const e = backend.deck.slides.find((s) => s.id === args.op.slide).elements.find((e) => e.id === u.id);
-      function merge(a, b) { for (const [k,v] of Object.entries(b)) { if (v && typeof v === 'object' && !Array.isArray(v)) merge(a[k] ||= {},v); else a[k]=v; } }
-      merge(e,u.patch);
+      mergeDocumentPatch(e,u.patch);
     }
     backend.revision++; return structuredClone(backend);
   }
@@ -30,6 +40,23 @@ const F=await import('../ui/js/findreplace.js'), P=await import('../ui/js/format
 const C=await import('../ui/js/crop.js'), G=await import('../ui/js/groups.js');
 const S=await import('../ui/js/store.js'), T=await import('../ui/js/textedit.js');
 const plain=(html)=>F.indexHtml(html).text.trimEnd();
+await test('native transport stub rejects prototype keys at every depth',()=>{
+  for (const key of ['__proto__','constructor','prototype']) {
+    for (const nested of [false,true]) {
+      const unsafe=JSON.parse(`{"${key}":{"polluted":true}}`);
+      const target={content:{}};
+      let rejected=false;
+      try { mergeDocumentPatch(target,nested ? {content:unsafe} : unsafe); } catch { rejected=true; }
+      assert(rejected, 'Accepted unsafe key: ' + key);
+      equal(Object.getPrototypeOf(target),Object.prototype);
+      assert(!Object.hasOwn(target,key)); assert(!Object.hasOwn(target.content,key));
+      assert(!Object.hasOwn(Object.prototype,'polluted'));
+    }
+  }
+  const target=Object.create({content:{text:'inherited'}});
+  mergeDocumentPatch(target,{content:{text:'own'}});
+  equal(target.content.text,'own'); equal(Object.getPrototypeOf(target).content.text,'inherited');
+});
 await test('literal search: metacharacters, case, accents and UTF-16',()=>{
   equal(F.literalMatches('a.b aXb A.B','a.b').map((m)=>m.start),[0,8]);
   equal(F.literalMatches('ação AÇÃO 😀ação','ação',true).map((m)=>m.start),[0,12]);
