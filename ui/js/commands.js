@@ -31,6 +31,8 @@ export const COMMANDS = [
   { id: 'file.exportPdf', group: N_('Export'), label: N_('Export as PDF / Print…'), icon: 'file-text', keys: ['Mod+P'], global: true, when: hasDoc, run: A.exportPdf },
 
   // Edit
+  { id: 'edit.find', group: N_('Edit'), label: N_('Find and Replace…'), icon: 'search', keys: ['Mod+F', 'Mod+H'], global: true, when: hasDoc,
+    run: () => import('./findreplace.js').then((m) => m.openFindReplace()) },
   { id: 'edit.undo', group: N_('Edit'), label: N_('Undo'), icon: 'undo-2', keys: ['Mod+Z'], when: () => S.state.doc?.canUndo, run: S.undo },
   { id: 'edit.redo', group: N_('Edit'), label: N_('Redo'), icon: 'redo-2', keys: ['Mod+Shift+Z', 'Mod+Y'], when: () => S.state.doc?.canRedo, run: S.redo },
   { id: 'edit.duplicate', group: N_('Edit'), label: N_('Duplicate'), icon: 'copy', keys: ['Mod+D'], when: hasDoc,
@@ -41,6 +43,12 @@ export const COMMANDS = [
   { id: 'edit.deselect', group: N_('Edit'), label: N_('Deselect'), keys: ['Escape'], when: hasDoc, hidden: true,
     run: () => S.set({ selection: [], menu: null }) },
   { id: 'edit.lock', group: N_('Arrange'), label: N_('Lock / Unlock'), icon: 'lock', keys: ['Mod+L'], when: hasSel, run: A.toggleLock },
+
+  { id: 'edit.group', group: N_('Arrange'), label: N_('Group'), icon: 'group', keys: ['Mod+G'], when: () => S.selectedElements().length > 1 && S.selectedElements().every((e) => !e.locked), run: () => import('./groups.js').then((m) => m.editGroup()) },
+  { id: 'edit.ungroup', group: N_('Arrange'), label: N_('Ungroup'), icon: 'ungroup', keys: ['Mod+Shift+G'], when: () => S.selectedElements().some((e) => e.group), run: () => import('./groups.js').then((m) => m.editGroup(true)) },
+
+  { id: 'edit.copyFormat', group: N_('Edit'), label: N_('Copy Formatting'), icon: 'paintbrush', keys: ['Mod+Alt+C'], global: true, when: () => S.state.selection.length === 1, run: () => import('./formatpainter.js').then((m) => m.copyFormat(false)) },
+  { id: 'edit.pasteFormat', group: N_('Edit'), label: N_('Paste Formatting'), icon: 'paintbrush', keys: ['Mod+Alt+V'], global: true, when: () => !!S.state.formatPainter && hasSel(), run: () => import('./formatpainter.js').then((m) => m.applyFormat()) },
 
   // Text: the selected text while editing, whole boxes otherwise.
   { id: 'text.bold', group: N_('Text'), label: N_('Bold'), icon: 'bold', keys: ['Mod+B'], global: true, when: hasDoc, run: () => format('bold') },

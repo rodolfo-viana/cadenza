@@ -10,12 +10,16 @@ import { NotesPanel } from './notes.js';
 import { Welcome, Logo } from './welcome.js';
 import { ModalHost } from './dialogs.js';
 import { MenuHost, Toasts, Busy } from './ui.js';
+import { PainterBar } from './formatpainter.js';
+import { FindReplace } from './findreplace.js';
 
 function Editor() {
-  useStore();
+  const st = useStore();
   const s = settings();
   return html`<div class="editor">
     <${Toolbar} />
+    <${PainterBar} />
+    ${st.findReplace && html`<${FindReplace} key=${st.doc.docId} />`}
     <div class="workspace">
       <${Navigator} />
       <main class="center">

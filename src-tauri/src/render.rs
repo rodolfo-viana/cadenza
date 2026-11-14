@@ -322,6 +322,11 @@ fn box_css(style: &BoxStyle, with_fill: bool) -> String {
 
 /// Renders one element (wrapper + content).
 pub fn element(deck: &Deck, el: &Element, ctx: &Ctx) -> String {
+    let mut logical = el.clone();
+    logical.w /= el.content_scale;
+    logical.h /= el.content_scale;
+    let physical = el;
+    let el = &logical;
     let inner = match &el.content {
         Content::Text(t) => text_element(&t.text, &el.style, ctx),
         Content::Shape(s) => shape_element(s, el),
@@ -335,7 +340,21 @@ pub fn element(deck: &Deck, el: &Element, ctx: &Ctx) -> String {
         Content::Diagram(d) => diagram_element(d, el, deck, ctx),
         Content::Camera(c) => camera_element(c, el, ctx),
     };
-    let Some(inner) = inner else { return String::new() };
+    let Some(mut inner) = inner else { return String::new() };
+    let el = physical;
+    if el.content_scale != 1.0 {
+        inner = format!(
+            r#"<div class="cz-scale" style="zoom:{};width:{}px;height:{};">{}</div>"#,
+            el.content_scale,
+            num(logical.w),
+            if matches!(&el.content, Content::Text(t) if t.text.style.auto_height) {
+                "auto".into()
+            } else {
+                format!("{}px", num(logical.h))
+            },
+            inner
+        );
+    }
 
     // Text boxes that fit their text are exactly as tall as it, in the editor
     // and in every export alike; the stored height only follows (the editor
@@ -655,6 +674,34 @@ fn image_element(i: &ImageContent, el: &Element, ctx: &Ctx) -> Option<String> {
     }
     if !filters.is_empty() {
         let _ = write!(img_style, "filter:{};", filters.join(" "));
+    }
+    if let Some(c) = i.crop.filter(|c| c.valid() && !(c.x == 0.0 && c.y == 0.0 && c.w == 1.0 && c.h == 1.0)) {
+        let inset = 2.0 * (el.style.padding.max(0.0) + el.style.border_width.max(0.0));
+        let bw = (el.w - inset).max(1.0);
+        let bh = (el.h - inset).max(1.0);
+        let iw = i.natural_width.max(1) as f64 * c.w;
+        let ih = i.natural_height.max(1) as f64 * c.h;
+        let ratio = if i.fit == "contain" { (bw / iw).min(bh / ih) } else { (bw / iw).max(bh / ih) };
+        let (w, h) = if i.fit == "fill" { (bw, bh) } else { (iw * ratio, ih * ratio) };
+        let x = (bw - w) * i.focus_x.clamp(0.0, 100.0) / 100.0;
+        let y = (bh - h) * i.focus_y.clamp(0.0, 100.0) / 100.0;
+        return Some(format!(
+            r#"<div class="cz-box cz-image-box" style="{}"><div class="cz-crop-viewport" style="position:relative;width:100%;height:100%;overflow:hidden;transform:scale({},{});"><div style="position:absolute;overflow:hidden;left:{}%;top:{}%;width:{}%;height:{}%;"><img src="{}" alt="{}" draggable="false" style="{}position:absolute;max-width:none;max-height:none;object-fit:fill;width:{}%;height:{}%;left:{}%;top:{}%;"></div></div></div>"#,
+            esc(&box_style),
+            if i.flip_x { -1 } else { 1 },
+            if i.flip_y { -1 } else { 1 },
+            num(x / bw * 100.0),
+            num(y / bh * 100.0),
+            num(w / bw * 100.0),
+            num(h / bh * 100.0),
+            esc(&ctx.url(&i.src)),
+            esc(&i.alt),
+            esc(&img_style),
+            num(100.0 / c.w),
+            num(100.0 / c.h),
+            num(-c.x / c.w * 100.0),
+            num(-c.y / c.h * 100.0)
+        ));
     }
     if i.flip_x || i.flip_y {
         let _ = write!(

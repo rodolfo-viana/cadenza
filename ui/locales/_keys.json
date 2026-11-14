@@ -322,9 +322,9 @@
   ]
  },
  {
-  "key": "All slides are skipped — there is nothing to present.",
+  "key": "All slides",
   "files": [
-   "lib.rs"
+   "findreplace.js"
   ]
  },
  {
@@ -420,6 +420,12 @@
   ]
  },
  {
+  "key": "Apply",
+  "files": [
+   "crop.js"
+  ]
+ },
+ {
   "key": "Apply to All Slides",
   "files": [
    "inspector.js"
@@ -482,6 +488,12 @@
   "key": "Asia",
   "files": [
    "charts.js"
+  ]
+ },
+ {
+  "key": "Aspect ratio",
+  "files": [
+   "crop.js"
   ]
  },
  {
@@ -914,7 +926,9 @@
  {
   "key": "Cancel",
   "files": [
+   "crop.js",
    "dialogs.js",
+   "formatpainter.js",
    "themebuilder.js",
    "updates.js"
   ]
@@ -1235,6 +1249,7 @@
   "key": "Close",
   "files": [
    "dialogs.js",
+   "findreplace.js",
    "present.js",
    "ui.js",
    "updates.js"
@@ -1368,6 +1383,12 @@
   ]
  },
  {
+  "key": "Copy Formatting",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
   "key": "Copy the link of the video you want, then come back to Cadenza.",
   "files": [
    "media.js"
@@ -1458,12 +1479,6 @@
   ]
  },
  {
-  "key": "Could not write the PDF",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
   "key": "Countries",
   "files": [
    "panels.js"
@@ -1479,6 +1494,15 @@
   "key": "Create Presentation",
   "files": [
    "welcome.js"
+  ]
+ },
+ {
+  "key": "Crop Image",
+  "files": [
+   "canvas.js",
+   "crop.js",
+   "panels.js",
+   "ops.rs"
   ]
  },
  {
@@ -1508,6 +1532,7 @@
  {
   "key": "Current slide",
   "files": [
+   "findreplace.js",
    "presenter.html"
   ]
  },
@@ -1526,7 +1551,8 @@
  {
   "key": "Cut",
   "files": [
-   "canvas.js"
+   "canvas.js",
+   "ops.rs"
   ]
  },
  {
@@ -2135,12 +2161,6 @@
   ]
  },
  {
-  "key": "Expected binary data",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
   "key": "Export",
   "files": [
    "commands.js",
@@ -2299,6 +2319,24 @@
   ]
  },
  {
+  "key": "Find",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
+  "key": "Find and Replace",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
+  "key": "Find and Replace…",
+  "files": [
+   "commands.js"
+  ]
+ },
+ {
   "key": "Find Photo Online…",
   "files": [
    "canvas.js"
@@ -2451,6 +2489,18 @@
   ]
  },
  {
+  "key": "Format Painter",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Format Painter: click an object to apply. Escape cancels.",
+  "files": [
+   "formatpainter.js"
+  ]
+ },
+ {
   "key": "Formatting applies to the selected text.",
   "files": [
    "panels.js"
@@ -2460,6 +2510,12 @@
   "key": "Frame",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Free",
+  "files": [
+   "crop.js"
   ]
  },
  {
@@ -2598,6 +2654,19 @@
   ]
  },
  {
+  "key": "Group",
+  "files": [
+   "commands.js",
+   "ops.rs"
+  ]
+ },
+ {
+  "key": "Group — Alt-click to select an object inside",
+  "files": [
+   "canvas.js"
+  ]
+ },
+ {
   "key": "Groups",
   "files": [
    "chartdata.js"
@@ -2719,6 +2788,12 @@
   "key": "Heatmap",
   "files": [
    "chart.rs"
+  ]
+ },
+ {
+  "key": "Height",
+  "files": [
+   "crop.js"
   ]
  },
  {
@@ -2913,6 +2988,12 @@
   ]
  },
  {
+  "key": "Include speaker notes",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
   "key": "Inline equation ($…$)",
   "files": [
    "panels.js"
@@ -3078,6 +3159,12 @@
   ]
  },
  {
+  "key": "Invalid formatting",
+  "files": [
+   "formatting.rs"
+  ]
+ },
+ {
   "key": "invalid session",
   "files": [
    "document.rs"
@@ -3124,6 +3211,12 @@
   "files": [
    "panels.js",
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Keep applying",
+  "files": [
+   "formatpainter.js"
   ]
  },
  {
@@ -3381,7 +3474,6 @@
  {
   "key": "lock poisoned",
   "files": [
-   "lib.rs",
    "secrets.rs"
   ]
  },
@@ -3509,6 +3601,12 @@
   "key": "Marker size",
   "files": [
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Match case",
+  "files": [
+   "findreplace.js"
   ]
  },
  {
@@ -3740,6 +3838,12 @@
   ]
  },
  {
+  "key": "Next match",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
   "key": "Next Slide",
   "files": [
    "commands.js"
@@ -3795,27 +3899,9 @@
   ]
  },
  {
-  "key": "No presentation is open",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
-  "key": "No presentation is open in this window",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
   "key": "No slide is selected",
   "files": [
    "clipboard.rs"
-  ]
- },
- {
-  "key": "No update was found.",
-  "files": [
-   "lib.rs"
   ]
  },
  {
@@ -3837,6 +3923,12 @@
   "key": "North America",
   "files": [
    "charts.js"
+  ]
+ },
+ {
+  "key": "Not an image",
+  "files": [
+   "ops.rs"
   ]
  },
  {
@@ -4145,6 +4237,12 @@
   ]
  },
  {
+  "key": "Original image",
+  "files": [
+   "crop.js"
+  ]
+ },
+ {
   "key": "Original Proportions",
   "files": [
    "canvas.js"
@@ -4153,6 +4251,7 @@
  {
   "key": "Original Ratio",
   "files": [
+   "crop.js",
    "panels.js"
   ]
  },
@@ -4198,6 +4297,12 @@
   "key": "Page address",
   "files": [
    "actions.js"
+  ]
+ },
+ {
+  "key": "Paint Format",
+  "files": [
+   "ops.rs"
   ]
  },
  {
@@ -4255,6 +4360,12 @@
   "key": "Paste cells from a spreadsheet, or data in CSV form.",
   "files": [
    "datachart.js"
+  ]
+ },
+ {
+  "key": "Paste Formatting",
+  "files": [
+   "commands.js"
   ]
  },
  {
@@ -4480,6 +4591,12 @@
   ]
  },
  {
+  "key": "Previous match",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
   "key": "Previous Slide",
   "files": [
    "commands.js"
@@ -4691,9 +4808,17 @@
   ]
  },
  {
+  "key": "Replace",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
   "key": "Replace All",
   "files": [
-   "actions.js"
+   "actions.js",
+   "findreplace.js",
+   "ops.rs"
   ]
  },
  {
@@ -4710,9 +4835,27 @@
   ]
  },
  {
+  "key": "Replace Text",
+  "files": [
+   "ops.rs"
+  ]
+ },
+ {
   "key": "Replace Video…",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Replace with",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
+  "key": "Replaced {n} occurrence(s).",
+  "files": [
+   "findreplace.js"
   ]
  },
  {
@@ -4728,6 +4871,12 @@
   ]
  },
  {
+  "key": "Reset Crop",
+  "files": [
+   "crop.js"
+  ]
+ },
+ {
   "key": "Reset timer (R)",
   "files": [
    "presenter.html"
@@ -4737,6 +4886,12 @@
   "key": "Resize",
   "files": [
    "ops.rs"
+  ]
+ },
+ {
+  "key": "Resize crop",
+  "files": [
+   "crop.js"
   ]
  },
  {
@@ -4967,6 +5122,12 @@
   ]
  },
  {
+  "key": "Search in",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
   "key": "Search Online…",
   "files": [
    "panels.js"
@@ -4976,6 +5137,12 @@
   "key": "Search photos or paste a link to an image…",
   "files": [
    "media.js"
+  ]
+ },
+ {
+  "key": "Search results",
+  "files": [
+   "findreplace.js"
   ]
  },
  {
@@ -5024,6 +5191,18 @@
   "key": "Select All",
   "files": [
    "commands.js"
+  ]
+ },
+ {
+  "key": "Select an area of the original image. Drag the area to reposition it. Rotation, flips and the frame stay unchanged.",
+  "files": [
+   "crop.js"
+  ]
+ },
+ {
+  "key": "Selected crop area",
+  "files": [
+   "crop.js"
   ]
  },
  {
@@ -5188,6 +5367,12 @@
   ]
  },
  {
+  "key": "Showing the first 500 results. All occurrences are included in Replace All.",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
   "key": "Shrink",
   "files": [
    "inspector.js"
@@ -5259,7 +5444,8 @@
  {
   "key": "slide not found",
   "files": [
-   "ops.rs"
+   "ops.rs",
+   "textchange.rs"
   ]
  },
  {
@@ -5296,6 +5482,7 @@
  {
   "key": "Slide {n}",
   "files": [
+   "findreplace.js",
    "inspector.js"
   ]
  },
@@ -5303,6 +5490,12 @@
   "key": "Slide {n} of {total}",
   "files": [
    "presenter.js"
+  ]
+ },
+ {
+  "key": "Slide {n} — notes",
+  "files": [
+   "findreplace.js"
   ]
  },
  {
@@ -5667,6 +5860,18 @@
   ]
  },
  {
+  "key": "table cell not found",
+  "files": [
+   "textchange.rs"
+  ]
+ },
+ {
+  "key": "table not found",
+  "files": [
+   "textchange.rs"
+  ]
+ },
+ {
   "key": "Target {n}",
   "files": [
    "charts.js"
@@ -5733,6 +5938,12 @@
   ]
  },
  {
+  "key": "Text boxes, shapes and table cells.",
+  "files": [
+   "findreplace.js"
+  ]
+ },
+ {
   "key": "Text color",
   "files": [
    "panels.js",
@@ -5743,6 +5954,12 @@
   "key": "Text in shape",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "text not found",
+  "files": [
+   "textchange.rs"
   ]
  },
  {
@@ -5813,12 +6030,6 @@
   ]
  },
  {
-  "key": "The file is too large to chart (over 20 MB).",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
   "key": "The first column holds the X values. Each other column is a group of points.",
   "files": [
    "panels.js"
@@ -5828,12 +6039,6 @@
   "key": "The link did not open — check that it is complete and public",
   "files": [
    "media.rs"
-  ]
- },
- {
-  "key": "The Markdown file has no content",
-  "files": [
-   "lib.rs"
   ]
  },
  {
@@ -5861,15 +6066,9 @@
   ]
  },
  {
-  "key": "The presentation is no longer open",
+  "key": "The text changed. Search again before replacing it.",
   "files": [
-   "lib.rs"
-  ]
- },
- {
-  "key": "The update hasn't been downloaded.",
-  "files": [
-   "lib.rs"
+   "findreplace.js"
   ]
  },
  {
@@ -6052,12 +6251,6 @@
   ]
  },
  {
-  "key": "This copy of Cadenza can't update itself.",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
   "key": "This file is not a Cadenza presentation",
   "files": [
    "package.rs"
@@ -6088,9 +6281,9 @@
   ]
  },
  {
-  "key": "This presentation is already open in another window.",
+  "key": "This object only supports box formatting",
   "files": [
-   "lib.rs"
+   "formatting.rs"
   ]
  },
  {
@@ -6183,6 +6376,12 @@
   "key": "Tracking",
   "files": [
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Transform Group",
+  "files": [
+   "ops.rs"
   ]
  },
  {
@@ -6285,15 +6484,16 @@
   ]
  },
  {
-  "key": "Unknown media provider",
+  "key": "Ungroup",
   "files": [
-   "media.rs"
+   "commands.js",
+   "ops.rs"
   ]
  },
  {
-  "key": "Unknown provider",
+  "key": "Unknown media provider",
   "files": [
-   "lib.rs"
+   "media.rs"
   ]
  },
  {
@@ -6506,6 +6706,12 @@
   ]
  },
  {
+  "key": "Wait for the image to load before cropping.",
+  "files": [
+   "crop.js"
+  ]
+ },
+ {
   "key": "Web Page",
   "files": [
    "actions.js",
@@ -6547,6 +6753,12 @@
   "key": "Widescreen 16:9 (1280×720)",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Width",
+  "files": [
+   "crop.js"
   ]
  },
  {
@@ -6781,12 +6993,6 @@
   ]
  },
  {
-  "key": "{name} — pick something to insert into Cadenza",
-  "files": [
-   "lib.rs"
-  ]
- },
- {
   "key": "{name}: unsupported file type",
   "files": [
    "actions.js"
@@ -6798,6 +7004,12 @@
    "inspector.js"
   ],
   "one": "{n} object selected"
+ },
+ {
+  "key": "{n} occurrence(s)",
+  "files": [
+   "findreplace.js"
+  ]
  },
  {
   "key": "{n} px/s",

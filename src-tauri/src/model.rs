@@ -139,7 +139,18 @@ impl Deck {
                 el.y = sanitize_coord(el.y);
                 el.rotation = if el.rotation.is_finite() { el.rotation % 360.0 } else { 0.0 };
                 el.opacity = if el.opacity.is_finite() { el.opacity.clamp(0.0, 1.0) } else { 1.0 };
+                el.content_scale = if el.content_scale.is_finite() && el.content_scale > 0.0 {
+                    el.content_scale.clamp(0.001, 1000.0)
+                } else {
+                    1.0
+                };
+                if let Content::Image(image) = &mut el.content
+                    && image.crop.is_some_and(|c| !c.valid())
+                {
+                    image.crop = None;
+                }
             }
+            crate::groups::normalize(slide);
         }
         if let Some(first) = self.slides.first_mut() {
             first.nested = false;
@@ -320,6 +331,7 @@ impl Slide {
         for el in &mut copy.elements {
             el.id = new_id("e");
         }
+        crate::groups::reidentify(&mut copy.elements);
         copy
     }
 
@@ -422,6 +434,13 @@ pub struct Element {
     pub rotation: f64,
     pub opacity: f64,
     pub locked: bool,
+    /// Flat persistent editing group. Members retain their stacking and builds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<crate::groups::GroupFrame>,
+    /// Uniform visual scale: preserves typography, strokes and filters when a
+    /// group is resized, including after ungrouping.
+    #[serde(skip_serializing_if = "is_unit_scale")]
+    pub content_scale: f64,
     pub style: BoxStyle,
     pub build: Build,
     /// Click action during the presentation.
@@ -443,12 +462,18 @@ impl Default for Element {
             rotation: 0.0,
             opacity: 1.0,
             locked: false,
+            group: None,
+            content_scale: 1.0,
             style: BoxStyle::default(),
             build: Build::default(),
             action: Action::default(),
             content: Content::Text(TextContent::default()),
         }
     }
+}
+
+fn is_unit_scale(value: &f64) -> bool {
+    *value == 1.0
 }
 
 impl Element {
@@ -747,6 +772,29 @@ pub struct ImageContent {
     /// Intrinsic size, when known.
     pub natural_width: u32,
     pub natural_height: u32,
+    /// Selected region of the original, in unflipped normalized coordinates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crop: Option<CropRect>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct CropRect {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
+impl CropRect {
+    pub fn valid(&self) -> bool {
+        [self.x, self.y, self.w, self.h].iter().all(|v| v.is_finite())
+            && self.x >= 0.0
+            && self.y >= 0.0
+            && self.w > 0.0
+            && self.h > 0.0
+            && self.x + self.w <= 1.0 + 1e-9
+            && self.y + self.h <= 1.0 + 1e-9
+    }
 }
 
 impl Default for ImageContent {
@@ -766,6 +814,7 @@ impl Default for ImageContent {
             saturate: 100.0,
             natural_width: 0,
             natural_height: 0,
+            crop: None,
         }
     }
 }

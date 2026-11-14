@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""Run the editing regression harness in a fresh headless Chromium profile."""
+import argparse
+import functools
+import html
+import http.server
+import pathlib
+import re
+import shutil
+import subprocess
+import tempfile
+import threading
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--browser", help="Path to Chromium or Google Chrome")
+    args = parser.parse_args()
+    browser = args.browser or next(
+        (path for name in ("chromium", "google-chrome", "chromium-browser") if (path := shutil.which(name))), None
+    )
+    if not browser:
+        parser.error("Chromium or Google Chrome is required; use --browser to select it")
+    root = pathlib.Path(__file__).resolve().parent.parent
+
+    class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *args: object) -> None:
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(QuietHandler, directory=str(root)))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    # Snap Chromium sees a private home/cache; its shared directory is also
+    # reachable by the host process that creates and cleans up this profile.
+    executable = pathlib.Path(shutil.which(browser) or browser)
+    cache = pathlib.Path.home() / ("snap/chromium/common" if executable.parent == pathlib.Path("/snap/bin") else ".cache")
+    cache.mkdir(parents=True, exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory(prefix="cadenza-browser-test-", dir=cache) as profile:
+            result = subprocess.run(
+                [browser, "--headless", "--no-sandbox", "--disable-gpu", f"--user-data-dir={profile}",
+                 "--virtual-time-budget=8000", "--dump-dom",
+                 f"http://127.0.0.1:{server.server_port}/tools/test_editing.html"],
+                capture_output=True, text=True, timeout=45, check=False,
+            )
+            report = re.search(r'<pre id="result">(.*?)</pre>', result.stdout, re.S)
+            print(html.unescape(report.group(1)) if report else "Browser did not finish the test harness.")
+            if result.returncode or not re.search(r'<body\b[^>]*data-result="pass"', result.stdout):
+                print(result.stderr[-4000:])
+                raise SystemExit(1)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

@@ -14,30 +14,30 @@ Cadenza currently creates slides from 12 built-in layouts. A slide remembers its
 
 ## Format painter
 
-Copying a style should be faster than configuring each property again in the Format inspector.
+Implemented in the development branch. See [Editing tools](docs/editing-tools.md) for copied properties and keyboard shortcuts.
 
-- [ ] Copy and apply text or object formatting without replacing content, geometry, links or animations.
-- [ ] Define clearly which properties are copied for text selections, text boxes and other object types.
-- [ ] Support one-time application and repeated application, with a visible active state and Escape to cancel.
-- [ ] Make each application undoable and accessible through the keyboard.
+- [x] Copy and apply text or object formatting without replacing content, geometry, links or animations.
+- [x] Define clearly which properties are copied for text selections, text boxes and other object types.
+- [x] Support one-time application and repeated application, with a visible active state and Escape to cancel.
+- [x] Make each application undoable and accessible through the keyboard.
 
 ## Find and replace
 
-The command palette can find commands and slides, but there is no presentation-wide text replacement workflow.
+Implemented for text boxes, shape text, table cells and optional speaker notes; see [Editing tools](docs/editing-tools.md).
 
-- [ ] Find text across slides, show matches and navigate to the matching slide and text box.
-- [ ] Replace one match or all matches, preserving surrounding rich-text formatting.
-- [ ] Provide case matching and clear scope controls; decide whether speaker notes are included.
-- [ ] Show the number of replacements and make Replace All a single Undo step.
+- [x] Find text across slides, show matches and navigate to the matching slide and text box.
+- [x] Replace one match or all matches, preserving surrounding rich-text formatting.
+- [x] Provide case matching and clear scope controls; decide whether speaker notes are included.
+- [x] Show the number of replacements and make Replace All a single Undo step.
 
 ## Persistent object groups
 
-Multiple selection already allows joint editing, but the document has no persistent group of objects.
+Implemented as flat groups with proportional visual scaling and Alt-click member selection; see [Editing tools](docs/editing-tools.md).
 
-- [ ] Group and ungroup objects while preserving their positions, styles and relative stacking order.
-- [ ] Move, resize and rotate a group; define how to select and edit an individual member.
-- [ ] Preserve groups through duplication, copy/paste, saving/reopening and exports.
-- [ ] Specify interactions with locking, animation and stacking; start with a clear, bounded grouping model.
+- [x] Group and ungroup objects while preserving their positions, styles and relative stacking order.
+- [x] Move, resize and rotate a group; define how to select and edit an individual member.
+- [x] Preserve groups through duplication, copy/paste, saving/reopening and exports.
+- [x] Specify interactions with locking, animation and stacking; start with a clear, bounded grouping model.
 
 ## Comments
 
@@ -59,12 +59,13 @@ Undo/Redo and crash recovery already exist. The missing capability is browsing a
 
 ## Visual image cropping and framing
 
-Images currently have Fill, Fit and Stretch modes, plus numerical X/Y focus controls. The next step is direct manipulation on the slide.
+Implemented as a visual source-region editor. Existing Fill, Fit, Stretch and numerical focus controls remain available; see [Editing tools](docs/editing-tools.md).
 
-- [ ] Drag crop handles and reposition the image inside its frame, with a visible preview of the original image.
-- [ ] Support aspect-ratio constraints and resetting the crop without modifying the original asset.
-- [ ] Keep existing image settings compatible and preserve the crop in saved files and exports.
-- [ ] Verify the interaction on Linux and Windows, including Undo/Redo and keyboard access.
+- [x] Drag crop handles and reposition the selected source region, with a visible preview of the original image and an unchanged slide frame.
+- [x] Support aspect-ratio constraints and resetting the crop without modifying the original asset.
+- [x] Keep existing image settings compatible and preserve the crop in saved files and exports.
+- [x] Verify the Linux interaction, including Apply/Undo/Redo and keyboard controls.
+- [ ] Verify the interaction on Windows/WebView2 (no VM was available in this session).
 
 ## Stacking order: bring forward and send backward
 

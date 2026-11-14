@@ -381,6 +381,35 @@ export function selectionFontSize() {
   return parseFloat(getComputedStyle(selectionStart(session.range)).fontSize) || 0;
 }
 
+/** A concrete snapshot of the first selected character for the format painter. */
+export function captureTextFormat() {
+  if (!textSelected()) return null;
+  const style = getComputedStyle(selectionStart(session.range));
+  return Object.fromEntries(['font-family', 'font-size', 'font-weight', 'font-style', 'color', 'text-decoration-line', 'letter-spacing'].map((key) => [key, style.getPropertyValue(key)]));
+}
+
+/** Paint only the selected characters, retaining links and paragraph structure. */
+export function paintTextFormat(style) {
+  if (!textSelected() || !style) return false;
+  const s = session, offsets = textOffsets(s.node, s.range);
+  return asStep(s, () => {
+    s.node.focus({ preventScroll: true });
+    selectOffsets(s.node, offsets);
+    document.execCommand('removeFormat');
+    const walker = document.createTreeWalker(s.node, NodeFilter.SHOW_TEXT);
+    const runs = []; let node, pos = 0;
+    while ((node = walker.nextNode())) { const end = pos + node.data.length; if (pos < offsets[1] && end > offsets[0]) runs.push({ node, start: Math.max(0, offsets[0] - pos), end: Math.min(node.data.length, offsets[1] - pos) }); pos = end; }
+    for (const run of runs.reverse()) {
+      const r = document.createRange(); r.setStart(run.node, run.start); r.setEnd(run.node, run.end);
+      const span = document.createElement('span');
+      for (const [key, value] of Object.entries(style)) span.style.setProperty(key, value);
+      r.surroundContents(span);
+    }
+    selectOffsets(s.node, offsets); s.range = rangeAt(s.node, offsets);
+    return true;
+  });
+}
+
 /**
  * The element holding the first selected character. A selection made with
  * the keyboard often starts at the very end of the text before it, which can

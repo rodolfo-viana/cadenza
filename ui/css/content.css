@@ -490,3 +490,6 @@
   -webkit-mask: var(--cz-icon) center / contain no-repeat;
   mask: var(--cz-icon) center / contain no-repeat;
 }
+
+/* A logical content box keeps all visual units intact when groups scale. */
+.reveal .cz-scale { position:relative; }

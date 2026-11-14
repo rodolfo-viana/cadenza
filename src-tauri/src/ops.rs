@@ -61,11 +61,21 @@ pub enum Op {
         #[serde(default)]
         duplicate: bool,
     },
+    PaintFormat {
+        slide: String,
+        updates: Vec<ElementPatch>,
+    },
     UpdateElements {
         slide: String,
         updates: Vec<ElementPatch>,
     },
     DeleteElements {
+        slide: String,
+        ids: Vec<String>,
+    },
+    /// Cut removes exactly the members captured in the clipboard snapshot,
+    /// even if grouping changes while the native clipboard write is pending.
+    CutElements {
         slide: String,
         ids: Vec<String>,
     },
@@ -88,6 +98,33 @@ pub enum Op {
     SetBuildOrder {
         slide: String,
         ids: Vec<String>,
+    },
+    /// Replaces text on any number of slides as one validated undo step.
+    ReplaceText {
+        changes: Vec<crate::textchange::TextChange>,
+        #[serde(default)]
+        all: bool,
+    },
+    GroupElements {
+        slide: String,
+        ids: Vec<String>,
+    },
+    UngroupElements {
+        slide: String,
+        ids: Vec<String>,
+    },
+    TransformGroup {
+        slide: String,
+        before: crate::groups::GroupFrame,
+        after: crate::groups::GroupFrame,
+    },
+    CropImage {
+        slide: String,
+        id: String,
+        before: ImageContent,
+        crop: Option<CropRect>,
+        natural_width: u32,
+        natural_height: u32,
     },
     /// JSON merge patch applied to deck properties (not its slides).
     UpdateDeck {
@@ -215,6 +252,56 @@ pub fn apply(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
 
 fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
     match op {
+        Op::PaintFormat { slide, updates } => {
+            for update in &updates {
+                let el = find_slide(deck, &slide)?
+                    .element(&update.id)
+                    .ok_or_else(|| anyhow::anyhow!("element not found"))?;
+                anyhow::ensure!(!el.locked, "The object is locked");
+                crate::formatting::validate(el, &update.patch)?;
+            }
+            let mut result = apply_inner(deck, Op::UpdateElements { slide, updates })?;
+            result.label = n_("Paint Format").into();
+            Ok(result)
+        }
+        Op::GroupElements { slide, ids } => {
+            let created = crate::groups::group(find_slide(deck, &slide)?, &ids)?;
+            Ok(outcome("Group", Some(slide), created))
+        }
+        Op::UngroupElements { slide, ids } => {
+            crate::groups::ungroup(find_slide(deck, &slide)?, &ids);
+            Ok(outcome("Ungroup", Some(slide), vec![]))
+        }
+        Op::TransformGroup { slide, before, after } => {
+            crate::groups::transform(find_slide(deck, &slide)?, &before, &after)?;
+            Ok(outcome("Transform Group", Some(slide), vec![]))
+        }
+        Op::CropImage {
+            slide,
+            id,
+            before,
+            crop,
+            natural_width,
+            natural_height,
+        } => {
+            anyhow::ensure!(crop.is_none_or(|c| c.valid()), "Invalid crop rectangle");
+            anyhow::ensure!(natural_width > 0 && natural_height > 0, "Image dimensions are unavailable");
+            let el = find_slide(deck, &slide)?.element_mut(&id).ok_or_else(|| anyhow::anyhow!("element not found"))?;
+            anyhow::ensure!(!el.locked, "The image is locked");
+            let Content::Image(image) = &mut el.content else {
+                anyhow::bail!("Not an image")
+            };
+            anyhow::ensure!(*image == before, "The image changed. Open Crop again.");
+            image.crop = crop;
+            image.natural_width = natural_width;
+            image.natural_height = natural_height;
+            Ok(outcome("Crop Image", Some(slide), vec![]))
+        }
+        Op::ReplaceText { changes, all } => {
+            let slide = changes.first().map(|change| change.slide.clone());
+            crate::textchange::apply(deck, changes)?;
+            Ok(outcome(if all { n_("Replace All") } else { n_("Replace Text") }, slide, vec![]))
+        }
         Op::AddSlide { after, layout } => {
             let slide = layouts::new_slide(&layout, deck.width, deck.height);
             let id = slide.id.clone();
@@ -306,10 +393,11 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
         }
         Op::InsertElements {
             slide,
-            elements,
+            mut elements,
             offset,
             duplicate,
         } => {
+            crate::groups::reidentify(&mut elements);
             let s = find_slide(deck, &slide)?;
             let existing_links: Vec<String> = s.elements.iter().map(|e| e.link.clone()).collect();
             let mut created = Vec::new();
@@ -321,6 +409,10 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                     // Pasting onto another slide keeps the Magic Move link.
                     el.link = link;
                 }
+                if let Some(g) = &mut el.group {
+                    g.x += offset;
+                    g.y += offset;
+                }
                 el.x += offset;
                 el.y += offset;
                 sanitize_element(&mut el);
@@ -331,10 +423,19 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
         }
         Op::UpdateElements { slide, updates } => {
             let s = find_slide(deck, &slide)?;
+            let before = s.elements.clone();
             let mut label = n_("Change");
             for u in &updates {
+                if ["x", "y", "w", "h", "rotation"].iter().any(|key| u.patch.get(key).is_some())
+                    && let Some(group) = s.element(&u.id).and_then(|el| el.group.as_ref())
+                {
+                    anyhow::ensure!(
+                        !s.elements.iter().any(|el| el.group.as_ref().is_some_and(|g| g.id == group.id) && el.locked),
+                        "The group contains locked objects"
+                    );
+                }
                 let el = s.element_mut(&u.id).ok_or_else(|| anyhow::anyhow!("element not found"))?;
-                let mut patch = strip(&u.patch, &["id"]);
+                let mut patch = strip(&u.patch, &["id", "group", "contentScale"]);
                 if let Some(Value::Object(c)) = patch.get_mut("content") {
                     c.remove("kind");
                 }
@@ -349,25 +450,87 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                 }
                 let mut updated = patched(el, &patch)?;
                 updated.id = u.id.clone();
+                if let (Content::Image(old), Content::Image(new)) = (&el.content, &mut updated.content) {
+                    if old.src != new.src {
+                        new.crop = None;
+                        if patch.pointer("/content/naturalWidth").is_none() {
+                            new.natural_width = 0;
+                        }
+                        if patch.pointer("/content/naturalHeight").is_none() {
+                            new.natural_height = 0;
+                        }
+                    }
+                    anyhow::ensure!(new.crop.is_none_or(|c| c.valid()), "Invalid crop rectangle");
+                }
+                if updated.group.is_some() {
+                    crate::groups::validate_geometry(&updated)?;
+                }
                 sanitize_element(&mut updated);
                 *el = updated;
             }
+            crate::groups::reconcile(s, &before);
             Ok(outcome(label, Some(slide), vec![]))
         }
         Op::DeleteElements { slide, ids } => {
             let s = find_slide(deck, &slide)?;
+            let ids = crate::groups::expand(s, &ids);
             s.elements.retain(|e| !ids.contains(&e.id));
             Ok(outcome("Delete", Some(slide), vec![]))
         }
+        Op::CutElements { slide, ids } => {
+            let s = find_slide(deck, &slide)?;
+            s.elements.retain(|e| !ids.contains(&e.id));
+            Ok(outcome("Cut", Some(slide), vec![]))
+        }
         Op::ArrangeElements { slide, ids, action } => {
             let s = find_slide(deck, &slide)?;
+            let ids = crate::groups::expand(s, &ids);
             arrange(&mut s.elements, &ids, &action);
             Ok(outcome("Arrange", Some(slide), vec![]))
         }
         Op::AlignElements { slide, ids, mode, to_slide } => {
             let (w, h) = (deck.width as f64, deck.height as f64);
             let s = find_slide(deck, &slide)?;
-            align(&mut s.elements, &ids, &mode, to_slide, w, h);
+            let ids = crate::groups::expand(s, &ids);
+            // Align each group as one rigid unit, not each of its children.
+            let mut units = Vec::new();
+            let mut seen = std::collections::HashSet::new();
+            for e in &s.elements {
+                if !ids.contains(&e.id) {
+                    continue;
+                }
+                if let Some(g) = &e.group {
+                    if seen.insert(g.id.clone()) {
+                        units.push(Element {
+                            id: g.id.clone(),
+                            x: g.x,
+                            y: g.y,
+                            w: g.w,
+                            h: g.h,
+                            rotation: g.rotation,
+                            locked: s
+                                .elements
+                                .iter()
+                                .any(|member| member.group.as_ref().is_some_and(|other| other.id == g.id) && member.locked),
+                            ..Element::default()
+                        });
+                    }
+                } else {
+                    units.push(e.clone());
+                }
+            }
+            let original = units.clone();
+            let unit_ids = units.iter().map(|e| e.id.clone()).collect::<Vec<_>>();
+            align(&mut units, &unit_ids, &mode, to_slide, w, h);
+            let before = s.elements.clone();
+            for e in &mut s.elements {
+                let id = e.group.as_ref().map_or(e.id.as_str(), |g| &g.id);
+                if let Some(i) = original.iter().position(|o| o.id == id) {
+                    e.x += units[i].x - original[i].x;
+                    e.y += units[i].y - original[i].y;
+                }
+            }
+            crate::groups::reconcile(s, &before);
             Ok(outcome("Align", Some(slide), vec![]))
         }
         Op::SetBuildOrder { slide, ids } => {
@@ -434,6 +597,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             let (sx, sy) = (nw / ow, nh / oh);
             let s = sx.min(sy);
             for slide in &mut deck.slides {
+                let before = slide.elements.clone();
                 for el in &mut slide.elements {
                     let (cx, cy) = ((el.x + el.w / 2.0) * sx, (el.y + el.h / 2.0) * sy);
                     el.w *= s;
@@ -447,6 +611,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                     }
                     scale_fonts(&mut el.content, s);
                 }
+                crate::groups::reconcile(slide, &before);
             }
             deck.width = nw as u32;
             deck.height = nh as u32;

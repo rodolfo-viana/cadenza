@@ -187,3 +187,6 @@ chart-network
 earth
 grip
 sheet
+crop
+group
+ungroup

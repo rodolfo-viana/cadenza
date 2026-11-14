@@ -75,6 +75,7 @@ const SUPPRESS = new Set(['Mod+R', 'Mod+Shift+R', 'F5', 'Shift+F5', 'Mod+P', 'Mo
 window.addEventListener('keydown', (e) => {
   const c = combo(e);
   if (SUPPRESS.has(c)) e.preventDefault();
+  if (state.formatPainter?.active && e.key === 'Escape') { e.preventDefault(); set({ formatPainter: { ...state.formatPainter, active: false } }); return; }
   if (state.modal || state.menu || state.shapePicker) return;
   // Drawing a motion path: Enter keeps it, Esc drops it.
   if (state.drawPath && (e.key === 'Enter' || e.key === 'Escape')) {

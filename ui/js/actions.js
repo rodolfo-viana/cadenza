@@ -1,6 +1,7 @@
 // Editor actions shared by the toolbar, menus, shortcuts and the command
 // palette.
 
+import { expandGroups } from './groups.js';
 import { invoke, importBytes, dialog, opener, clipboard, IMAGE_EXTS, VIDEO_EXTS } from './api.js';
 import {
   state,
@@ -335,7 +336,7 @@ let copying = 0;
 /** Handles the DOM `copy`/`cut` events outside text fields. */
 export function onCopy(e, cut = false) {
   const slides = state.focus === 'slides';
-  const ids = [...(slides ? state.selectedSlides : state.selection)];
+  let ids = [...(slides ? state.selectedSlides : state.selection)];
   if (!state.doc || !ids.length) return;
   const docId = state.doc.docId;
   const slide = state.slideId;
@@ -347,13 +348,14 @@ export function onCopy(e, cut = false) {
     try {
       if (!(await flushEdits())) return;
       if (state.doc?.docId !== docId) return;
+      if (cut && !slides) ids = expandGroups(deck().slides.find((s) => s.id === slide), ids);
       await (slides
         ? copySlides(deck().slides.filter((s) => ids.includes(s.id)))
         : copyElements((deck().slides.find((s) => s.id === slide)?.elements || []).filter((el) => ids.includes(el.id))));
       lastCopySlide = slide;
       pasteCount = 0;
       if (cut && state.doc?.docId === docId) {
-        await apply(slides ? { op: 'deleteSlides', ids } : { op: 'deleteElements', slide, ids });
+        await apply(slides ? { op: 'deleteSlides', ids } : { op: 'cutElements', slide, ids });
       }
     } catch (err) {
       toast(String(err), 'error');

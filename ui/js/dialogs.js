@@ -11,6 +11,7 @@ import { Logo } from './welcome.js';
 import { keyLabel, cls } from './util.js';
 import { opener, invoke } from './api.js';
 import { MediaLibrary, KeyPrompt } from './media.js';
+import { CropDialog } from './crop.js';
 import { ThemeBuilder } from './themebuilder.js';
 import { ChartData } from './datachart.js';
 import { UpdateDialog, checkForUpdates } from './updates.js';
@@ -20,7 +21,7 @@ export function ModalHost() {
   const st = useStore();
   const m = st.modal;
   if (!m) return null;
-  const C = { unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder, chartData: ChartData, update: UpdateDialog }[m.type];
+  const C = { crop: CropDialog, unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder, chartData: ChartData, update: UpdateDialog }[m.type];
   return C ? html`<${C} ...${m.props} />` : null;
 }
 

@@ -40,6 +40,9 @@ function appMenu() {
     },
     '-',
     cmd('app.palette'),
+    cmd('edit.find'),
+    cmd('edit.group'),
+    cmd('edit.ungroup'),
     cmd('app.settings'),
     cmd('app.shortcuts'),
     cmd('app.about'),
@@ -210,6 +213,8 @@ export function Toolbar() {
         disabled=${!doc.canRedo}
         onClick=${redo}
       />
+      <${ToolButton} icon="paintbrush" label=${t('Format Painter')} active=${!!st.formatPainter?.active} disabled=${st.selection.length !== 1 && !st.formatPainter?.active}
+        onMouseDown=${(e) => e.preventDefault()} onClick=${() => st.formatPainter?.active ? set({ formatPainter: { ...st.formatPainter, active: false } }) : import('./formatpainter.js').then((m) => m.copyFormat())} />
       <span class="tb-sep" />
       <${ToolButton} icon="type" label=${t('Text')} caret onClick=${menu(textMenu)} />
       <${ToolButton} icon="shapes" label=${t('Shape')} caret onClick=${(e) => showShapePicker(e.currentTarget)} />

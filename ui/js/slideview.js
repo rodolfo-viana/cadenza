@@ -110,7 +110,7 @@ function syncAttributes(target, source) {
 /** Updates the element being edited without touching its text. */
 function patchEditing(old, neu) {
   syncAttributes(old, neu);
-  for (const sel of ['.cz-rot', '.cz-box', '.cz-shape-text', '.cz-text']) {
+  for (const sel of ['.cz-rot', '.cz-scale', '.cz-box', '.cz-shape-text', '.cz-text']) {
     const a = old.querySelector(sel);
     const b = neu.querySelector(sel);
     if (a && b) syncAttributes(a, b);

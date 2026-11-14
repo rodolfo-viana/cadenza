@@ -1972,3 +1972,23 @@ test('the frame printing workaround leaves the top-level presentation alone', ()
   vm.runInNewContext(fs.readFileSync(path.join(root, 'print-frames.js'), 'utf8'), { window });
   assert.deepEqual(window.listeners, {});
 });
+
+
+test('cutting one selected group member snapshots the entire group before deleting exactly those ids', async () => {
+  const backend = view();
+  backend.deck.slides[0].elements = [
+    { id: 'a', group: { id: 'g' }, content: { kind: 'image', src: 'a.png' } },
+    { id: 'outside', content: { kind: 'image', src: 'outside.png' } },
+    { id: 'b', group: { id: 'g' }, content: { kind: 'image', src: 'b.png' } },
+  ];
+  const calls = [];
+  const { S, A } = await ui(async (name, args) => {
+    calls.push({ name, args });
+    if (name === 'clipboard_copy') return { ...clone(args.selection), media: SNAPSHOT };
+    if (name === 'doc_apply') return { ...clone(backend), revision: 2 };
+  });
+  S.openView(clone(backend)); S.select(['a'], { individual: true });
+  await A.onCopy({ preventDefault() {} }, true);
+  assert.deepEqual(clone(calls.find((c) => c.name === 'clipboard_copy').args.selection.elements.map((e) => e.id)), ['a', 'b']);
+  assert.deepEqual(clone(calls.find((c) => c.name === 'doc_apply').args.op), { op: 'cutElements', slide: 'slide-1', ids: ['a', 'b'] });
+});

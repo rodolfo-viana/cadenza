@@ -410,6 +410,7 @@ export function ImagePanel({ els }) {
       <${Button} icon="images" label=${t('Search Online…')} onClick=${() => import('./media.js').then((m) => m.openMediaLibrary('photos', single.id))} />
       ${single.content.naturalWidth > 0 && html`<${Button} icon="ratio" label=${t('Original Ratio')} onClick=${() => A.resetImageSize(single)} />`}
     </div>`}
+    ${single?.content.src && html`<${Button} icon="crop" label=${t('Crop Image')} disabled=${single.locked} onClick=${() => import('./crop.js').then((m) => m.openCrop(single))} />`}
     <${Row} label=${t('Fit')}>
       <${Segmented}
         value=${c('fit')}

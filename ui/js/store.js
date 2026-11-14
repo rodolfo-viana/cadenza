@@ -5,6 +5,7 @@
 // changed. Everything here is plain JS; components subscribe with
 // `useStore()` and re-render on change.
 
+import { expandGroups } from './groups.js';
 import { useEffect, useReducer } from './lib.js';
 import { invoke, dialog, events, currentWindow, getAllWindows, FILE_FILTER } from './api.js';
 import { t, setLanguage } from './i18n.js';
@@ -295,6 +296,8 @@ export const openView = (view) => loadView(view);
 
 function loadView(view) {
   set({
+    findReplace: false,
+    formatPainter: null,
     doc: null,
     slideId: view.deck.slides[0]?.id || null,
     selection: [],
@@ -448,7 +451,7 @@ export function stepSlide(delta) {
   if (next) goToSlide(next.id);
 }
 
-export const select = (ids) => set({ selection: ids, focus: 'canvas' });
+export const select = (ids, { individual = false } = {}) => set({ selection: individual ? ids : expandGroups(currentSlide(), ids), focus: 'canvas' });
 
 // ---------------------------------------------------------------------------
 // Documents

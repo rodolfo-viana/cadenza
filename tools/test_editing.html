@@ -1,0 +1,142 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cadenza editing regression tests</title>
+<link rel="stylesheet" href="../ui/css/content.css">
+<pre id="result">Running…</pre>
+<div id="fixture" class="reveal"></div>
+<script type="module">
+// Run in a real browser: these checks require DOM parsing, ranges, computed
+// text styles and layout. Only the native document transport is replaced.
+const calls = [];
+let backend;
+window.__TAURI__ = { core: { invoke: async (name, args) => {
+  calls.push({ name, args });
+  if (name === 'doc_apply') {
+    for (const u of args.op.updates || []) {
+      const e = backend.deck.slides.find((s) => s.id === args.op.slide).elements.find((e) => e.id === u.id);
+      function merge(a, b) { for (const [k,v] of Object.entries(b)) { if (v && typeof v === 'object' && !Array.isArray(v)) merge(a[k] ||= {},v); else a[k]=v; } }
+      merge(e,u.patch);
+    }
+    backend.revision++; return structuredClone(backend);
+  }
+} }, window: { getCurrentWindow: () => ({ setTitle: async () => {} }) }, event: {}, dialog: {}, clipboardManager: {} };
+let passed = 0, failed = 0;
+const lines = [];
+function assert(ok, message='Assertion failed') { if (!ok) throw new Error(message); }
+function equal(a,b) { assert(JSON.stringify(a) === JSON.stringify(b), `${JSON.stringify(a)} != ${JSON.stringify(b)}`); }
+async function test(name, fn) { try { await fn(); passed++; lines.push('PASS ' + name); } catch(e) { failed++; lines.push('FAIL '+name+'\n'+e.stack); } }
+try {
+const F=await import('../ui/js/findreplace.js'), P=await import('../ui/js/formatpainter.js');
+const C=await import('../ui/js/crop.js'), G=await import('../ui/js/groups.js');
+const S=await import('../ui/js/store.js'), T=await import('../ui/js/textedit.js');
+const plain=(html)=>F.indexHtml(html).text.trimEnd();
+await test('literal search: metacharacters, case, accents and UTF-16',()=>{
+  equal(F.literalMatches('a.b aXb A.B','a.b').map((m)=>m.start),[0,8]);
+  equal(F.literalMatches('ação AÇÃO 😀ação','ação',true).map((m)=>m.start),[0,12]);
+  equal(F.literalMatches('x',''),[]);
+});
+await test('search crosses inline styles but never attributes or paragraphs',()=>{
+  const source='<p data-x="needle">ca<b>den</b>za &amp; café</p><p>next</p>';
+  const text=F.indexHtml(source).text;
+  equal(F.literalMatches(text,'cadenza').length,1); equal(F.literalMatches(text,'needle').length,0);
+  equal(F.literalMatches(text,'cafénext').length,0); assert(text.includes('&'));
+});
+await test('replacement preserves links and untouched formatting across runs',()=>{
+  const source='<p><b>ca</b><a href="https://example.org"><i>denza</i></a> <u>kept</u></p>';
+  const result=F.replaceHtml(source,F.literalMatches(F.indexHtml(source).text,'cadenza'),'new');
+  equal(plain(result),'new kept'); assert(result.includes('<b>new</b>')); assert(result.includes('href="https://example.org"')); assert(result.includes('<u>kept</u>'));
+});
+await test('replace all is literal, nonrecursive and HTML safe',()=>{
+  const source='<p>cat cat cat</p>';
+  const m=F.literalMatches(F.indexHtml(source).text,'cat');
+  equal(plain(F.replaceHtml(source,m,'cat$&<img>')),'cat$&<img> cat$&<img> cat$&<img>');
+  equal(plain(F.replaceHtml(source,m,'')),'');
+});
+const deck={slides:[{id:'s1',notes:'term note',elements:[{id:'a',content:{kind:'text',html:'<b>term</b> term'}},{id:'b',content:{kind:'shape',text:{html:'TERM'}}},{id:'c',content:{kind:'table',rows:[['term','<i>TERM</i>']]}}]},{id:'s2',notes:'term',elements:[{id:'d',content:{kind:'text',html:'term'}}]}]};
+await test('search scopes text, shapes, tables and optional notes',()=>{
+  equal(F.searchDeck(deck,'term').length,6); equal(F.searchDeck(deck,'term',{notes:true}).length,8);
+  equal(F.searchDeck(deck,'term',{slideId:'s1',matchCase:true}).length,3);
+  const changes=F.replacementChanges(F.searchDeck(deck,'term'),'next'); equal(changes.length,5);
+  equal(changes[0].before,'<b>term</b> term'); equal(plain(changes[0].after),'next next');
+});
+await test('format snapshot excludes content, geometry, links and builds',()=>{
+  const source={x:10,w:100,build:{effect:'fade'},action:{url:'keep'},style:{fill:'red',padding:8},content:{kind:'text',html:'source',style:{fontSize:48,autoHeight:true}}};
+  const snap=P.formatSnapshot(source); source.style.fill='blue'; equal(snap.box.fill,'red'); assert(!JSON.stringify(snap).includes('source')); assert(!('autoHeight' in snap.text));
+  const target={...source,content:{kind:'text',html:'<b>target</b> <a href="https://example.org">link</a>',style:{autoHeight:false}}};
+  const patch=P.formatPatch(target,snap); equal(Object.keys(patch).sort(),['content','style']); equal(plain(patch.content.html),'target link'); assert(patch.content.html.includes('href=')); assert(!('autoHeight' in patch.content.style));
+});
+await test('painter preserves effective font and stroke sizes across group scales',()=>{
+  const source={contentScale:2,style:{borderWidth:3,padding:4},content:{kind:'text',html:'source',style:{fontSize:20}}};
+  const snapshot=P.formatSnapshot(source);snapshot.characters={'font-size':'20px'};
+  const patch=P.formatPatch({contentScale:0.5,content:{kind:'text',html:'target',style:{}}},snapshot);
+  equal(patch.content.style.fontSize,80);equal(patch.style.borderWidth,12);assert(patch.content.html.includes('80px'));
+});
+await test('image painter copies effects but never crop/source/fit/flips',()=>{
+  const source={style:{borderWidth:5},content:{kind:'image',src:'original.png',crop:{x:0,w:0.5},fit:'cover',flipX:true,brightness:130}};
+  const patch=P.formatPatch(source,P.formatSnapshot(source)); equal(patch.content,{brightness:130}); equal(patch.style,{borderWidth:5});
+});
+await test('selected-text painter does not copy object decoration',()=>{
+  const source={style:{fill:'red'},content:{kind:'text',style:{fontSize:48}}};
+  const snapshot=P.formatSnapshot(source,{'font-size':'48px',color:'rgb(255, 0, 0)'});
+  const patch=P.formatPatch({content:{kind:'text',html:'keep',style:{}}},snapshot); assert(!patch.style); equal(plain(patch.content.html),'keep');
+});
+await test('crop drag clamps all edges and pan retains dimensions',()=>{
+  equal(C.cropDrag({x:0.2,y:0.3,w:0.5,h:0.4},'move',2,-2),{x:0.5,y:0,w:0.5,h:0.4});
+  const c=C.cropDrag(C.FULL_CROP,'nw',0.25,0.5); equal(c,{x:0.25,y:0.5,w:0.75,h:0.5});
+  for (const h of ['nw','ne','sw','se']) for (const dx of [-2,0,2]) for (const dy of [-2,0,2]) {
+    const c=C.cropDrag({x:0.2,y:0.2,w:0.6,h:0.6},h,dx,dy); assert(c.x>=0 && c.y>=0 && c.w>0 && c.h>0 && c.x+c.w<=1.00001 && c.y+c.h<=1.00001);
+  }
+});
+await test('crop aspect ratios constrain pixels, not normalized fractions',()=>{
+  const c=C.cropAspect(C.FULL_CROP,1,800,400); equal(c,{x:0.25,y:0,w:0.5,h:1});
+  const r=C.cropDrag(c,'se',0.1,-0.1,0.5); assert(Math.abs(r.w*800/(r.h*400)-1)<1e-8);
+});
+await test('group selection expands while preserving slide stacking order',()=>{
+  const s={elements:[{id:'a',group:{id:'g'}},{id:'middle'},{id:'b',group:{id:'g'}}]}; equal(G.expandGroups(s,['b']),['a','b']); equal(G.expandGroups(s,['middle','b']),['a','middle','b']);
+});
+await test('group preview uses the rotated center and a uniform visual scale',()=>{
+  const before={x:0,y:0,w:200,h:100,rotation:0}; const after={x:0,y:0,w:400,h:200,rotation:90};
+  const e={x:10,y:20,w:40,h:20,rotation:20,contentScale:1}; const result=G.transformMember(e,before,after);
+  assert(Math.abs(result.x-200)<1e-8); assert(Math.abs(result.y+60)<1e-8); equal(result.rotation,110); equal(result.contentScale,2);
+});
+await test('real DOM: text painter preserves the unselected range and hyperlink',async()=>{
+  const el={id:'text1',x:0,y:0,w:400,h:100,content:{kind:'text',html:'<p>before <a href="https://example.org"><b>selected</b></a> after</p>',style:{fontSize:24,autoHeight:false}},style:{}};
+  backend={docId:'browser-test',revision:1,path:null,dirty:false,full:true,themeHref:'',deckCss:'',slides:{},outcome:{label:'Edit'},deck:{title:'Test',width:1280,height:720,settings:{},slides:[{id:'s1',elements:[el]}]}};
+  S.openView(structuredClone(backend)); S.select(['text1']);
+  const wrapper=document.createElement('div'); wrapper.innerHTML=`<div class="cz-text">${el.content.html}</div>`; document.getElementById('fixture').append(wrapper);
+  const node=wrapper.firstChild; await T.beginTextEdit({node:()=>wrapper},el);
+  const text=node.querySelector('b').firstChild; const range=document.createRange(); range.selectNodeContents(text); window.getSelection().removeAllRanges(); window.getSelection().addRange(range); document.dispatchEvent(new Event('selectionchange'));
+  assert(T.paintTextFormat({'font-size':'40px','font-weight':'400',color:'rgb(255, 0, 0)'}));
+  await S.flushEdits(); equal(node.textContent,'before selected after'); assert(node.querySelector('a')?.href === 'https://example.org/');
+  assert(node.querySelector('[style]')); equal([...new Set(calls.filter((c)=>c.name==='doc_apply').map((c)=>c.args.coalesce))],['text:text1:1']);
+  await T.endAllEditing();
+});
+await test('crop opens for a loaded canvas image',async()=>{
+  const {canvasApi}=await import('../ui/js/canvas.js');
+  const el={id:'image1',content:{kind:'image',src:'local.svg',naturalWidth:800,naturalHeight:400},style:{}};
+  backend.deck.slides[0].elements.push(el); backend.revision++; S.openView(structuredClone(backend));
+  const img={src:'http://localhost/local.svg',naturalWidth:800,naturalHeight:400};
+  canvasApi.view={node:()=>({querySelector:()=>img})};
+  const ended=await T.endAllEditing(); const found=S.deck().slides.find((s)=>s.id===S.state.slideId)?.elements.find((e)=>e.id===el.id);
+  await C.openCrop(el); assert(S.state.modal?.type==='crop', JSON.stringify({ended,found,docId:S.state.doc?.docId,modal:S.state.modal,toasts:S.state.toasts,src:canvasApi.view?.node(el.id)?.querySelector('img')})); S.closeModal();
+});
+await test('scaled equations persist physical rather than logical measurements',async()=>{
+  const {fittedMath}=await import('../ui/js/canvas.js');
+  const box=document.createElement('div');box.className='cz-math-box';box.style.cssText='padding:10px;border:2px solid black';
+  const math=document.createElement('div');math.className='cz-math';math.style.cssText='width:100px;height:40px';math.textContent='x';box.appendChild(math);document.getElementById('fixture').appendChild(box);
+  const el={x:0,y:0,w:1,h:1,rotation:0,contentScale:0.5,content:{align:'left'}};
+  const result=fittedMath(el,{querySelector:()=>box}); equal(result.w,62);equal(result.h,32);
+});
+await test('CSS zoom: grouped text scales every visual unit and auto height',()=>{
+  const host=document.getElementById('fixture');
+  host.innerHTML='<div class="cz-el cz-text cz-auto" style="width:200px"><div class="cz-rot"><div class="cz-text-box cz-box"><div style="font:20px/1 sans-serif;padding:10px">one<br>two</div></div></div></div>';
+  const original=host.firstChild, h=original.offsetHeight; assert(h>0);
+  const copy=original.cloneNode(true); copy.style.left='250px'; copy.style.width='400px';
+  const rot=copy.firstChild, scale=document.createElement('div'); scale.className='cz-scale'; scale.style.cssText='zoom:2;width:200px;height:auto'; while(rot.firstChild) scale.appendChild(rot.firstChild); rot.appendChild(scale); host.appendChild(copy);
+  assert(Math.abs(scale.getBoundingClientRect().width-400)<1);
+  assert(Math.abs(copy.getBoundingClientRect().height-2*h)<1,`${copy.getBoundingClientRect().height} vs ${h}`);
+});
+} catch(e) { failed++; lines.push(e.stack); }
+document.getElementById('result').textContent=`${passed} passed; ${failed} failed\n`+lines.join('\n');
+document.body.dataset.result=failed?'fail':'pass';
+</script>

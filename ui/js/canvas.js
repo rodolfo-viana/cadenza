@@ -24,6 +24,7 @@ import * as A from './actions.js';
 import { item } from './commands.js';
 import { beginTextEdit, endTextEdit, editingNode, beginTableEdit, endTableEdit, tableNode, isEditing, isEditingTable } from './textedit.js';
 import { bounds, unionBounds, intersects, rotate, clamp, cls } from './util.js';
+import { expandGroups, selectedGroup, transformMember } from './groups.js';
 import { t, language } from './i18n.js';
 
 const PAD = 48; // space around the slide
@@ -103,7 +104,7 @@ function storeFits(view) {
     const updates = [];
     for (const el of s.elements) {
       const node = view.node(el.id);
-      if (!node) continue;
+      if (!node || (el.group && s.elements.some((e) => e.group?.id === el.group.id && e.locked))) continue;
       if (fitsText(el)) {
         const h = node.offsetHeight;
         if (h > 0 && Math.abs(h - el.h) >= 1) updates.push({ id: el.id, patch: { h } });
@@ -112,7 +113,7 @@ function storeFits(view) {
         if (g) updates.push({ id: el.id, patch: g });
       } else if (el.content.kind === 'table') {
         // A table never shrinks below its rows: the box grows instead.
-        const h = node.querySelector('table.cz-table')?.offsetHeight || 0;
+        const h = (node.querySelector('table.cz-table')?.offsetHeight || 0) * (el.contentScale || 1);
         if (h - el.h >= 1) updates.push({ id: el.id, patch: { h } });
       }
     }
@@ -125,14 +126,14 @@ function storeFits(view) {
  * already does). The side its alignment names stays put, the middle for a
  * centered one, also when the box is rotated.
  */
-function fittedMath(el, node) {
+export function fittedMath(el, node) {
   const box = node.querySelector('.cz-math-box');
   const math = box?.querySelector('.cz-math');
   if (!math?.firstChild) return null;
   const cs = getComputedStyle(box);
   const px = (...props) => props.reduce((sum, p) => sum + (parseFloat(cs[p]) || 0), 0);
-  const w = Math.ceil(math.scrollWidth + px('paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth'));
-  const h = Math.ceil(math.scrollHeight + px('paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'));
+  const w = (math.scrollWidth + px('paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth')) * (el.contentScale || 1);
+  const h = (math.scrollHeight + px('paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth')) * (el.contentScale || 1);
   if (!w || !h || (Math.abs(w - el.w) < 1 && Math.abs(h - el.h) < 1)) return null;
   const side = { left: -1, right: 1 }[el.content.align] || 0;
   const shift = (side * (el.w - w)) / 2;
@@ -273,6 +274,8 @@ export function Canvas() {
     n.style.top = g.y + 'px';
     n.style.width = g.w + 'px';
     if (!fitsText(el)) n.style.height = g.h + 'px';
+    const scaled = n.querySelector('.cz-scale');
+    if (scaled) { scaled.style.width = `${g.w / (el.contentScale || 1)}px`; scaled.style.height = fitsText(el) ? 'auto' : `${g.h / (el.contentScale || 1)}px`; }
     const rot = n.querySelector('.cz-rot');
     if (rot) rot.style.transform = g.rotation ? `rotate(${g.rotation}deg)` : '';
   }
@@ -315,7 +318,9 @@ export function Canvas() {
   // -- gestures ----------------------------------------------------------------
 
   function startMove(e, ids) {
-    const els = slide.elements.filter((el) => ids.includes(el.id) && !el.locked);
+    const moving = slide.elements.filter((el) => ids.includes(el.id));
+    if (moving.some((el) => el.group && el.locked)) return;
+    const els = moving.filter((el) => !el.locked);
     if (!els.length) return;
     const p0 = toSlide(e);
     const orig = Object.fromEntries(els.map((el) => [el.id, { ...geom(el) }]));
@@ -358,13 +363,62 @@ export function Canvas() {
         setGuides(gl);
         setTip({ x: group.x + dx, y: group.y + dy - 8 / scale, text: `${Math.round(group.x + dx)}, ${Math.round(group.y + dy)}` });
       },
-      () => {
-        setGuides(null);
-        setTip(null);
-        if (moved && last) commit(last);
-        else setLive(null);
+      async (ev) => {
+        setGuides(null); setTip(null);
+        for (const el of els) paint(el.id, orig[el.id], el);
+        if (moved && last && ev.type !== 'pointercancel') {
+          await apply({ op: 'updateElements', slide: slide.id, updates: els.map((el) => ({ id: el.id, patch: { x: last[el.id].x, y: last[el.id].y } })) });
+        }
+        setLive(null);
       },
     );
+  }
+
+  function startGroupTransform(e, before, handle) {
+    e.preventDefault(); e.stopPropagation();
+    const docId = state.doc.docId, slideId = slide.id;
+    const members = slide.elements.filter((el) => el.group?.id === before.id);
+    const originalHtml = new Map(members.map((el) => [el.id, nodeOf(el.id)?.innerHTML]));
+    const p0 = toSlide(e), cx = before.x + before.w / 2, cy = before.y + before.h / 2;
+    const hx = handle.includes('w') ? -1 : 1, hy = handle.includes('n') ? -1 : 1;
+    const [ax, ay] = rotate(cx - hx * before.w / 2, cy - hy * before.h / 2, cx, cy, before.rotation);
+    let last = null, cancelled = false;
+    const cancel = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopImmediatePropagation(); cancelled = true; window.dispatchEvent(new Event('pointercancel')); } };
+    window.addEventListener('keydown', cancel, true);
+    track((ev) => {
+      const p = toSlide(ev);
+      if (handle === 'rotate') {
+        let r = before.rotation + (Math.atan2(p.y - cy, p.x - cx) - Math.atan2(p0.y - cy, p0.x - cx)) * 180 / Math.PI;
+        if (ev.shiftKey) r = Math.round(r / 15) * 15;
+        last = { ...before, rotation: r };
+      } else {
+        const [px, py] = rotate(p.x, p.y, ax, ay, -before.rotation);
+        const minimum = Math.max(...members.map((el) => Math.max(4 / el.w, 4 / el.h, 0.001 / (el.contentScale || 1))));
+        const k = Math.max(minimum, (hx * (px - ax) / before.w + hy * (py - ay) / before.h) / 2);
+        const w = before.w * k, h = before.h * k;
+        const [nx, ny] = rotate(ax + hx * w / 2, ay + hy * h / 2, ax, ay, before.rotation);
+        last = { ...before, x: nx - w / 2, y: ny - h / 2, w, h };
+      }
+      const next = {};
+      for (const el of members) {
+        const g = transformMember(el, before, last); next[el.id] = g;
+        paint(el.id, g, el);
+        const rot = nodeOf(el.id)?.querySelector('.cz-rot');
+        if (rot) {
+          let scaled = rot.querySelector(':scope > .cz-scale');
+          if (!scaled) { scaled = document.createElement('div'); scaled.className = 'cz-scale'; while (rot.firstChild) scaled.appendChild(rot.firstChild); rot.appendChild(scaled); }
+          Object.assign(scaled.style, { zoom: g.contentScale, width: `${g.w / g.contentScale}px`, height: fitsText(el) ? 'auto' : `${g.h / g.contentScale}px` });
+        }
+      }
+      setLive(next);
+    }, async (ev) => {
+      window.removeEventListener('keydown', cancel, true);
+      // Always restore before committing: a rejected or cancelled operation must
+      // not leave the preview in the otherwise unchanged rendered slide.
+      for (const el of members) { const n = nodeOf(el.id); if (n && originalHtml.get(el.id) != null) { n.innerHTML = originalHtml.get(el.id); paint(el.id, el, el); } }
+      if (last && !cancelled && ev.type !== 'pointercancel') await apply({ op: 'transformGroup', slide: slideId, before, after: last }, { docId, select: false });
+      setLive(null);
+    });
   }
 
   function startResize(e, el, handle) {
@@ -592,15 +646,18 @@ export function Canvas() {
     if (elNode && slideRef.current.contains(elNode)) {
       e.preventDefault();
       const id = elNode.getAttribute('data-cz-id');
+      if (state.formatPainter?.active) { await import('./formatpainter.js').then((m) => m.applyFormat(expandGroups(slide, [id]), false)); return; }
+      if (e.altKey) { select([id], { individual: true }); startMove(e, [id]); return; }
       const additive = e.shiftKey || e.ctrlKey || e.metaKey;
       let sel = state.selection;
       if (additive) {
-        sel = sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id];
+        const members = expandGroups(slide, [id]);
+        sel = sel.includes(id) ? sel.filter((x) => !members.includes(x)) : [...sel, ...members];
         select(sel);
         return;
       }
       if (!sel.includes(id)) {
-        sel = [id];
+        sel = expandGroups(slide, [id]);
         select(sel);
       }
       startMove(e, sel);
@@ -623,7 +680,7 @@ export function Canvas() {
     const point = { x: e.clientX, y: e.clientY };
     if (k === 'text' || (k === 'shape' && el.content.shape !== 'line')) beginTextEdit(viewRef.current, el, point);
     else if (k === 'table') beginTableEdit(viewRef.current, el, point);
-    else if (k === 'image') A.replaceImage(el);
+    else if (k === 'image') { if (el.content.src) import('./crop.js').then((m) => m.openCrop(el)); else A.replaceImage(el); }
     else if (k === 'video' && !el.content.src) A.replaceVideo(el);
     else {
       set({ tab: 'format' });
@@ -662,6 +719,7 @@ export function Canvas() {
   // -- overlay ---------------------------------------------------------------------
 
   const selected = slide.elements.filter((el) => st.selection.includes(el.id));
+  const persistentGroup = selectedGroup(selected);
   const single = selected.length === 1 ? selected[0] : null;
   const editingId = st.editing || st.editingTable;
 
@@ -692,7 +750,7 @@ export function Canvas() {
       <div class="rot-handle" title=${t('Rotate (Shift: 15° steps)')} onPointerDown=${(e) => startRotate(e, el)}><${Icon} name="rotate-cw" size=${11} /></div>`;
   };
 
-  const groupB = selected.length > 1 ? unionBounds(selected.map((el) => bounds(geom(el)))) : null;
+  const groupB = persistentGroup && !live ? persistentGroup : selected.length > 1 ? unionBounds(selected.map((el) => bounds(geom(el)))) : null;
   const selB = selected.length ? unionBounds(selected.map((el) => bounds(geom(el)))) : null;
 
   // User guides, with the one being dragged at its live position.
@@ -837,7 +895,9 @@ export function Canvas() {
             ${el.locked && html`<div class="lock-badge" title=${t('Locked')}><${Icon} name="lock" size=${11} /></div>`}
           </div>`;
         })}
-        ${groupB && html`<div class="group-box" style=${box2screen(groupB)} />`}
+        ${groupB && html`<div class="group-box" style=${box2screen(groupB)} title=${persistentGroup ? t('Group — Alt-click to select an object inside') : ''}>
+          ${persistentGroup && !live && !selected.some((e) => e.locked) && html`${['nw', 'ne', 'se', 'sw'].map((h) => html`<div class=${'handle h-' + h} style=${{ cursor: cursorFor(h, persistentGroup.rotation) }} onPointerDown=${(e) => startGroupTransform(e, persistentGroup, h)} />`)}<div class="rot-stem" /><div class="rot-handle" onPointerDown=${(e) => startGroupTransform(e, persistentGroup, 'rotate')}><${Icon} name="rotate-cw" size=${11} /></div>`}
+        </div>`}
         ${guideLines.map((g) =>
           g.axis === 'x'
             ? html`<div
@@ -937,6 +997,9 @@ function elementMenu() {
     one && k === 'image' && { label: t('Find Photo Online…'), icon: 'images', run: () => import('./media.js').then((m) => m.openMediaLibrary('photos', one.id)) },
     one && k === 'image' && one.content.naturalWidth && { label: t('Original Proportions'), icon: 'ratio', run: () => A.resetImageSize(one) },
     one && k === 'video' && { label: t('Choose Video File…'), icon: 'film', run: () => A.replaceVideo(one) },
+    item('edit.group'),
+    item('edit.ungroup'),
+    one && k === 'image' && one.content.src && { label: t('Crop Image'), icon: 'crop', run: () => import('./crop.js').then((m) => m.openCrop(one)) },
     one && '-',
     { label: t('Cut'), icon: 'scissors', keys: 'Mod+X', run: () => document.execCommand('cut') },
     { label: t('Copy'), icon: 'copy', keys: 'Mod+C', run: () => document.execCommand('copy') },

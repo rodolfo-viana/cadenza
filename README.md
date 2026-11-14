@@ -23,6 +23,8 @@ See **[live demo](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-n
 - LaTeX math with KaTeX, as equation objects or inline in any text: `$e^{i\pi}+1=0$`.
 - [Mermaid](https://mermaid.js.org) diagrams: flowcharts, sequences, timelines, mind maps and more.
 - Rulers, draggable guides, smart guides and a snapping grid.
+- [Find and replace, format painter, visual image cropping and persistent object groups](docs/editing-tools.md)
+  in the development branch, with Undo/Redo and saved-file support.
 - Undo/redo for everything, a command palette (Ctrl+K) and keyboard shortcuts for all
   common actions.
 
