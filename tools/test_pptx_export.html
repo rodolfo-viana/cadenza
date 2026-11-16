@@ -32,6 +32,28 @@ window.run = async function () {
   const zip=await JSZip.loadAsync(result.bytes);
   const xml=async path=>new DOMParser().parseFromString(await zip.file(path).async('string'),'application/xml');
   const names=(doc,tag)=>[...doc.getElementsByTagName(tag)];
+  const relationshipNamespace='http://schemas.openxmlformats.org/package/2006/relationships';
+  const hyperlinkType='http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink';
+  const hasExternalHyperlink=(doc,target)=>[...doc.getElementsByTagNameNS(relationshipNamespace,'Relationship')].some(node=>
+    node.parentElement===doc.documentElement && node.getAttribute('Type')===hyperlinkType
+    && node.getAttribute('TargetMode')==='External' && node.getAttribute('Target')===target);
+  // A URL elsewhere in the XML, or inside an attacker-controlled URL, cannot
+  // satisfy the hyperlink assertion. Read the relationship's exact attributes.
+  const relationshipFixture=(attributes={})=>{
+    const doc=document.implementation.createDocument(relationshipNamespace,'Relationships');
+    const node=doc.createElementNS(relationshipNamespace,'Relationship');
+    for(const [key,value] of Object.entries({Id:'rId1',Type:hyperlinkType,TargetMode:'External',Target:'https://example.com',...attributes}))node.setAttribute(key,value);
+    doc.documentElement.appendChild(node);return doc;
+  };
+  ok(hasExternalHyperlink(relationshipFixture(),'https://example.com'),'Exact external hyperlink is accepted');
+  for(const [label,attributes] of [
+    ['hostname suffix',{Target:'https://example.com.evil.test'}],
+    ['userinfo',{Target:'https://example.com@evil.test'}],
+    ['query parameter',{Target:'https://evil.test/?url=https://example.com'}],
+    ['unrelated attribute',{Target:'https://evil.test',Description:'https://example.com'}],
+    ['image relationship',{Type:'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image'}],
+    ['internal relationship',{TargetMode:'Internal'}],
+  ])ok(!hasExternalHyperlink(relationshipFixture(attributes),'https://example.com'),`Hyperlink assertion rejects ${label}`);
   const slide1=await xml('ppt/slides/slide1.xml'),slide2=await xml('ppt/slides/slide2.xml');
   for(const [i,doc] of [slide1,slide2].entries()){
     const relationships=await xml(`ppt/slides/_rels/slide${i+1}.xml.rels`);
@@ -54,7 +76,7 @@ window.run = async function () {
   equal(names(slide1,'a:tr').length,3,'Table does not create extra slides');
   equal(names(slide1,'c:chart').length,1,'Chart is native');
   ok(names(slide1,'a:prstGeom').some(n=>n.getAttribute('prst')==='rect'),'Basic shape remains native');
-  ok((await zip.file('ppt/slides/_rels/slide1.xml.rels').async('string')).includes('https://example.com'),'Safe hyperlink relationship survives');
+  ok(hasExternalHyperlink(await xml('ppt/slides/_rels/slide1.xml.rels'),'https://example.com'),'Exact external hyperlink relationship survives');
   ok((await zip.file('ppt/notesSlides/notesSlide1.xml').async('string')).includes('Notes survive export: ç, α, 日本語.'),'Unicode notes survive');
   const chart=await xml('ppt/charts/chart1.xml');
   const values=names(chart,'c:numCache')[0];

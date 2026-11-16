@@ -47,9 +47,9 @@ async function modal(element = null, overrides = {}) {
       escapeHtml: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
     },
   };
-  const context = vm.createContext({ console, setTimeout, clearTimeout, document: { createElement() {
-    return { set innerHTML(value) { this.textContent = value.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'); } };
-  } } });
+  // DOM-dependent table editing runs in test_editing.html with the browser's
+  // HTML parser. Do not approximate parsing or entity decoding with regexes.
+  const context = vm.createContext({ console, setTimeout, clearTimeout });
   const cache = new Map();
   function load(name) {
     if (cache.has(name)) return cache.get(name);
@@ -227,18 +227,6 @@ test('failed Apply keeps the draft; a late response never closes a newer modal',
   edit(delayed, ',Value\nA,3\nB,2');
   await chart(delayed);
   assert.equal(delayed.closed.length, 0);
-});
-
-test('editing current table data preserves formatting in unchanged cells and historical source', async () => {
-  const content = { kind: 'table', headerRow: true, rows: [['<b>Name</b>', 'Value'], ['A', '<i>1</i>']], fontSize: 32 };
-  const source = { text: 'Name,Value\nA,1', header: true, transpose: false, delimiter: ',', dialect: 'csv', roles: [], edited: false };
-  const ui = await modal({ id: 'table-a', w: 700, h: 400, content, dataSource: source });
-  edit(ui, 'Name,Value\nB,1');
-  await handler(ui.render(), 'onClick', 'Apply data to table')();
-  const patch = ui.applied[0].updates[0].patch;
-  assert.deepEqual(patch.content.rows, [['<b>Name</b>', 'Value'], ['B', '<i>1</i>']]);
-  assert.equal(patch.content.fontSize, 32);
-  assert.equal(patch.dataSource, undefined);
 });
 
 test('a new CSV with one repeated category keeps its label', async () => {

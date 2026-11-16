@@ -39,6 +39,7 @@ try {
 const F=await import('../ui/js/findreplace.js'), P=await import('../ui/js/formatpainter.js');
 const C=await import('../ui/js/crop.js'), G=await import('../ui/js/groups.js');
 const S=await import('../ui/js/store.js'), T=await import('../ui/js/textedit.js');
+const D=await import('../ui/js/datasource.js'), CSV=await import('../ui/js/chartdata.js');
 const plain=(html)=>F.indexHtml(html).text.trimEnd();
 await test('native transport stub rejects prototype keys at every depth',()=>{
   for (const key of ['__proto__','constructor','prototype']) {
@@ -177,6 +178,54 @@ await test('CSS zoom: grouped text scales every visual unit and auto height',()=
   const rot=copy.firstChild, scale=document.createElement('div'); scale.className='cz-scale'; scale.style.cssText='zoom:2;width:200px;height:auto'; while(rot.firstChild) scale.appendChild(rot.firstChild); rot.appendChild(scale); host.appendChild(copy);
   assert(Math.abs(scale.getBoundingClientRect().width-400)<1);
   assert(Math.abs(copy.getBoundingClientRect().height-2*h)<1,`${copy.getBoundingClientRect().height} vs ${h}`);
+});
+await test('table CSV decodes nested HTML entities exactly once',()=>{
+  const rows=[['&amp;lt;b&amp;gt;','&amp;amp;'],['&lt;script&gt;literal&lt;/script&gt;','&#65; &#x1F600; &quot; &apos;']];
+  const input=D.tableInput({kind:'table',headerRow:false,rows});
+  equal(CSV.parseRows(input.text),[['&lt;b&gt;','&amp;'],['<script>literal<\/script>','A 😀 " \u0027']]);
+});
+await test('table CSV uses real HTML parsing and preserves unchanged rich cells',()=>{
+  const content={kind:'table',headerRow:false,rows:[['<b title="a > b">Name</b>','one<br>two'],['<i>1</i>','&amp;lt;b&amp;gt;']]};
+  const input=D.tableInput(content);
+  equal(CSV.parseRows(input.text),[['Name','one\ntwo'],['1','&lt;b&gt;']]);
+  const table=CSV.readTable(input.text,{header:false,delimiter:','});
+  equal(D.tableFromData(table,content).rows,content.rows);
+});
+await test('CSV markup stays literal when inserted into table cells',()=>{
+  const values=['<img src=x onerror=alert(1)>','<scr<script>ipt>','&lt;img&gt;','one\ntwo'];
+  const table=CSV.readTable(CSV.rowsToCsv([values]),{header:false,delimiter:','});
+  const content=D.tableFromData(table);
+  const template=document.createElement('template');
+  for (const cell of content.rows[0]) {
+    template.innerHTML=cell;
+    assert([...template.content.querySelectorAll('*')].every(node=>node.tagName==='BR'),'CSV introduced an HTML element');
+  }
+  equal(CSV.parseRows(D.tableInput(content).text),[values]);
+});
+await test('real DOM: editing table CSV preserves unchanged formatting and original source',async()=>{
+  const L=await import('../ui/js/lib.js'), {ChartData}=await import('../ui/js/datachart.js');
+  const content={kind:'table',headerRow:true,rows:[['<b>Name</b>','Value'],['A','<i>1</i>']],fontSize:32};
+  const source={text:'Name,Value\nA,1',header:true,transpose:false,delimiter:',',dialect:'csv',roles:[],edited:false};
+  const el={id:'table-a',w:700,h:400,content,dataSource:source};
+  backend={docId:'table-csv-test',revision:1,path:null,dirty:false,full:true,themeHref:'',deckCss:'',slides:{},outcome:{},
+    deck:{title:'Table test',width:1280,height:720,settings:{},slides:[{id:'s1',elements:[el]}]}};
+  S.openView(structuredClone(backend)); S.openModal('chartData',{target:el.id});
+  const host=document.createElement('div');document.getElementById('fixture').append(host);
+  const waitFor=async(predicate)=>{for(let i=0;i<80;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,20));}throw new Error('Table editor did not settle');};
+  try {
+    L.render(L.html`<${ChartData} target=${el.id} />`,host);
+    const field=host.querySelector('textarea');equal(field.value,'Name,Value\nA,1');
+    field.value='Name,Value\nB,1';field.dispatchEvent(new Event('input',{bubbles:true}));
+    await waitFor(()=>[...host.querySelectorAll('td')].some(cell=>cell.textContent==='B'));
+    const before=calls.length;
+    [...host.querySelectorAll('button')].find(button=>button.textContent.trim()==='Apply data to table').click();
+    await waitFor(()=>calls.slice(before).some(call=>call.name==='doc_apply'));
+    assert(await S.flushEdits());
+    const patch=calls.slice(before).find(call=>call.name==='doc_apply').args.op.updates[0].patch;
+    equal(patch.content.rows,[['<b>Name</b>','Value'],['B','<i>1</i>']]);
+    equal(patch.content.fontSize,32);assert(!Object.hasOwn(patch,'dataSource'));
+    equal(backend.deck.slides[0].elements[0].dataSource,source);
+  } finally {L.render(null,host);host.remove();S.closeModal();}
 });
 } catch(e) { failed++; lines.push(e.stack); }
 document.getElementById('result').textContent=`${passed} passed; ${failed} failed\n`+lines.join('\n');
