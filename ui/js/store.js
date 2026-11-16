@@ -6,7 +6,7 @@
 // `useStore()` and re-render on change.
 
 import { expandGroups } from './groups.js';
-import { useEffect, useReducer } from './lib.js';
+import { useLayoutEffect, useReducer } from './lib.js';
 import { invoke, dialog, events, currentWindow, getAllWindows, FILE_FILTER } from './api.js';
 import { t, setLanguage } from './i18n.js';
 import { clone, fileName, scopeCss } from './util.js';
@@ -51,7 +51,7 @@ export function set(patch) {
 /** Re-renders the calling component whenever the state changes. */
 export function useStore() {
   const [, force] = useReducer((x) => x + 1, 0);
-  useEffect(() => subscribe(force), []);
+  useLayoutEffect(() => subscribe(force), []);
   return state;
 }
 
@@ -390,28 +390,23 @@ export const updateSlides = (ids, patch, coalesce) => apply({ op: 'updateSlides'
 export const updateCurrentSlide = (patch, coalesce) => updateSlides([state.slideId], patch, coalesce);
 export const updateDeck = (patch, coalesce) => apply({ op: 'updateDeck', patch }, { coalesce, navigate: false });
 
-export async function undo() {
-  if (!(await flushEdits())) return;
-  if (!state.doc?.canUndo) return;
-  try {
-    const before = state.doc.deck;
-    if (ingest(await invoke('doc_undo'))) selectChanged(before);
-    historySync?.();
-  } catch (e) {
-    toast(String(e), 'error');
-  }
+export function undo() {
+  return stepHistory('doc_undo', 'canUndo');
 }
 
-export async function redo() {
-  if (!(await flushEdits())) return;
-  if (!state.doc?.canRedo) return;
-  try {
-    const before = state.doc.deck;
-    if (ingest(await invoke('doc_redo'))) selectChanged(before);
-    historySync?.();
-  } catch (e) {
-    toast(String(e), 'error');
-  }
+export function redo() {
+  return stepHistory('doc_redo', 'canRedo');
+}
+
+async function stepHistory(command, available) {
+  const docId = state.doc?.docId;
+  if (!docId || !(await flushEdits()) || state.doc?.docId !== docId || !state.doc[available]) return;
+  // History operations share the same identity guard and serialization as edits.
+  const before = state.doc.deck;
+  const out = await enqueue(command, {}, { docId });
+  if (!out || state.doc?.docId !== docId) return;
+  selectChanged(before);
+  historySync?.();
 }
 
 /**
@@ -427,7 +422,7 @@ function selectChanged(before) {
   if (ids.length) set({ selection: ids });
 }
 
-export const seal = () => state.doc && invoke('doc_seal').catch(() => {});
+export const seal = () => state.doc && invoke('doc_seal', { docId: state.doc.docId }).catch(() => {});
 
 // ---------------------------------------------------------------------------
 // Navigation & selection
@@ -682,6 +677,7 @@ export async function boot() {
   const st = await invoke('doc_state');
   if (st.view) loadView(st.view);
   set({ ready: true });
+  if (st.imported) openModal('pptxImportReport', { issues: state.doc?.deck.importIssues || [] });
   if (st.pendingOpen) {
     set({ busy: t('Opening…') });
     try {

@@ -1,0 +1,5 @@
+.pptx-preview { display: block; width: 100%; max-height: 340px; object-fit: contain; background: var(--canvas); border: 1px solid var(--border); border-radius: 8px; margin-block: 12px; }
+.pptx-error { color: var(--danger); overflow-wrap: anywhere; }
+.conversion-issues { max-height: 320px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 13px; }
+.conversion-issues ul { margin: 10px 0; padding-inline-start: 20px; }
+.conversion-issues li { margin-block: 10px; }

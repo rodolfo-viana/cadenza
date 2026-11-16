@@ -105,6 +105,7 @@
     else document.getElementById('cz-theme').removeAttribute('href');
     document.getElementById('cz-deck-css').textContent = data.deckCss;
     var waits = [];
+    if (mode === 'print') waits.push(loadScript('js/print-media.js'));
     if (data.needs.code) {
       waits.push(addStylesheet('vendor/reveal/plugin/highlight/' + data.codeTheme + '.css'));
       waits.push(loadScript('vendor/reveal/plugin/highlight.js'));
@@ -147,7 +148,11 @@
     }
 
     return Promise.all(waits).then(function () {
-      return window.CadenzaRuntime.start(cfg, { notes: false, camera: mode === 'show' });
+      var layout = mode === 'print' ? window.CadenzaPrint.layoutReady(Reveal) : Promise.resolve();
+      var starting = Promise.resolve().then(function () {
+        return window.CadenzaRuntime.start(cfg, { notes: false, camera: mode === 'show' });
+      });
+      return Promise.all([starting, layout]);
     }).then(function () {
       var loading = document.getElementById('cz-loading');
       if (loading) loading.remove();
@@ -157,7 +162,7 @@
   }
 
   function bootShow() {
-    tauri.core.invoke('present_data').then(function (data) {
+    tauri.core.invoke('present_data', { docId: params.get('docId') || null }).then(function (data) {
       var h = parseInt(params.get('h') || '0', 10) || 0;
       var v = parseInt(params.get('v') || '0', 10) || 0;
       return loadLanguage(data.language).then(function () { return boot(data, { h: h, v: v }); });
@@ -197,12 +202,12 @@
   function bootPrint() {
     var size = null;
     var title = '';
-    tauri.core.invoke('present_data').then(function (data) {
+    tauri.core.invoke('present_data', { docId: params.get('docId') || null }).then(function (data) {
       size = { width: data.width, height: data.height };
       title = data.title;
       return loadLanguage(data.language).then(function () { return boot(data); });
     }).then(function () {
-      return Promise.all([stillVideos(), stillEmbeds()]);
+      return window.CadenzaPrint.prepareMedia();
     }).then(function () {
       var bar = document.createElement('div');
       bar.className = 'cz-print-bar';
@@ -228,87 +233,13 @@
         document.getElementById('cz-pdf').onclick = function () { savePdf(size, title); };
         return;
       }
-      var printed = false;
-      var go = function () {
-        if (printed) return;
-        printed = true;
-        setTimeout(print, 400);
-      };
-      Reveal.on('pdf-ready', go);
-      setTimeout(go, 2500);
+      // Pagination and media are ready before either automatic or manual print.
+      setTimeout(print, 400);
+    }).catch(function (e) {
+      var loading = document.getElementById('cz-loading');
+      if (loading) loading.textContent = t('Could not prepare the slides for printing.');
+      tauri.core.invoke('ui_log', { level: 'error', message: String(e) }).catch(function () {});
     });
-  }
-
-  /**
-   * Printouts don't show video frames (they came out black): each video
-   * becomes a picture of its first frame. Waits at most a few seconds.
-   */
-  function stillVideos() {
-    var videos = [].slice.call(document.querySelectorAll('.reveal video'));
-    return Promise.all(videos.map(function (v) {
-      return new Promise(function (resolve) {
-        var finish = function () {
-          clearTimeout(timer);
-          resolve();
-        };
-        var timer = setTimeout(finish, 5000);
-        var draw = function () {
-          try {
-            var c = document.createElement('canvas');
-            c.width = v.videoWidth;
-            c.height = v.videoHeight;
-            c.getContext('2d').drawImage(v, 0, 0);
-            var cs = getComputedStyle(v);
-            ['position', 'top', 'left', 'width', 'height', 'object-fit', 'object-position', 'max-width', 'max-height'].forEach(function (p) {
-              c.style.setProperty(p, cs.getPropertyValue(p));
-            });
-            c.className = v.className;
-            v.pause();
-            v.replaceWith(c);
-          } catch (e) {
-            /* keep the video */
-          }
-          finish();
-        };
-        v.muted = true;
-        v.addEventListener('seeked', draw, { once: true });
-        v.addEventListener('error', finish, { once: true });
-        var seek = function () { v.currentTime = Math.min(0.1, (v.duration || 1) / 2); };
-        if (v.readyState >= 1) seek();
-        else {
-          v.addEventListener('loadedmetadata', seek, { once: true });
-          v.preload = 'auto';
-          if (!v.getAttribute('src') && v.dataset.src) v.src = v.dataset.src;
-          v.load();
-        }
-      });
-    }));
-  }
-
-  /** YouTube players print empty: they show the video's picture instead. */
-  function stillEmbeds() {
-    var frames = [].slice.call(document.querySelectorAll('.reveal .cz-video-box iframe'));
-    return Promise.all(frames.map(function (f) {
-      var m = /youtube\.com\/embed\/(?:\?v=)?([\w-]{6,})/.exec(f.getAttribute('data-src') || f.getAttribute('src') || '');
-      if (!m) return null;
-      return new Promise(function (resolve) {
-        var img = new Image();
-        var timer = setTimeout(resolve, 5000);
-        img.alt = '';
-        img.style.cssText = 'display:block;width:100%;height:100%;object-fit:cover';
-        img.onload = function () {
-          clearTimeout(timer);
-          resolve();
-        };
-        img.onerror = function () {
-          img.remove();
-          clearTimeout(timer);
-          resolve();
-        };
-        img.src = 'https://img.youtube.com/vi/' + m[1] + '/hqdefault.jpg';
-        f.replaceWith(img);
-      });
-    }));
   }
 
   /** Asks where to save, then writes the PDF (Windows). */

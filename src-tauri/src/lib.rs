@@ -6,6 +6,7 @@
 //! webview and talks to it through the commands defined here.
 
 pub mod browse;
+pub mod capture;
 pub mod chart;
 pub mod clipboard;
 pub mod custom_theme;
@@ -25,6 +26,8 @@ pub mod media;
 pub mod model;
 pub mod ops;
 pub mod package;
+pub mod pptx;
+pub mod pptx_import;
 pub mod render;
 pub mod sanitize;
 pub mod secrets;
@@ -76,6 +79,7 @@ pub struct AppState {
     /// Media of the latest copy, shared by every window.
     clipboard: clipboard::Store,
     updates: updates::Updates,
+    exports: pptx::Exports,
 }
 
 /// What a new editor window opens once its page has loaded.
@@ -83,6 +87,8 @@ enum Pending {
     File(PathBuf),
     /// A presentation with unsaved changes, from its recovery snapshot.
     Session(String),
+    /// A converted presentation whose assets are already in its own session.
+    Imported(Box<Document>),
 }
 
 impl AppState {
@@ -416,6 +422,7 @@ fn doc_state(window: Window, state: State<AppState>) -> CmdResult<Value> {
     match state.pending_open.lock().map_err(err)?.remove(window.label()) {
         Some(Pending::File(path)) => return Ok(json!({ "pendingOpen": path })),
         Some(Pending::Session(id)) => return Ok(json!({ "pendingRecover": id })),
+        Some(Pending::Imported(doc)) => return Ok(json!({ "view": install_doc(&state, window.label(), *doc)?, "imported": true })),
         None => {}
     }
     let mut docs = state.docs.lock().map_err(err)?;
@@ -449,16 +456,22 @@ fn doc_apply(window: Window, state: State<AppState>, op: Op, coalesce: Option<St
 }
 
 #[tauri::command]
-fn doc_undo(window: Window, state: State<AppState>) -> CmdResult<DocView> {
+fn doc_undo(window: Window, state: State<AppState>, doc_id: Option<String>) -> CmdResult<DocView> {
     state.with_doc(window.label(), |doc| {
+        if let Some(id) = doc_id {
+            doc.ensure_id(&id)?;
+        }
         let out = doc.undo();
         Ok(doc.view(false, out))
     })
 }
 
 #[tauri::command]
-fn doc_redo(window: Window, state: State<AppState>) -> CmdResult<DocView> {
+fn doc_redo(window: Window, state: State<AppState>, doc_id: Option<String>) -> CmdResult<DocView> {
     state.with_doc(window.label(), |doc| {
+        if let Some(id) = doc_id {
+            doc.ensure_id(&id)?;
+        }
         let out = doc.redo();
         Ok(doc.view(false, out))
     })
@@ -466,8 +479,11 @@ fn doc_redo(window: Window, state: State<AppState>) -> CmdResult<DocView> {
 
 /// Ends the current coalescing group (e.g. when a text box loses focus).
 #[tauri::command]
-fn doc_seal(window: Window, state: State<AppState>) -> CmdResult<()> {
+fn doc_seal(window: Window, state: State<AppState>, doc_id: Option<String>) -> CmdResult<()> {
     state.with_doc(window.label(), |doc| {
+        if let Some(id) = doc_id {
+            doc.ensure_id(&id)?;
+        }
         doc.history.seal();
         Ok(())
     })
@@ -665,10 +681,13 @@ async fn asset_import_clipboard_image(window: Window, state: State<'_, AppState>
 
 /// Imports a Markdown file, either replacing the deck or appending slides.
 #[tauri::command]
-async fn import_markdown(window: Window, state: State<'_, AppState>, path: String, replace: bool) -> CmdResult<DocView> {
+async fn import_markdown(window: Window, state: State<'_, AppState>, path: String, replace: bool, doc_id: Option<String>) -> CmdResult<DocView> {
     let text = std::fs::read_to_string(&path).map_err(err)?;
     let base = Path::new(&path).parent().map(Path::to_path_buf).unwrap_or_default();
     state.with_doc(window.label(), |doc| {
+        if let Some(id) = doc_id {
+            doc.ensure_id(&id)?;
+        }
         let parsed = markdown::parse(&text);
         if parsed.is_empty() {
             anyhow::bail!("The Markdown file has no content");
@@ -1023,14 +1042,29 @@ async fn media_import(window: Window, state: State<'_, AppState>, url: String, d
 // ---------------------------------------------------------------------------
 
 fn ui_reader(app: &AppHandle) -> impl Fn(&str) -> Option<Vec<u8>> + '_ {
-    move |path: &str| app.asset_resolver().get(path.to_string()).map(|a| a.bytes)
+    let resolver = app.asset_resolver();
+    let paths = resolver.iter().map(|(key, _)| key.into_owned()).collect::<Vec<_>>();
+    exact_ui_reader(paths, move |path| resolver.get(path.to_string()).map(|a| a.bytes))
+}
+
+/// AssetResolver serves index.html for unknown routes. Export reads files,
+/// not browser routes, and must preserve missing optional font fallbacks.
+fn exact_ui_reader(paths: impl IntoIterator<Item = String>, read: impl Fn(&str) -> Option<Vec<u8>>) -> impl Fn(&str) -> Option<Vec<u8>> {
+    let paths: std::collections::HashSet<_> = paths.into_iter().collect();
+    move |path| {
+        let key = tauri::utils::assets::AssetKey::from(path);
+        if paths.contains(key.as_ref()) { read(path) } else { None }
+    }
 }
 
 #[tauri::command]
-async fn export_html(app: AppHandle, window: Window, state: State<'_, AppState>, path: String, single: bool) -> CmdResult<String> {
+async fn export_html(app: AppHandle, window: Window, state: State<'_, AppState>, path: String, single: bool, doc_id: Option<String>) -> CmdResult<String> {
     let (deck, assets) = {
         let docs = state.docs.lock().map_err(err)?;
         let doc = docs.get(window.label()).ok_or("No presentation is open")?;
+        if let Some(id) = doc_id {
+            doc.ensure_id(&id).map_err(err)?;
+        }
         (doc.deck.clone(), doc.assets_dir())
     };
     let target = PathBuf::from(&path);
@@ -1054,10 +1088,23 @@ async fn export_html(app: AppHandle, window: Window, state: State<'_, AppState>,
 /// the calling page's IPC handler, and on Windows building a WebView2 window
 /// there deadlocks the whole app (see `WebviewWindowBuilder::new`).
 #[tauri::command]
-async fn export_pdf(app: AppHandle, window: Window) -> CmdResult<()> {
+async fn export_pdf(app: AppHandle, window: Window, state: State<'_, AppState>, doc_id: Option<String>) -> CmdResult<()> {
+    // Capture identity even for older callers, before closing an existing print
+    // window yields. The new print page checks it again when requesting data.
+    let expected = state.with_doc(window.label(), |doc| {
+        if let Some(id) = &doc_id {
+            doc.ensure_id(id)?;
+        }
+        Ok(doc.id.clone())
+    })?;
     let label = format!("print-{}", window.label());
     close_and_wait(&app, &[&label]).await;
-    let url = format!("present.html?doc={}&print-pdf", util::encode_uri_component(window.label()));
+    state.with_doc_id(window.label(), &expected, |_| Ok(()))?;
+    let url = format!(
+        "present.html?doc={}&docId={}&print-pdf",
+        util::encode_uri_component(window.label()),
+        util::encode_uri_component(&expected)
+    );
     let builder = sized(window_builder(&app, &label, WebviewUrl::App(url.into())), &app, (1100.0, 800.0));
     #[cfg(windows)]
     let builder = builder.initialization_script_for_all_frames(include_str!("../../ui/js/print-frames.js"));
@@ -1222,7 +1269,7 @@ struct PresentData {
 
 /// Everything a presentation window needs to start reveal.js.
 #[tauri::command]
-fn present_data(window: Window, state: State<AppState>) -> CmdResult<PresentData> {
+fn present_data(window: Window, state: State<AppState>, doc_id: Option<String>) -> CmdResult<PresentData> {
     let owner = owner_label(window.label()).to_string();
     let (language, teleprompter) = {
         let s = state.settings.lock().map_err(err)?;
@@ -1230,6 +1277,9 @@ fn present_data(window: Window, state: State<AppState>) -> CmdResult<PresentData
     };
     let docs = state.docs.lock().map_err(err)?;
     let doc = docs.get(&owner).ok_or("The presentation is no longer open")?;
+    if let Some(id) = doc_id {
+        doc.ensure_id(&id).map_err(err)?;
+    }
     let deck = &doc.deck;
     let assets = doc.assets_dir();
     let url = move |name: &str| document::file_url(&assets.join(name));
@@ -1585,11 +1635,17 @@ fn open_editor(app: &AppHandle, pending: Option<Pending>) -> tauri::Result<()> {
     {
         map.insert(label.clone(), p);
     }
-    sized(window_builder(app, &label, WebviewUrl::App("index.html".into())), app, (1440.0, 900.0))
+    let opened = sized(window_builder(app, &label, WebviewUrl::App("index.html".into())), app, (1440.0, 900.0))
         .title("Cadenza")
         .min_inner_size(900.0, 560.0)
         .center()
-        .build()?;
+        .build();
+    if let Err(error) = opened {
+        if let Some(Pending::Imported(doc)) = state.pending_open.lock().ok().and_then(|mut pending| pending.remove(&label)) {
+            doc.dispose();
+        }
+        return Err(error);
+    }
     Ok(())
 }
 
@@ -1812,6 +1868,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                 browsers: Mutex::new(HashMap::new()),
                 clipboard: clipboard::Store::new(cache.join("clipboard")),
                 updates: updates::Updates::default(),
+                exports: pptx::Exports::default(),
             });
             fonts::warm_up();
             // Credential cleanup has its own completion marker and retries on
@@ -1854,6 +1911,7 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             if let WindowEvent::Destroyed = event {
                 let label = window.label().to_string();
                 let app = window.app_handle();
+                app.state::<AppState>().exports.window_closed(app, &label);
                 if label.starts_with("editor-") {
                     close_presentation(app, &label);
                     if let Some(w) = app.get_webview_window(&format!("print-{label}")) {
@@ -1861,6 +1919,9 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
                     }
                     stop_browser(app, &label);
                     let state = app.state::<AppState>();
+                    if let Some(Pending::Imported(doc)) = state.pending_open.lock().ok().and_then(|mut pending| pending.remove(&label)) {
+                        doc.dispose();
+                    }
                     let doc = state.docs.lock().ok().and_then(|mut d| d.remove(&label));
                     // Closed for an update: the session reopens after the restart.
                     if let Some(doc) = doc
@@ -1925,6 +1986,14 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
             import_markdown,
             export_html,
             export_pdf,
+            pptx::import_pptx,
+            pptx::pptx_begin_export,
+            pptx::pptx_export_asset,
+            pptx::pptx_capture,
+            pptx::pptx_capture_data,
+            pptx::pptx_capture_ready,
+            pptx::pptx_end_export,
+            pptx::pptx_save,
             print_slides,
             print_to_pdf,
             present_data,
@@ -1952,6 +2021,50 @@ fn run_editor(context: tauri::Context<tauri::Wry>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exports_use_exact_bundled_files_without_spa_fallbacks() {
+        use base64::Engine;
+        use tauri::utils::assets::AssetKey;
+        let context: tauri::Context<tauri::Wry> = tauri::generate_context!();
+        let assets = context.assets();
+        // Model the native resolver's SPA fallback, using the actual bundle.
+        let read = exact_ui_reader(assets.iter().map(|(key, _)| key.into_owned()), |path| {
+            assets
+                .get(&AssetKey::from(path))
+                .or_else(|| assets.get(&AssetKey::from("index.html")))
+                .map(|b| b.into_owned())
+        });
+        for path in ["js/runtime.js", "vendor/katex/fonts/KaTeX_Main-Regular.woff2"] {
+            assert!(read(path).is_some());
+            assert_eq!(read(path), read(&format!("/{path}")));
+        }
+        for path in ["missing.js", "vendor/katex/fonts/missing.woff2", "../ui/index.html"] {
+            assert!(read(path).is_none(), "{path} must not resolve to index.html");
+        }
+        let mut deck = layouts::starter_deck("cadenza-midnight", 1280, 720);
+        deck.slides[0].elements.push(model::Element {
+            content: model::Content::Math(model::MathContent::default()),
+            ..Default::default()
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let site = dir.path().join("site");
+        let single = dir.path().join("single.html");
+        export::export_folder(&deck, dir.path(), &site, &read).unwrap();
+        export::export_single(&deck, dir.path(), &single, &read).unwrap();
+        let html = std::fs::read_to_string(single).unwrap();
+        let fonts = site.join("lib/vendor/katex/fonts");
+        let files: Vec<_> = std::fs::read_dir(fonts).unwrap().map(Result::unwrap).collect();
+        assert_eq!(files.len(), 20, "only the twenty bundled WOFF2 files should travel");
+        for file in files {
+            let bytes = std::fs::read(file.path()).unwrap();
+            assert_eq!(&bytes[..4], b"wOF2");
+            let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+            assert!(html.contains(&format!("data:font/woff2;base64,{encoded}")));
+        }
+        assert!(!html.contains("data:font/woff;base64,") && !html.contains("data:font/ttf;base64,"));
+        assert!(read("vendor/katex/fonts/KaTeX_Main-Regular.woff").is_none());
+    }
 
     #[cfg(target_os = "linux")]
     #[test]

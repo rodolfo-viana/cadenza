@@ -25,7 +25,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev poppler-utils python3-gi gir1.2-webkit2-4.1 xvfb
 
       # Pinned to v1 (on the action's master branch), which takes the
       # toolchain as an input; @stable would pick it from the ref instead.
@@ -58,11 +58,60 @@ jobs:
         run: node tools/check_js.cjs
 
       - name: UI tests
-        run: node --experimental-vm-modules tools/test_ui.cjs
+        run: >-
+          node --experimental-vm-modules --test
+          tools/test_ui.cjs tools/test_data_source.cjs
+          tools/test_diagram_visual.cjs tools/test_diagram_edits.cjs
+          tools/test_math_edits.cjs tools/test_print_media.cjs tools/test_pptx_actions.cjs
 
-      - name: Browser editing tests
-        run: python3 tools/test_browser.py --browser google-chrome
+      - name: Browser regression tests
+        run: |
+          for page in test_editing.html test_diagrams.html test_math_editor.html test_transition_preview.html test_pptx_capture.html; do
+            python3 tools/test_browser.py --browser google-chrome --page "$page"
+          done
+
+      - name: PDF rendering regression
+        run: |
+          cargo run --manifest-path src-tauri/Cargo.toml --locked --example print_fixture > "$RUNNER_TEMP/print-data.json"
+          node tools/test_print.cjs "$RUNNER_TEMP/print-data.json" "$RUNNER_TEMP/cadenza-print-results" google-chrome
+
+      - name: PowerPoint export regression
+        run: |
+          cargo run --manifest-path src-tauri/Cargo.toml --locked --example pptx_fixture > "$RUNNER_TEMP/pptx-snapshot.json"
+          node tools/test_pptx_export.cjs "$RUNNER_TEMP/pptx-snapshot.json" "$RUNNER_TEMP/cadenza-pptx-results" google-chrome
+
+      - name: PowerPoint WebKitGTK measurement regression
+        run: /usr/bin/python3 tools/test_pptx_webkit.py "$RUNNER_TEMP/pptx-snapshot.json"
+
+      - name: Translation extraction tests
+        run: python3 tools/test_i18n.py
 
       # Strings not translated yet show in English, so they don't fail it.
       - name: Translations
         run: python3 tools/i18n.py check --allow-missing
+
+  windows:
+    # Compile and exercise cfg(windows) code on PRs, not only release tags.
+    # This does not replace testing the running WebView2 application.
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - uses: swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: src-tauri
+
+      - name: Windows Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Windows Rust tests
+        working-directory: src-tauri
+        run: cargo test --lib --locked

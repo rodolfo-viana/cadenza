@@ -44,6 +44,9 @@ src-tauri/        Rust app (Tauri 2)
   src/ops.rs        every editing operation, validated and applied in Rust
   src/document.rs   an open document: undo history, assets, recovery, saving
   src/render.rs     slide HTML for the editor, the show and exports
+  src/pptx_import/  bounded OOXML parsing and supported PowerPoint mappings
+  src/pptx.rs       immutable PowerPoint export jobs and native saving
+  src/capture.rs    platform webview capture for export images
   src/lib.rs        Tauri commands, windows, presenting
   src/…             charts, maps, shapes, themes, Markdown import, export, fonts,
                     media library, secrets, settings, updates
@@ -53,7 +56,8 @@ ui/               the interface: HTML, CSS and JavaScript modules (no build step
   js/               Preact + htm components, one module per area
   css/              app.css (interface), content.css (slide content)
   locales/          translation catalogs
-  vendor/           third-party libraries (reveal.js, KaTeX, Mermaid, …)
+  vendor/           pinned third-party libraries and licenses (reveal.js, KaTeX,
+                    Mermaid, MathLive, PptxGenJS, …)
 tools/            maintenance scripts (icons, themes, fonts, translations, checks)
 ```
 
@@ -90,6 +94,12 @@ A few principles keep Cadenza predictable. Please follow them:
   actually exported. A typo there would otherwise only show up as a blank window.
 - Run `node --experimental-vm-modules tools/test_ui.cjs` for the document, editing and clipboard
   regression tests. They use the real UI modules with stubbed DOM and Tauri boundaries.
+- Add feature tests beside it: data source parsing, diagram transactions, equation drafts and
+  print preparation have their own `tools/test_*.cjs` suites. Keep asynchronous tests target-bound:
+  exercise cancellation, a changed document, Undo/Redo and rejected writes, not only the happy path.
+- Browser harnesses in `tools/test_*.html` exercise the bundled libraries, DOM and controls.
+  Run them with `python3 tools/test_browser.py --page <filename>`; `--browser` selects a Chromium
+  executable. Use synthetic fixtures and a fresh profile, never a personal browser session.
 
 **CSS**
 - Use the color tokens defined at the top of `app.css` so both light and dark modes work.
@@ -113,7 +123,8 @@ t('line height::Line')                     // "context::" separates identical En
 
 Keep whole sentences in one call; never build a sentence from translated pieces, because word order
 differs between languages. Strings shown by Rust (errors, undo labels, layout and shape names) are
-collected too; an undo label not written straight into `outcome("…")` is marked with `n_("…")`.
+collected recursively from `src-tauri/src`; an undo label not written straight into `outcome("…")`
+is marked with `n_("…")`.
 
 After changing interface text, run from the repository root:
 
@@ -148,14 +159,63 @@ into every language, but please say so in the description. To add a language, ad
 - Before opening it, check that these pass:
 
   ```sh
-  cd src-tauri && cargo fmt --check && cargo clippy --all-targets && cargo test --lib && cd ..
+  cargo fmt --manifest-path src-tauri/Cargo.toml --check
+  cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+  cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
   node tools/check_js.cjs
-  node --experimental-vm-modules tools/test_ui.cjs
-  python3 tools/i18n.py check
+  node --experimental-vm-modules --test tools/test_ui.cjs tools/test_data_source.cjs \
+    tools/test_diagram_visual.cjs tools/test_diagram_edits.cjs \
+    tools/test_math_edits.cjs tools/test_print_media.cjs tools/test_pptx_actions.cjs
+  python3 tools/test_browser.py --page test_editing.html
+  python3 tools/test_browser.py --page test_diagrams.html
+  python3 tools/test_browser.py --page test_math_editor.html
+  python3 tools/test_browser.py --page test_transition_preview.html
+  python3 tools/test_browser.py --page test_pptx_capture.html
+  python3 tools/test_i18n.py
+  python3 tools/i18n.py check --allow-missing
   ```
 
-  GitHub Actions runs them on every push to main and every pull request (`.github/workflows/checks.yml`),
-  where any Clippy warning fails.
+  GitHub Actions runs these on every push to main and every pull request
+  (`.github/workflows/checks.yml`), where any Clippy warning fails. A separate Windows job runs
+  Clippy and the Rust tests so `cfg(windows)` code is checked before a release.
+
+Changes to image/video rendering or export also need the real PDF regression. Install Chromium,
+Node 22 or newer and Poppler (`poppler-utils` on Debian/Ubuntu), then run:
+
+```sh
+cargo run --manifest-path src-tauri/Cargo.toml --locked --example print_fixture > /tmp/print-data.json
+node tools/test_print.cjs /tmp/print-data.json /tmp/cadenza-print-results
+```
+
+This checks decoded video, intermediate-page crops and the pixels of the resulting PDF. Its
+artifacts are described in [the fixture guide](tools/fixtures/README.md). Headless Chromium tests
+and Windows compilation do not substitute for running the app in WebKitGTK/WebView2: review
+native exports, font loading, keyboard/clipboard behavior, DPI and cancellation on both platforms
+when those paths change. PowerPoint conversion expectations are documented in
+[Interoperability](docs/interoperability.md).
+
+PowerPoint export has a separate browser/OOXML regression using the same prerequisites:
+
+```sh
+cargo run --manifest-path src-tauri/Cargo.toml --locked --example pptx_fixture > /tmp/pptx-snapshot.json
+node tools/test_pptx_export.cjs /tmp/pptx-snapshot.json /tmp/cadenza-pptx-results
+```
+
+This checks the real mapper and generated package, using a contract fixture for capture. It
+does not validate native screenshots. The output includes `export.pptx` and `results.json`;
+open the presentation in PowerPoint or LibreOffice when changing a supported mapping. The
+import corpus includes a file generated by LibreOffice, documented in
+[the PowerPoint fixture guide](tools/fixtures/pptx/README.md).
+
+On Linux, also exercise measurement in WebKitGTK's `tauri://` context. Install `python3-gi`,
+`gir1.2-webkit2-4.1` and `xvfb`, then run:
+
+```sh
+/usr/bin/python3 tools/test_pptx_webkit.py /tmp/pptx-snapshot.json
+```
+
+The harness opens an ephemeral Xvfb display and checks real stylesheet measurement, cancellation,
+missing stylesheets and cleanup. It does not use your desktop display or browser profile.
 
 ## Releases
 

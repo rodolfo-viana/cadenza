@@ -33,10 +33,11 @@ function appMenu() {
     cmd('file.saveAs'),
     '-',
     cmd('file.importMd'),
+    cmd('file.importPptx'),
     {
       label: t('Export'),
       icon: 'share',
-      children: [cmd('file.exportFolder'), cmd('file.exportSingle'), cmd('file.exportPdf')],
+      children: [cmd('file.exportFolder'), cmd('file.exportSingle'), cmd('file.exportPdf'), cmd('file.exportPptx')],
     },
     '-',
     cmd('app.palette'),
@@ -219,7 +220,10 @@ export function Toolbar() {
       <${ToolButton} icon="type" label=${t('Text')} caret onClick=${menu(textMenu)} />
       <${ToolButton} icon="shapes" label=${t('Shape')} caret onClick=${(e) => showShapePicker(e.currentTarget)} />
       <${ToolButton} icon="image" label=${t('Media')} caret onClick=${menu(mediaMenu)} />
-      <${ToolButton} icon="table" label=${t('Table')} onClick=${() => A.insert('table')} />
+      <${ToolButton} icon="table" label=${t('Table')} caret onClick=${menu(() => [
+        { label: t('Blank table'), icon: 'table', run: () => A.insert('table') },
+        { label: t('From Data…'), icon: 'file-spreadsheet', run: () => openModal('chartData', { kind: 'table' }) },
+      ])} />
       <${ToolButton} icon="chart-column" label=${t('Chart')} caret onClick=${menu(chartMenu)} />
       <${ToolButton} icon="code" label=${t('Code')} onClick=${() => A.insert('code')} />
       <${ToolButton} icon="sigma" label=${t('Equation')} onClick=${() => A.insert('math')} />

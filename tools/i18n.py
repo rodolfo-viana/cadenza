@@ -59,9 +59,9 @@ def rust_unescape(s: str) -> str:
 def collect() -> list[dict]:
     keys: dict[str, dict] = {}
 
-    def add(key, where, one=None):
+    def add(key, where, one=None, explicit=False):
         # Skip blanks; from Rust also sentinel codes (NEEDS_KEY) and identifiers.
-        if not key.strip() or (where.endswith(".rs") and re.fullmatch(r"[A-Z0-9_]+|[a-z0-9_.-]+", key)):
+        if not key.strip() or (not explicit and where.endswith(".rs") and re.fullmatch(r"[A-Z0-9_]+|[a-z0-9_.-]+", key)):
             return
         k = keys.setdefault(key, {"key": key, "files": []})
         if one is not None:
@@ -82,7 +82,9 @@ def collect() -> list[dict]:
         for m in HTML.finditer(f.read_text()):
             add(m.group(1), f.name)
     # Static chart and shape names are tuples ("id", "Name").
-    for f in sorted((ROOT / "src-tauri/src").glob("*.rs")):
+    rust_root = ROOT / "src-tauri/src"
+    for f in sorted(rust_root.rglob("*.rs")):
+        where = f.relative_to(rust_root).as_posix()
         src = f.read_text()
         src = src.split("#[cfg(test)]")[0]
         for pat in RS_PATTERNS:
@@ -90,10 +92,10 @@ def collect() -> list[dict]:
                 s = rust_unescape(m.group(1))
                 # format!() arguments ({}, {:?}, {0}) are not keys; {name} placeholders are.
                 if not re.search(r"\{\}|\{[:\d]|\{\{", s) and (("{" not in s) or "tr(" in m.group(0)):
-                    add(s, f.name)
+                    add(s, where, explicit=m.group(0).startswith('n_('))
         if f.name in ("chart.rs", "shapes.rs"):
             for m in re.finditer(r'\(\s*"[a-z0-9-]+"\s*,\s*"([A-Z][^"]*)"\s*\)', src):
-                add(m.group(1), f.name)
+                add(m.group(1), where)
     return sorted(keys.values(), key=lambda k: k["key"].lower())
 
 

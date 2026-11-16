@@ -1,0 +1,144 @@
+<!doctype html><html><head><meta charset="utf-8"><title>PPTX export regression</title></head><body>
+<script type="module">
+import { buildPptx, pictureGeometry } from '../ui/js/pptx-export.js';
+import { color, measureSnapshot, textRuns, bounded } from '../ui/js/pptx-layout.js';
+window.run = async function () {
+  const snapshot = await fetch('/snapshot.json').then(r=>r.json());
+  const png = await fetch('/tools/fixtures/print-crop.png').then(r=>r.blob()).then(blob=>new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.readAsDataURL(blob);}));
+  let assertions=0;
+  const ok=(value,message)=>{if(!value)throw new Error(message);assertions++;};
+  const equal=(a,b,message)=>ok(JSON.stringify(a)===JSON.stringify(b),`${message}: ${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`);
+  const rejects=async(fn,pattern)=>{try{await fn();throw new Error('Expected rejection');}catch(error){ok(pattern.test(String(error)),`Unexpected rejection: ${error}`);}};
+  const calls=[],assets=[],progress=[];
+  const bg=document.createElement('canvas');bg.width=1280;bg.height=720;const brush=bg.getContext('2d');brush.fillStyle='#141426';brush.fillRect(0,0,bg.width,bg.height);
+  const capture=async(id,options={})=>{calls.push([id,options]);
+    if(options.background)return {data:bg.toDataURL(),x:0,y:0,w:1280,h:720};
+    if(options.elementId==='equation')return {data:png,x:370,y:480,w:190,h:150};
+    return {data:png,x:13,y:17,w:400,h:300};};
+  const asset=async name=>{assets.push(name);if(name!=='print-crop.png')throw new Error('Unpinned asset');return png;};
+  const before=document.querySelectorAll('iframe').length;
+  const frozen=JSON.stringify(snapshot);
+  const result=await buildPptx(snapshot,{capture,asset,onProgress:p=>progress.push(p)});
+  equal(JSON.stringify(snapshot),frozen,'Export never mutates the document snapshot');
+  equal(document.querySelectorAll('iframe').length,before,'Measuring frame is disposed');
+  equal(assets,['print-crop.png'],'Only pinned local assets are read');
+  equal(calls,[['editable',{background:true}],['editable',{elementId:'equation'}],['fallback',{background:true}],['fallback',{elementId:'unsupported-shape'}],['fallback',{elementId:'diagram'}],['fallback',{elementId:'remote-image'}],['round-charts',{background:true}]],'Semantic subset and raster boundary');
+  ok(result.bytes instanceof ArrayBuffer && result.bytes.byteLength>5000,'Binary PPTX is returned');
+  const issueCodes=result.issues.map(i=>i.code);
+  ok(issueCodes.includes('PPTX_DIAGRAM_STALE'),'Stale Mermaid cache is reported');
+  ok(issueCodes.includes('PPTX_CAMERA_OMITTED'),'Camera omission is reported without activating it');
+  ok(result.issues.filter(i=>i.code==='PPTX_RASTERIZED').length===4,'Every rasterized object is reported');
+  equal(progress.at(-1),{phase:'writing',completed:3,total:3},'Hidden slide excluded from progress');
+  const zip=await JSZip.loadAsync(result.bytes);
+  const xml=async path=>new DOMParser().parseFromString(await zip.file(path).async('string'),'application/xml');
+  const names=(doc,tag)=>[...doc.getElementsByTagName(tag)];
+  const slide1=await xml('ppt/slides/slide1.xml'),slide2=await xml('ppt/slides/slide2.xml');
+  for(const [i,doc] of [slide1,slide2].entries()){
+    const relationships=await xml(`ppt/slides/_rels/slide${i+1}.xml.rels`);
+    const ids=new Set(names(relationships,'Relationship').map(n=>n.getAttribute('Id')));
+    for(const link of names(doc,'a:hlinkClick'))ok(ids.has(link.getAttribute('r:id')),'Every hyperlink has an actual relationship');
+    for(const paragraph of names(doc,'a:p')){
+      const properties=[...paragraph.children].filter(n=>n.localName==='pPr');
+      ok(properties.length<=1 && (!properties.length||paragraph.firstElementChild===properties[0]),'One paragraph-property node precedes all text runs');
+    }
+  }
+  for(const name of Object.keys(zip.files).filter(n=>n.endsWith('.xml')||n.endsWith('.rels'))){const doc=await xml(name);ok(!doc.querySelector('parsererror'),`Well-formed XML: ${name}`);}
+  const presentation=await xml('ppt/presentation.xml');
+  equal(names(presentation,'p:sldId').length,3,'Exactly the visible slides are exported');
+  const size=names(presentation,'p:sldSz')[0];equal([size.getAttribute('cx'),size.getAttribute('cy')],['12192000','6858000'],'96 CSS px map to one inch');
+  ok(names(slide1,'a:t').some(n=>n.textContent==='Editable '),'Text remains native and searchable');
+  ok(names(slide1,'a:rPr').some(n=>n.getAttribute('b')==='1'),'Bold rich run remains editable');
+  ok(names(slide1,'a:rPr').some(n=>n.getAttribute('i')==='1'),'Italic rich run remains editable');
+  ok(names(slide1,'a:rPr').some(n=>n.getAttribute('u')==='sng'),'Underline survives');
+  equal(names(slide1,'a:tbl').length,1,'Table is an editable DrawingML table');
+  equal(names(slide1,'a:tr').length,3,'Table does not create extra slides');
+  equal(names(slide1,'c:chart').length,1,'Chart is native');
+  ok(names(slide1,'a:prstGeom').some(n=>n.getAttribute('prst')==='rect'),'Basic shape remains native');
+  ok((await zip.file('ppt/slides/_rels/slide1.xml.rels').async('string')).includes('https://example.com'),'Safe hyperlink relationship survives');
+  ok((await zip.file('ppt/notesSlides/notesSlide1.xml').async('string')).includes('Notes survive export: ç, α, 日本語.'),'Unicode notes survive');
+  const chart=await xml('ppt/charts/chart1.xml');
+  const values=names(chart,'c:numCache')[0];
+  equal(names(values,'c:v').map(n=>n.textContent),['0','','8'],'Chart zero and missing values remain distinct');
+  const workbookName=Object.keys(zip.files).find(n=>n.startsWith('ppt/embeddings/')&&n.endsWith('.xlsx'));
+  ok(workbookName,'Editable chart includes its workbook');
+  const workbook=await JSZip.loadAsync(await zip.file(workbookName).async('uint8array'));
+  const worksheet=new DOMParser().parseFromString(await workbook.file('xl/worksheets/sheet1.xml').async('string'),'application/xml');
+  const cells=names(worksheet,'c');
+  equal(cells.find(n=>n.getAttribute('r')==='B2')?.textContent,'0','Workbook preserves numeric zero');
+  equal(cells.find(n=>n.getAttribute('r')==='B3')?.textContent||'','','Workbook preserves missing value');
+  const pics=names(slide1,'p:pic');
+  const crop=names(pics.find(p=>names(p,'p:cNvPr')[0]?.getAttribute('name')==='picture'),'a:srcRect')[0];
+  equal([crop.getAttribute('l'),crop.getAttribute('r'),crop.getAttribute('t'),crop.getAttribute('b')],['0','50000','0','0'],'Selected image region is a native crop');
+  const fallback=names(slide2,'p:pic').find(p=>names(p,'p:cNvPr')[0]?.getAttribute('name')==='unsupported-shape');
+  const transform=names(fallback,'a:xfrm')[0];
+  ok(!transform.hasAttribute('rot'),'Raster fallback does not double-apply baked rotation');
+  equal([names(transform,'a:off')[0].getAttribute('x'),names(transform,'a:off')[0].getAttribute('y')],['123825','161925'],'Fallback uses actual capture bounds');
+  const rich=names(slide2,'p:sp').find(p=>names(p,'p:cNvPr')[0]?.getAttribute('name')==='rich-text');
+  equal(names(rich,'a:pPr').filter(n=>names(n,'a:buChar').length).length,2,'One bullet per list item even across rich runs');
+  ok(names(rich,'a:rPr').every(n=>names(n,'a:alpha')[0]?.getAttribute('val')==='50000'),'Opacity applies to every editable rich-text run');
+  ok(names(rich,'a:rPr').some(n=>n.getAttribute('sz')==='2700'),'Rich text contentScale maps to point sizes');
+  ok(names(rich,'a:rPr').some(n=>Number(n.getAttribute('baseline'))<0),'Subscript remains editable');
+  ok(names(rich,'a:rPr').some(n=>Number(n.getAttribute('baseline'))>0),'Superscript remains editable');
+  ok((await zip.file('ppt/slides/_rels/slide2.xml.rels').async('string')).includes('Target="slide1.xml"'),'Internal slide action remains a link');
+
+  // Boundary failures cannot silently emit a partial or stale file.
+  const abort=new AbortController();abort.abort();
+  await rejects(()=>buildPptx(snapshot,{capture,asset,signal:abort.signal}),/Abort/);
+  await rejects(()=>buildPptx({...snapshot,width:0},{capture,asset}),/Invalid/);
+  const skipped=structuredClone(snapshot);skipped.deck.slides.forEach(s=>s.hidden=true);
+  await rejects(()=>buildPptx(skipped,{capture,asset}),/nothing to export/);
+  await rejects(()=>buildPptx(snapshot,{capture:async()=>{throw new Error('Capture failed');},asset}),/Capture failed/);
+  equal(document.querySelectorAll('iframe').length,before,'Capture failure disposes measuring frame');
+  await rejects(()=>buildPptx(snapshot,{capture:async()=>({data:'not PNG'}),asset}),/invalid background/);
+  await rejects(()=>buildPptx({...snapshot,slides:[]},{capture,asset}),/rendered slide is missing/);
+  const cancelDuring=new AbortController();
+  await rejects(()=>buildPptx(snapshot,{capture:async()=>{cancelDuring.abort();return {data:png};},asset,signal:cancelDuring.signal}),/Abort/);
+  equal(document.querySelectorAll('iframe').length,before,'Mid-export cancellation disposes measuring frame');
+  const blocked=new AbortController();
+  await rejects(()=>buildPptx(snapshot,{capture:()=>{setTimeout(()=>blocked.abort(),10);return new Promise(()=>{});},asset,signal:blocked.signal}),/Abort/);
+  equal(document.querySelectorAll('iframe').length,before,'Cancellation interrupts a stalled native capture');
+  const css=structuredClone(snapshot);css.deck.customCss='.cz-el{filter:grayscale(1)}';calls.length=0;
+  const flattened=await buildPptx(css,{capture,asset});
+  equal(calls,[['editable',{}],['fallback',{}],['round-charts',{}]],'Custom CSS uses full-slide native captures');
+  ok(flattened.issues.filter(i=>i.code==='PPTX_RASTERIZED').length===3,'Full-slide fallback reports loss of editability');
+  const shadowed=structuredClone(snapshot);shadowed.deck.slides[0].elements.find(e=>e.id==='shape').content.text.style.shadow='soft';
+  shadowed.deck.slides[0].elements[0].group={id:'group-test'};calls.length=0;
+  const shadowResult=await buildPptx(shadowed,{capture,asset});
+  ok(calls.some(([id,options])=>id==='editable'&&options.elementId==='shape'),'A shape with a text shadow retains its appearance via capture');
+  ok(shadowResult.issues.some(i=>i.code==='PPTX_GROUPS_FLATTENED'),'Editing group loss is reported');
+  await rejects(()=>bounded(new Promise(()=>{}),null,1),/finish loading/);
+  equal(color('rgba(20, 40, 60, 0.5)'),{color:'14283C',transparency:50},'Resolved color alpha is preserved');
+  const image=snapshot.deck.slides[0].elements.find(e=>e.id==='picture');
+  ok(pictureGeometry({...image,content:{...image.content,crop:{x:-1,y:0,w:.5,h:1}}})===null,'Invalid crop cannot create broken geometry');
+  const contain=pictureGeometry({...image,w:400,h:400,content:{...image.content,fit:'contain',flipX:false}});
+  equal(Math.round(contain.sizing.w*96),267,'Contain preserves selected-region aspect');
+  const frame=await measureSnapshot(snapshot);
+  try {
+    const round=await frame.slide(snapshot.slides.find(s=>s.id==='round-charts'));
+    for(const [i,id] of ['pie','donut'].entries()){
+      const chartNode=[...round.root.querySelectorAll('.cz-el')].find(n=>n.dataset.czId===id);
+      const expected=[...chartNode.querySelectorAll('.cz-chart-svg path[style],.cz-chart-svg circle[style]')].map(n=>color(round.style(n).fill).color);
+      const doc=await xml(`ppt/charts/chart${i+2}.xml`);
+      const colors=names(doc,'c:dPt').map(n=>names(n,'a:srgbClr')[0]?.getAttribute('val'));
+      equal(colors,expected,`${id}: native slice colors exactly match computed renderer colors`);
+      equal(new Set(colors).size,expected.length,`${id}: categories keep distinct colors, including palette variations after six`);
+      ok(names(doc,'c:legend').length===1&&names(doc,'c:varyColors')[0]?.getAttribute('val')==='1',`${id}: legend keys use category colors`);
+      const chartStyle=[...doc.documentElement.children].find(n=>n.localName==='spPr');
+      ok(names(names(chartStyle,'a:ln')[0],'a:noFill').length===1,`${id}: export does not add a chart-area border`);
+      if(id==='donut')equal(names(doc,'c:holeSize')[0]?.getAttribute('val'),'58','Native donut preserves hole ratio');
+    }
+    const read=await frame.slide(snapshot.slides[0]),node=read.root.querySelector('.cz-text:not(.cz-el)');
+    const runs=textRuns(node,read.style,2);equal(runs.runs[0].options.fontSize,48,'Content scale multiplies px-to-pt text size');
+    const original=node.style.cssText;
+    for(const [property,value] of [['textShadow','2px 2px 2px black'],['filter','blur(2px)'],['textDecoration','underline double'],['textIndent','20px'],['fontVariantCaps','small-caps']]){
+      node.style[property]=value;ok(textRuns(node,read.style)===null,`Computed ${property} without a faithful native equivalent uses fallback`);node.style.cssText=original;
+    }
+    const bold=node.querySelector('strong');bold.style.backgroundColor='red';ok(textRuns(node,read.style)===null,'Inline background highlighting is preserved via fallback');bold.style.backgroundColor='';
+    bold.style.letterSpacing='2px';const spaced=textRuns(node,read.style,2);equal(spaced.runs.find(r=>r.text==='bold').options.charSpacing,3,'Per-run letter spacing is mapped in points');bold.style.letterSpacing='';
+    node.style.textTransform='uppercase';ok(textRuns(node,read.style).runs.some(r=>r.text==='EDITABLE '),'Computed text transformation is mapped');node.style.cssText=original;
+  }
+  finally{frame.dispose();}
+  const bytes=new Uint8Array(result.bytes);let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
+  return {assertions,issues:result.issues,bytes:btoa(binary)};
+};
+</script></body></html>

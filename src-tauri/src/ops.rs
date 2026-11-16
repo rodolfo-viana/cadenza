@@ -13,6 +13,10 @@ use crate::sanitize;
 pub use crate::sanitize::element as sanitize_element;
 use crate::util::new_id;
 
+#[cfg(test)]
+#[path = "data_source_tests.rs"]
+mod data_source_tests;
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Op {
@@ -237,6 +241,57 @@ fn patched<T: serde::Serialize + serde::de::DeserializeOwned>(item: &T, patch: &
     Ok(serde_json::from_value(v)?)
 }
 
+/// Only data edits separate current content from its historical input.
+/// Colors, markers, axes, table formatting and object geometry do not.
+fn data_changed(before: &Content, after: &Content) -> bool {
+    match (before, after) {
+        (Content::Table(a), Content::Table(b)) => {
+            a.rows != b.rows && {
+                let mut plain = ammonia::Builder::default();
+                // Inline formatting does not change cell data. Keep line breaks.
+                plain.tags(["br"].into_iter().collect()).generic_attributes(Default::default());
+                let values = |rows: &[Vec<String>]| {
+                    rows.iter()
+                        .map(|row| row.iter().map(|s| plain.clean(s).to_string()).collect::<Vec<_>>())
+                        .collect::<Vec<_>>()
+                };
+                values(&a.rows) != values(&b.rows)
+            }
+        }
+        (Content::Chart(a), Content::Chart(b)) => {
+            a.labels != b.labels
+                || a.links != b.links
+                || a.error_bars != b.error_bars
+                || a.series.len() != b.series.len()
+                || a.series
+                    .iter()
+                    .zip(&b.series)
+                    .any(|(a, b)| a.name != b.name || a.values != b.values || a.low != b.low || a.high != b.high)
+        }
+        _ => false,
+    }
+}
+
+fn validate_data_source(el: &mut Element) -> anyhow::Result<()> {
+    let Some(source) = &mut el.data_source else { return Ok(()) };
+    anyhow::ensure!(
+        matches!(el.content, Content::Chart(_) | Content::Table(_)),
+        "Data sources belong to charts or tables"
+    );
+    anyhow::ensure!(source.text.len() <= 20 * 1024 * 1024, "Data file is too large (maximum 20 MB)");
+    anyhow::ensure!(matches!(source.delimiter.as_str(), "," | ";" | "\t"), "Invalid data separator");
+    anyhow::ensure!(matches!(source.dialect.as_str(), "csv" | "pgfplots"), "Invalid data format");
+    anyhow::ensure!(
+        source
+            .roles
+            .iter()
+            .all(|r| matches!(r.as_str(), "label" | "value" | "pm" | "minus" | "plus" | "low" | "high" | "group" | "ignore")),
+        "Invalid data column role"
+    );
+    source.name = source.name.rsplit(['/', '\\']).next().unwrap_or_default().into();
+    Ok(())
+}
+
 fn find_slide<'a>(deck: &'a mut Deck, id: &str) -> anyhow::Result<&'a mut Slide> {
     deck.slide_mut(id).ok_or_else(|| anyhow::anyhow!("slide not found"))
 }
@@ -299,7 +354,23 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
         }
         Op::ReplaceText { changes, all } => {
             let slide = changes.first().map(|change| change.slide.clone());
+            let tables: Vec<_> = changes
+                .iter()
+                .filter_map(|change| {
+                    let el = deck.slide(&change.slide)?.element(change.element.as_deref()?)?;
+                    el.data_source.as_ref().filter(|_| matches!(el.content, Content::Table(_)))?;
+                    Some((change.slide.clone(), el.id.clone(), el.content.clone()))
+                })
+                .collect();
             crate::textchange::apply(deck, changes)?;
+            for (sid, eid, before) in tables {
+                if let Some(el) = deck.slide_mut(&sid).and_then(|s| s.element_mut(&eid))
+                    && data_changed(&before, &el.content)
+                    && let Some(source) = &mut el.data_source
+                {
+                    source.edited = true;
+                }
+            }
             Ok(outcome(if all { n_("Replace All") } else { n_("Replace Text") }, slide, vec![]))
         }
         Op::AddSlide { after, layout } => {
@@ -362,6 +433,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                 for el in &mut s.elements {
                     el.id = new_id("e");
                     sanitize_element(el);
+                    validate_data_source(el)?;
                 }
                 created.push(s.id.clone());
                 deck.slides.insert(start + offset, s);
@@ -386,6 +458,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                 el = patched(&el, &strip(&p, &["id", "link"]))?;
             }
             sanitize_element(&mut el);
+            validate_data_source(&mut el)?;
             let id = el.id.clone();
             let s = find_slide(deck, &slide)?;
             s.elements.push(el);
@@ -416,6 +489,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                 el.x += offset;
                 el.y += offset;
                 sanitize_element(&mut el);
+                validate_data_source(&mut el)?;
                 created.push(el.id.clone());
                 s.elements.push(el);
             }
@@ -466,6 +540,13 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
                     crate::groups::validate_geometry(&updated)?;
                 }
                 sanitize_element(&mut updated);
+                if patch.get("dataSource").is_none()
+                    && data_changed(&el.content, &updated.content)
+                    && let Some(source) = &mut updated.data_source
+                {
+                    source.edited = true;
+                }
+                validate_data_source(&mut updated)?;
                 *el = updated;
             }
             crate::groups::reconcile(s, &before);
@@ -622,6 +703,7 @@ fn apply_inner(deck: &mut Deck, op: Op) -> anyhow::Result<OpOutcome> {
             for slide in &mut deck.slides {
                 for el in &mut slide.elements {
                     sanitize_element(el);
+                    validate_data_source(el)?;
                 }
             }
             // Imports start at the first slide; labelled replacements

@@ -128,7 +128,7 @@ export function isTyping(target) {
   if (!el || el === document.body) return false;
   if (el.isContentEditable) return true;
   const tag = el.tagName;
-  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'MATH-FIELD') return true;
   if (tag === 'INPUT') return !['checkbox', 'radio', 'range', 'button', 'color'].includes(el.type);
   return false;
 }

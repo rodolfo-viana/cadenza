@@ -15,6 +15,7 @@ import threading
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--browser", help="Path to Chromium or Google Chrome")
+    parser.add_argument("--page", default="test_editing.html", help="Test HTML filename in tools/")
     args = parser.parse_args()
     browser = args.browser or next(
         (path for name in ("chromium", "google-chrome", "chromium-browser") if (path := shutil.which(name))), None
@@ -22,6 +23,8 @@ def main() -> None:
     if not browser:
         parser.error("Chromium or Google Chrome is required; use --browser to select it")
     root = pathlib.Path(__file__).resolve().parent.parent
+    if pathlib.Path(args.page).name != args.page or not (root / "tools" / args.page).is_file():
+        parser.error("--page must name an existing HTML file in tools/")
 
     class QuietHandler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *args: object) -> None:
@@ -40,7 +43,7 @@ def main() -> None:
             result = subprocess.run(
                 [browser, "--headless", "--no-sandbox", "--disable-gpu", f"--user-data-dir={profile}",
                  "--virtual-time-budget=8000", "--dump-dom",
-                 f"http://127.0.0.1:{server.server_port}/tools/test_editing.html"],
+                 f"http://127.0.0.1:{server.server_port}/tools/{args.page}"],
                 capture_output=True, text=True, timeout=45, check=False,
             )
             report = re.search(r'<pre id="result">(.*?)</pre>', result.stdout, re.S)

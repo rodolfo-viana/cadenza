@@ -443,6 +443,7 @@ dependencies = [
  "mime_guess",
  "png",
  "pulldown-cmark",
+ "roxmltree",
  "serde",
  "serde_json",
  "sha2 0.11.1",

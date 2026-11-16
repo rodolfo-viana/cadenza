@@ -66,6 +66,7 @@ export function Welcome() {
       <div class="welcome-actions">
         <button type="button" class="btn btn-primary btn-lg" onClick=${() => create()}><${Icon} name="file-plus" size=${18} />${t('New Presentation')}</button>
         <button type="button" class="btn btn-lg" onClick=${openDialog}><${Icon} name="folder-open" size=${18} />${t('Open…')}</button>
+        <button type="button" class="btn btn-lg" onClick=${() => import('./pptx-actions.js').then((m) => m.importPowerPoint())}><${Icon} name="file-down" size=${18} />${t('Import PowerPoint…')}</button>
       </div>
       ${info.recoverable?.length > 0 &&
       html`<div class="recover">

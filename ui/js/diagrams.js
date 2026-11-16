@@ -65,6 +65,37 @@ function normalizeSvg(svg) {
   }
   el.style.removeProperty('max-width');
   if (!el.getAttribute('xmlns')) el.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  // Mermaid's SVG text renderer leaves escaped labels as visible HTML
+  // entities (e.g. &#34;). Decode text once, never SVG markup: a literal
+  // <script> label must remain text, and an escaped #34; must remain #34;.
+  for (const text of el.querySelectorAll('text')) {
+    const walker = doc.createTreeWalker(text, 4); // NodeFilter.SHOW_TEXT
+    const nodes = [];
+    let source = '';
+    while (walker.nextNode()) {
+      const node = walker.currentNode, start = source.length;
+      source += node.nodeValue;
+      nodes.push({ node, start, end: source.length });
+    }
+    // A wrapped entity can span multiple tspans. Walk matches backwards to
+    // retain both the original offsets and Mermaid's line/style geometry.
+    let index = nodes.length - 1;
+    const matches = [...source.matchAll(/&#(\d+);|&(quot|apos|amp|lt|gt);/g)];
+    for (const match of matches.reverse()) {
+      const [, code, name] = match, n = Number(code);
+      if (!name && !(n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff))) continue;
+      const decoded = name ? { quot: '"', apos: "'", amp: '&', lt: '<', gt: '>' }[name] : String.fromCodePoint(n);
+      const start = match.index, end = start + match[0].length;
+      while (index >= 0 && nodes[index].start >= end) index--;
+      let i = index;
+      for (; i >= 0 && nodes[i].end > start; i--) {
+        const part = nodes[i], value = part.node.nodeValue;
+        part.node.nodeValue = value.slice(0, Math.max(0, start - part.start)) +
+          (start >= part.start ? decoded : '') + value.slice(Math.min(part.end, end) - part.start);
+      }
+      index = i + 1;
+    }
+  }
   return new XMLSerializer().serializeToString(el);
 }
 
@@ -112,8 +143,21 @@ export function svgAspect(svg) {
   return m ? Number(m[1]) / Number(m[2]) : null;
 }
 
+/** The inputs a cached SVG represents, independent of its light/dark display mode. */
+export function diagramInputs(content) {
+  return { source: content?.source || '', style: content?.style || 'classic', look: content?.look || 'classic' };
+}
+
+export function sameDiagramInputs(a, b) {
+  return !!a && !!b && a.source === b.source && a.style === b.style && a.look === b.look;
+}
+
+export function diagramPreviewCurrent(content) {
+  return !!content?.svgLight && !!content?.svgDark && sameDiagramInputs(content.renderedFor, diagramInputs(content));
+}
+
 const pending = new Set();
-const failed = new Map(); // element id → source that failed to render
+const failed = new Map(); // document/element → inputs that failed to render
 
 /**
  * Renders diagrams that have no stored SVG yet (new diagrams, imported
@@ -135,9 +179,11 @@ async function renderMissing() {
   for (const slide of deck.slides) {
     for (const el of slide.elements) {
       const c = el.content;
-      if (c.kind !== 'diagram' || !c.source.trim() || (c.svgLight && c.svgDark) || pending.has(el.id)) continue;
-      if (failed.get(el.id) === c.source) continue;
-      pending.add(el.id);
+      const key = JSON.stringify([docId, el.id]);
+      const inputs = diagramInputs(c);
+      if (c.kind !== 'diagram' || !c.source.trim() || diagramPreviewCurrent(c) || pending.has(key)) continue;
+      if (sameDiagramInputs(failed.get(key), inputs)) continue;
+      pending.add(key);
       try {
         const svgs = await renderDiagram(c.source, c.style, c.look);
         // Stored only if the diagram still has what was drawn: it may have
@@ -145,16 +191,16 @@ async function renderMissing() {
         await apply(
           () => {
             const now = state.doc?.deck.slides.find((s) => s.id === slide.id)?.elements.find((e) => e.id === el.id)?.content;
-            const same = now?.kind === 'diagram' && now.source === c.source && now.style === c.style && now.look === c.look;
-            return same ? { op: 'updateElements', slide: slide.id, updates: [{ id: el.id, patch: { content: svgs } }] } : null;
+            const same = now?.kind === 'diagram' && sameDiagramInputs(diagramInputs(now), inputs);
+            return same ? { op: 'updateElements', slide: slide.id, updates: [{ id: el.id, patch: { content: { ...svgs, renderedFor: inputs } } }] } : null;
           },
           { docId, track: false, navigate: false },
         );
       } catch (e) {
-        failed.set(el.id, c.source);
+        failed.set(key, inputs);
         console.warn('diagram render failed', e);
       } finally {
-        pending.delete(el.id);
+        pending.delete(key);
       }
     }
   }

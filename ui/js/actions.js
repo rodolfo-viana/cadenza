@@ -335,6 +335,13 @@ let copying = 0;
 
 /** Handles the DOM `copy`/`cut` events outside text fields. */
 export function onCopy(e, cut = false) {
+  if (!state.doc || !(state.focus === 'slides' ? state.selectedSlides : state.selection).length) return;
+  e.preventDefault();
+  return copySelection(cut);
+}
+
+/** Copies the selected objects/slides through the native clipboard, independent of DOM focus. */
+export function copySelection(cut = false) {
   const slides = state.focus === 'slides';
   let ids = [...(slides ? state.selectedSlides : state.selection)];
   if (!state.doc || !ids.length) return;
@@ -342,7 +349,6 @@ export function onCopy(e, cut = false) {
   const slide = state.slideId;
   // The backend snapshots and writes the clipboard under one lock shared by
   // all windows. Never cut until that complete operation succeeds.
-  e.preventDefault();
   copying++;
   const copy = async () => {
     try {
@@ -452,8 +458,10 @@ async function pasteData(files, text, target, docId) {
 // ---------------------------------------------------------------------------
 
 export async function importMarkdown() {
+  const docId = state.doc?.docId;
+  if (!docId) return;
   const path = await dialog.open({ title: t('Import Markdown'), multiple: false, filters: [{ name: t('Markdown'), extensions: ['md', 'markdown', 'txt'] }] });
-  if (!path) return;
+  if (!path || state.doc?.docId !== docId) return;
   const d = deck();
   // Replacing goes without asking only for a new presentation's untouched
   // first slide: empty text boxes, no notes, the theme's background.
@@ -470,12 +478,14 @@ export async function importMarkdown() {
         { value: 'replace', label: t('Replace All') },
       ],
     });
-    if (!choice) return;
+    if (!choice || state.doc?.docId !== docId) return;
     replace = choice === 'replace';
   }
   try {
-    if (!(await flushEdits())) return;
-    ingestView(await invoke('import_markdown', { path, replace }));
+    if (!(await flushEdits()) || state.doc?.docId !== docId) return;
+    const view = await invoke('import_markdown', { path, replace, docId });
+    if (state.doc?.docId !== docId) return;
+    ingestView(view);
     toast(t('Imported {name}', { name: fileName(path) }));
   } catch (e) {
     toast(String(e), 'error');
@@ -487,16 +497,17 @@ function safeTitle() {
 }
 
 export async function exportHtml(single) {
-  if (!state.doc) return;
-  if (!(await flushEdits())) return;
+  const docId = state.doc?.docId;
+  if (!docId || !(await flushEdits()) || state.doc?.docId !== docId) return;
   const path = single
     ? await dialog.save({ title: t('Export as Single HTML File'), defaultPath: `${safeTitle()}.html`, filters: [{ name: t('Web Page'), extensions: ['html'] }] })
     : await dialog.save({ title: t('Export as Website Folder (name a new folder, or pick the index.html of an earlier export)'), defaultPath: safeTitle() });
-  if (!path) return;
+  if (!path || state.doc?.docId !== docId) return;
   try {
     set({ busy: t('Exporting…') });
     await import('./diagrams.js').then((m) => m.ensureDiagrams());
-    const out = await invoke('export_html', { path, single });
+    if (state.doc?.docId !== docId) return;
+    const out = await invoke('export_html', { path, single, docId });
     toast(single ? t('Exported HTML file') : t('Exported website folder'), 'success', {
       action: { label: t('Show in Folder'), run: () => opener.revealItemInDir(out) },
       duration: 7000,
@@ -504,16 +515,17 @@ export async function exportHtml(single) {
   } catch (e) {
     toast(String(e), 'error');
   } finally {
-    set({ busy: null });
+    if (state.doc?.docId === docId) set({ busy: null });
   }
 }
 
 export async function exportPdf() {
-  if (!state.doc) return;
-  if (!(await flushEdits())) return;
+  const docId = state.doc?.docId;
+  if (!docId || !(await flushEdits()) || state.doc?.docId !== docId) return;
   try {
     await import('./diagrams.js').then((m) => m.ensureDiagrams());
-    await invoke('export_pdf');
+    if (state.doc?.docId !== docId) return;
+    await invoke('export_pdf', { docId });
   } catch (e) {
     toast(String(e), 'error');
   }

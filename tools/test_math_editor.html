@@ -1,0 +1,197 @@
+<!doctype html>
+<html data-ui="dark">
+<meta charset="utf-8">
+<title>Cadenza MathLive regression tests</title>
+<link rel="stylesheet" href="../ui/css/app.css">
+<link rel="stylesheet" href="../ui/css/math.css">
+<link rel="stylesheet" href="../ui/vendor/katex/katex.min.css">
+<style>body { overflow: auto; } #fixture { width: 308px; } #result { white-space: pre-wrap; }</style>
+<pre id="result">Running…</pre><div id="fixture"></div>
+<script src="../ui/vendor/katex/katex.min.js"></script>
+<script type="importmap">{"imports":{"../ui/vendor/mathlive/mathlive.min.mjs":"./fixtures/mathlive-delayed.mjs"}}</script>
+<script type="module">
+const calls = [], history = [], future = [], lines = [];
+let backend, failWrite = false, transportGate = null, lastGroup = null, passed = 0, failed = 0;
+const copy = (value) => structuredClone(value);
+window.__TAURI__ = { core: { invoke: async (name, args) => {
+  calls.push({ name, args: copy(args) });
+  if (transportGate) await transportGate;
+  if (failWrite) throw new Error('Deliberate transport failure');
+  if (name === 'doc_apply') {
+    if (args.track !== false) {
+      if (!args.coalesce || args.coalesce !== lastGroup) history.push(copy(backend.deck));
+      future.length = 0; lastGroup = args.coalesce;
+    }
+    for (const update of args.op.updates) {
+      const el = backend.deck.slides.find((s) => s.id === args.op.slide).elements.find((e) => e.id === update.id);
+      Object.assign(el.content, update.patch.content);
+    }
+  } else if (name === 'doc_undo') { future.push(copy(backend.deck)); backend.deck = history.pop(); lastGroup = null; }
+  else if (name === 'doc_redo') { history.push(copy(backend.deck)); backend.deck = future.pop(); lastGroup = null; }
+  else throw new Error('Unexpected native command ' + name);
+  backend.revision++; backend.canUndo = !!history.length; backend.canRedo = !!future.length;
+  return copy(backend);
+} }, window: { getCurrentWindow: () => ({ setTitle: async () => {} }) }, event: {}, dialog: {}, opener: {} };
+function assert(ok, message = 'Assertion failed') { if (!ok) throw new Error(message); }
+function equal(a, b) { assert(JSON.stringify(a) === JSON.stringify(b), `${JSON.stringify(a)} != ${JSON.stringify(b)}`); }
+async function test(name, fn) { try { await fn(); passed++; lines.push('PASS ' + name); } catch (e) { failed++; lines.push('FAIL ' + name + '\n' + e.stack); } }
+const delay = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
+async function waitFor(predicate) { for (let i = 0; i < 80; i++) { if (predicate()) return; await delay(20); } throw new Error('Timed out waiting for UI'); }
+try {
+  const P = await import('../ui/js/math-panel.js'), M = await import('../ui/js/mathlive-editor.js');
+  const S = await import('../ui/js/store.js'), L = await import('../ui/js/lib.js'), U = await import('../ui/js/util.js');
+  const fixture = document.getElementById('fixture');
+  const current = () => S.state.doc.deck.slides[0].elements[0].content;
+  const field = () => fixture.querySelector('math-field');
+  const button = (label) => [...fixture.querySelectorAll('button')].find((b) => b.textContent.trim() === label);
+  const settled = async () => { await delay(); assert(await S.flushEdits(), 'flush failed'); await delay(); };
+  function Panel() { S.useStore(); return L.html`<${P.MathPanel} els=${S.state.doc.deck.slides[0].elements} />`; }
+  async function mount(latex = 'x + 1', count = 1, wait = true) {
+    L.render(null, fixture); await delay(); failWrite = false; transportGate = null;
+    history.length = 0; future.length = 0; calls.length = 0; lastGroup = null;
+    backend = { docId: 'math-test', revision: 1, path: '/test.cadenza', fileName: 'Test', full: true,
+      themeHref: '', deckCss: '', slides: {}, outcome: {}, canUndo: false, canRedo: false,
+      deck: { title: 'Test', width: 1280, height: 720, settings: {}, slides: [{ id: 'slide', elements: Array.from({ length: count }, (_, i) => ({
+        id: 'math-' + i, x: 0, y: 0, w: 400, h: 200, content: { kind: 'math', latex, fontSize: 48, align: 'center', color: '', fit: true },
+      })) }] },
+    };
+    S.openView(copy(backend)); L.render(L.html`<${Panel} />`, fixture);
+    if (count === 1 && wait) await waitFor(() => field()?.shadowRoot && !fixture.textContent.includes('Loading equation editor'));
+    else await delay();
+  }
+
+  await test('a delayed real MathLive module never mounts an editor for a replaced document', async () => {
+    await mount('old', 1, false); await delay(100);
+    assert(!field(), 'the delayed module must still be loading');
+    const replacement = copy(backend); replacement.docId = 'replacement'; replacement.deck.slides[0].elements[0].content.latex = 'new';
+    S.openView(replacement); L.render(null, fixture); L.render(L.html`<${Panel} />`, fixture);
+    await waitFor(() => field()?.shadowRoot); await delay();
+    equal(fixture.querySelectorAll('math-field').length, 1); equal(field().value, 'new'); equal(calls.length, 0);
+  });
+
+  await test('opening and changing modes preserves exact LaTeX without a history entry', async () => {
+    const latex = '  \\frac { a }{ b } + x^{ 2 }  ';
+    await mount(latex); field().focus(); await delay();
+    button('LaTeX').click(); await delay(); equal(fixture.querySelector('textarea').value, latex);
+    button('Visual').click(); await waitFor(() => field()?.shadowRoot); await settled();
+    equal(current().latex, latex); equal(calls.length, 0); equal(history.length, 0);
+  });
+
+  await test('fraction, power, root, sum, integral and matrix buttons insert editable KaTeX-compatible structures', async () => {
+    await mount('');
+    for (const title of ['Fraction', 'Power', 'Square root', 'Sum', 'Integral', 'Matrix']) {
+      const mf = field(); mf.select();
+      fixture.querySelector(`button[title="${title}"]`).click(); await settled();
+      assert(current().latex.length > 0, title + ' was not saved');
+      assert(!current().latex.includes('\\placeholder'), title + ' leaked editor slots');
+      const rendered = window.katex.renderToString(current().latex, { throwOnError: true });
+      assert(rendered.includes('katex'), title);
+      equal(mf.getValue('latex-without-placeholders'), current().latex);
+    }
+    equal(history.length, 6, 'different structure buttons must not share one undo entry');
+  });
+
+  await test('virtual keyboard opens explicitly and cleans up on mode switch', async () => {
+    await mount(); equal(window.mathVirtualKeyboard.visible, false);
+    button('Show math keyboard').click(); await delay(); equal(window.mathVirtualKeyboard.visible, true);
+    assert(window.mathVirtualKeyboard.boundingRect.height > 0, 'keyboard did not lay out');
+    button('LaTeX').click(); await delay(); equal(window.mathVirtualKeyboard.visible, false);
+    equal(calls.length, 0);
+  });
+
+  await test('manual typing is included by immediate Save and reappears visually', async () => {
+    await mount(); button('LaTeX').click(); await delay(5);
+    const textarea = fixture.querySelector('textarea'); textarea.focus(); textarea.value = '\\sqrt{x^2 + y^2}';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    assert(await S.flushEdits()); equal(current().latex, textarea.value);
+    button('Visual').click(); await waitFor(() => field()?.shadowRoot); await delay();
+    equal(field().getValue('latex-without-placeholders'), '\\sqrt{x^2+y^2}');
+  });
+
+  await test('visual input, local undo/redo and document undo/redo keep source synchronized', async () => {
+    await mount('x'); const mf = field(); mf.focus(); mf.position = -1;
+    mf.insert('+1'); await settled(); const edited = current().latex; assert(edited.includes('+1'));
+    mf.executeCommand('undo'); await settled(); equal(current().latex, mf.getValue('latex-without-placeholders'));
+    assert(current().latex !== edited, 'field undo did not change source: ' + JSON.stringify({value: mf.value, canUndo: mf.canUndo(), canRedo: mf.canRedo(), calls}));
+    mf.executeCommand('redo'); await settled(); equal(current().latex, edited);
+    await S.undo(); await delay(); equal(mf.getValue('latex-without-placeholders'), current().latex);
+    await S.redo(); await delay(); equal(mf.getValue('latex-without-placeholders'), current().latex);
+  });
+
+  await test('unsupported LaTeX remains intact and available in the manual editor', async () => {
+    const latex = '\\unknownCadenzaCommand{x} + y';
+    await mount(latex); assert(field().readOnly); assert(fixture.textContent.includes('cannot interpret'));
+    button('LaTeX').click(); await delay(); equal(fixture.querySelector('textarea').value, latex);
+    equal(current().latex, latex); equal(calls.length, 0);
+  });
+
+  await test('failed writes retain the draft across modes and retry on Save', async () => {
+    await mount(); failWrite = true;
+    field().insert('+2', { selectionMode: 'after' }); await delay();
+    assert(fixture.querySelector('.math-editor-error')); const draft = field().getValue('latex-without-placeholders');
+    button('LaTeX').click(); await delay(); equal(fixture.querySelector('textarea').value, draft);
+    equal(await S.flushEdits(), false);
+    failWrite = false; assert(await S.flushEdits()); equal(current().latex, draft);
+  });
+
+  await test('a rejected visual draft remains available after closing and reopening its panel', async () => {
+    await mount(); failWrite = true; field().insert('+8'); await delay();
+    const draft = field().getValue('latex-without-placeholders');
+    L.render(null, fixture); await delay(); L.render(L.html`<${Panel} />`, fixture);
+    await waitFor(() => field()?.shadowRoot); await delay();
+    equal(field().getValue('latex-without-placeholders'), draft);
+    failWrite = false; assert(await S.flushEdits()); equal(current().latex, draft);
+  });
+
+  await test('a late native response cannot replace a different document or its equation field', async () => {
+    await mount('x'); let release; transportGate = new Promise((resolve) => { release = resolve; });
+    const previousField = field();
+    previousField.insert('+1'); await delay();
+    const replacement = copy(backend); replacement.docId = 'next-document'; replacement.deck.slides[0].elements[0].content.latex = 'z';
+    S.openView(replacement); await delay(); release(); await S.flushEdits(); transportGate = null;
+    await waitFor(() => field() !== previousField && field()?.shadowRoot && field().value === 'z');
+    equal(S.state.doc.docId, 'next-document'); equal(current().latex, 'z'); equal(field().value, 'z');
+  });
+
+  await test('IME composition is not saved midway and is committed on composition end', async () => {
+    await mount(); button('LaTeX').click(); await delay(); const textarea = fixture.querySelector('textarea'); textarea.focus();
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    textarea.value = '\\text{ação}'; textarea.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+    equal(await S.flushEdits(), false); equal(calls.length, 0);
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })); await settled();
+    equal(current().latex, '\\text{ação}');
+  });
+
+  await test('MathLive host and retargeted keyboard/clipboard events stay in the text-input scope', async () => {
+    await mount(); const mf = field(); mf.focus(); await waitFor(() => U.isTyping(document.activeElement)); assert(U.isTyping(mf));
+    const seen = [];
+    const handler = (event) => seen.push([event.type, U.isTyping(event.target)]);
+    for (const name of ['keydown', 'copy', 'cut', 'paste']) document.addEventListener(name, handler);
+    mf.shadowRoot.dispatchEvent(new KeyboardEvent('keydown', { key: 'F13', code: 'F13', bubbles: true, composed: true }));
+    for (const name of ['copy', 'cut', 'paste']) mf.shadowRoot.dispatchEvent(new ClipboardEvent(name, { clipboardData: new DataTransfer(), bubbles: true, composed: true }));
+    for (const name of ['keydown', 'copy', 'cut', 'paste']) document.removeEventListener(name, handler);
+    equal(seen, [['keydown', true], ['copy', true], ['cut', true], ['paste', true]]); equal(calls.length, 0);
+  });
+
+  await test('multi-selection keeps shared formatting controls without an equation source editor', async () => {
+    await mount('x', 2); assert(!field()); assert(!fixture.querySelector('textarea'));
+    assert(fixture.textContent.includes('Size')); assert(fixture.textContent.includes('Fit box to equation'));
+    const size = fixture.querySelector('input[type=text]'); size.focus(); size.value = '60';
+    size.dispatchEvent(new Event('input', { bubbles: true })); size.blur(); await settled();
+    equal(S.state.doc.deck.slides[0].elements.map((e) => e.content.fontSize), [60, 60]);
+  });
+
+  await test('MathLive and all requested fonts load locally with optional sound disabled', async () => {
+    await M.loadMathLive(); await document.fonts.ready;
+    equal(window.MathfieldElement.version, '0.111.4'); equal(window.MathfieldElement.soundsDirectory, null);
+    const resources = performance.getEntriesByType('resource').map((entry) => new URL(entry.name));
+    assert(resources.every((url) => url.origin === location.origin), 'an external resource was loaded');
+    assert(resources.some((url) => url.pathname.includes('/vendor/katex/fonts/')));
+    assert(!document.body.classList.contains('ML__fonts-did-not-load'));
+  });
+  L.render(null, fixture);
+} catch (e) { failed++; lines.push(e.stack); }
+document.getElementById('result').textContent = `${passed} passed; ${failed} failed\n` + lines.join('\n');
+document.body.dataset.result = failed ? 'fail' : 'pass';
+</script>
+</html>

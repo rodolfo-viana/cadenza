@@ -167,6 +167,14 @@ pub fn write(path: &Path, deck: &Deck, assets_dir: &Path) -> anyhow::Result<()> 
     if let Some(missing) = MissingMedia::find(deck, assets_dir) {
         return Err(missing.into());
     }
+    // The writer and reader must accept the same size. Check before creating
+    // a temporary package, so Save can never replace a readable file with one
+    // this version cannot reopen (including embedded original CSV data).
+    let json = serde_json::to_vec_pretty(deck)?;
+    anyhow::ensure!(
+        json.len() as u64 <= MAX_DECK_JSON,
+        "Presentation data is too large to save (maximum 64 MB). Reduce large tables or CSV sources."
+    );
     let dir = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
     let file_name = path
         .file_name()
@@ -180,7 +188,7 @@ pub fn write(path: &Path, deck: &Deck, assets_dir: &Path) -> anyhow::Result<()> 
         let store = SimpleFileOptions::default().compression_method(CompressionMethod::Stored).large_file(true);
 
         zip.start_file("deck.json", deflate)?;
-        zip.write_all(serde_json::to_string_pretty(deck)?.as_bytes())?;
+        zip.write_all(&json)?;
 
         zip.start_file("meta.json", deflate)?;
         let meta = serde_json::json!({
@@ -265,6 +273,42 @@ fn asset_names(path: &Path) -> anyhow::Result<Vec<String>> {
 mod tests {
     use super::*;
     use crate::model::*;
+
+    #[test]
+    fn oversized_save_preserves_the_last_readable_file_and_leaves_no_temporary_package() {
+        let dir = tempfile::tempdir().unwrap();
+        let assets = dir.path().join("assets");
+        fs::create_dir_all(&assets).unwrap();
+        let path = dir.path().join("safe.cadenza");
+        let mut deck = crate::layouts::starter_deck("black", 1280, 720);
+        write(&path, &deck, &assets).unwrap();
+        let saved = fs::read(&path).unwrap();
+        // Each individual CSV is below its 20 MiB import limit; their combined
+        // size exceeds the archive reader's cap, even before parsed chart data.
+        for _ in 0..4 {
+            deck.slides[0].elements.push(Element {
+                content: Content::Table(TableContent::default()),
+                data_source: Some(DataSource {
+                    text: "a".repeat(17 * 1024 * 1024),
+                    ..DataSource::default()
+                }),
+                ..Element::default()
+            });
+        }
+        let error = write(&path, &deck, &assets).unwrap_err();
+        assert!(error.to_string().contains("maximum 64 MB"));
+        assert_eq!(fs::read(&path).unwrap(), saved);
+        assert!(read(&path, &dir.path().join("reopened")).is_ok());
+        assert!(
+            !dir.path()
+                .read_dir()
+                .unwrap()
+                .any(|e| e.unwrap().file_name().to_string_lossy().ends_with(".tmp"))
+        );
+        let missing = dir.path().join("not-created.cadenza");
+        assert!(write(&missing, &deck, &assets).is_err());
+        assert!(!missing.exists());
+    }
 
     #[test]
     fn round_trip_with_assets() {

@@ -25,10 +25,12 @@ export const COMMANDS = [
   { id: 'file.save', group: N_('File'), label: N_('Save'), icon: 'save', keys: ['Mod+S'], global: true, when: hasDoc, run: () => S.save() },
   { id: 'file.saveAs', group: N_('File'), label: N_('Save As…'), keys: ['Mod+Shift+S'], global: true, when: hasDoc, run: () => S.save({ as: true }) },
   { id: 'file.close', group: N_('File'), label: N_('Close Presentation'), keys: ['Mod+W'], global: true, when: hasDoc, run: S.closeDocument },
+  { id: 'file.importPptx', group: N_('File'), label: N_('Import PowerPoint…'), icon: 'file-down', run: () => import('./pptx-actions.js').then((m) => m.importPowerPoint()) },
   { id: 'file.importMd', group: N_('File'), label: N_('Import Markdown…'), icon: 'file-down', when: hasDoc, run: A.importMarkdown },
   { id: 'file.exportFolder', group: N_('Export'), label: N_('Export as Website (folder)…'), icon: 'folder-output', when: hasDoc, run: () => A.exportHtml(false) },
   { id: 'file.exportSingle', group: N_('Export'), label: N_('Export as Single HTML File…'), icon: 'file-code-2', when: hasDoc, run: () => A.exportHtml(true) },
   { id: 'file.exportPdf', group: N_('Export'), label: N_('Export as PDF / Print…'), icon: 'file-text', keys: ['Mod+P'], global: true, when: hasDoc, run: A.exportPdf },
+  { id: 'file.exportPptx', group: N_('Export'), label: N_('Export PowerPoint…'), icon: 'file-down', when: hasDoc, run: () => S.openModal('pptxExport') },
 
   // Edit
   { id: 'edit.find', group: N_('Edit'), label: N_('Find and Replace…'), icon: 'search', keys: ['Mod+F', 'Mod+H'], global: true, when: hasDoc,

@@ -20,7 +20,13 @@
  {
   "key": "0 = use the presentation setting",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "A background image could not be loaded for export",
+  "files": [
+   "pptx-capture.js"
   ]
  },
  {
@@ -39,6 +45,18 @@
   "key": "A presentation studio built with Rust and the {engine} engine.",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "A presentation stylesheet could not be loaded.",
+  "files": [
+   "pptx-layout.js"
+  ]
+ },
+ {
+  "key": "A rendered slide is missing from the export snapshot.",
+  "files": [
+   "pptx-export.js"
   ]
  },
  {
@@ -90,9 +108,21 @@
   ]
  },
  {
+  "key": "Add block",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
   "key": "Add column",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Add connection",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -191,8 +221,8 @@
   "key": "Align",
   "files": [
    "canvas.js",
-   "panels.js",
-   "ops.rs"
+   "math-panel.js",
+   "panels.js"
   ]
  },
  {
@@ -318,7 +348,7 @@
  {
   "key": "All at once",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -328,15 +358,51 @@
   ]
  },
  {
+  "key": "All slides are skipped — there is nothing to export.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
   "key": "Already in an earlier row, so left out: {names}",
   "files": [
    "panels.js"
   ]
  },
  {
+  "key": "alternate content",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "Alternative text for accessibility",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "An element is missing from the rendered export snapshot.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "An image could not be loaded for export",
+  "files": [
+   "pptx-capture.js"
+  ]
+ },
+ {
+  "key": "An out-of-bounds image crop was not retained.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "An unresolved cell background was replaced by white. Light text colors were darkened to keep the table readable.",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -362,7 +428,7 @@
  {
   "key": "Animate objects shared with the previous slide",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -392,19 +458,19 @@
  {
   "key": "Appear (fade)",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Appear, then dim",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Appear, then disappear",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -426,6 +492,12 @@
   ]
  },
  {
+  "key": "Apply data to table",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "Apply to All Slides",
   "files": [
    "inspector.js"
@@ -435,6 +507,12 @@
   "key": "Apply to Presentation",
   "files": [
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Applying replaces the stored original CSV and the current data together.",
+  "files": [
+   "datachart.js"
   ]
  },
  {
@@ -454,8 +532,7 @@
   "files": [
    "canvas.js",
    "commands.js",
-   "panels.js",
-   "ops.rs"
+   "panels.js"
   ]
  },
  {
@@ -497,6 +574,12 @@
   ]
  },
  {
+  "key": "Asymmetric text frame insets were approximated using a uniform inset.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "Author",
   "files": [
    "inspector.js",
@@ -506,18 +589,21 @@
  {
   "key": "Auto",
   "files": [
+   "diagram-panel.js",
    "panels.js"
   ]
  },
  {
   "key": "Auto-advance",
   "files": [
+   "animation-panel.js",
    "inspector.js"
   ]
  },
  {
   "key": "Automatic",
   "files": [
+   "datachart.js",
    "themebuilder.js"
   ]
  },
@@ -554,9 +640,27 @@
   ]
  },
  {
+  "key": "background fill",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
   "key": "Background Image",
   "files": [
    "actions.js"
+  ]
+ },
+ {
+  "key": "background image",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "background style",
+  "files": [
+   "pptx_import/mod.rs"
   ]
  },
  {
@@ -611,6 +715,18 @@
   "key": "Blank",
   "files": [
    "layouts.rs"
+  ]
+ },
+ {
+  "key": "Blank table",
+  "files": [
+   "toolbar.js"
+  ]
+ },
+ {
+  "key": "Block",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -688,6 +804,12 @@
   ]
  },
  {
+  "key": "Bottom to top",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
   "key": "Brightness",
   "files": [
    "panels.js"
@@ -744,37 +866,37 @@
  {
   "key": "Build",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Build in",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Build In",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Build Order ({n})",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Build out",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Builds play one click at a time during the presentation. Objects with the same step appear together.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -805,61 +927,67 @@
  {
   "key": "by column",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "By column",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "by item",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "By item",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "by party",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "By party",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "by series",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "By series",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "by slice",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "By slice",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "Cached chart data is editable; unsupported axis, label and theme formatting may differ.",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -929,6 +1057,7 @@
    "crop.js",
    "dialogs.js",
    "formatpainter.js",
+   "pptx-dialog.js",
    "themebuilder.js",
    "updates.js"
   ]
@@ -964,6 +1093,12 @@
   ]
  },
  {
+  "key": "Cannot open PowerPoint presentation",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
   "key": "Cannot save: media is missing on these slides: {slides}. Replace or delete it, then save again.",
   "files": [
    "package.rs"
@@ -996,9 +1131,22 @@
   ]
  },
  {
+  "key": "cell backgrounds",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "Cell text and supported fills remain editable; row heights, column widths and borders use Cadenza's grid formatting.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "Center",
   "files": [
    "inspector.js",
+   "math-panel.js",
    "panels.js",
    "themebuilder.js"
   ]
@@ -1016,36 +1164,6 @@
   ]
  },
  {
-  "key": "Change",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Change Document",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Change Slide",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Change Slide Size",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Change Theme",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
   "key": "Changing the size scales your content to fit. reveal.js scales slides to any screen.",
   "files": [
    "inspector.js"
@@ -1055,6 +1173,7 @@
   "key": "Chart",
   "files": [
    "commands.js",
+   "element-label.js",
    "inspector.js",
    "panels.js",
    "toolbar.js"
@@ -1064,6 +1183,12 @@
   "key": "Chart & Shape Palette",
   "files": [
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "chart appearance",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -1191,7 +1316,8 @@
   "key": "Circle",
   "files": [
    "charts.js",
-   "panels.js"
+   "panels.js",
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -1203,7 +1329,7 @@
  {
   "key": "Classic",
   "files": [
-   "panels.js",
+   "diagram-panel.js",
    "themebuilder.js"
   ]
  },
@@ -1236,7 +1362,7 @@
  {
   "key": "Click on the slide to add points; press Enter or double-click to finish, Esc to cancel. Drag the points to adjust the path.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -1250,6 +1376,7 @@
   "files": [
    "dialogs.js",
    "findreplace.js",
+   "pptx-dialog.js",
    "present.js",
    "ui.js",
    "updates.js"
@@ -1276,6 +1403,7 @@
  {
   "key": "Code",
   "files": [
+   "element-label.js",
    "inspector.js",
    "panels.js",
    "toolbar.js",
@@ -1298,6 +1426,7 @@
   "key": "Color",
   "files": [
    "inspector.js",
+   "math-panel.js",
    "panels.js",
    "themebuilder.js"
   ]
@@ -1311,7 +1440,7 @@
  {
   "key": "Colors",
   "files": [
-   "panels.js",
+   "diagram-panel.js",
    "themebuilder.js"
   ]
  },
@@ -1334,6 +1463,12 @@
   ]
  },
  {
+  "key": "Comma",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "Command Palette…",
   "files": [
    "commands.js"
@@ -1349,6 +1484,18 @@
   "key": "Connected",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "Connection",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
+  "key": "Connections",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -1373,6 +1520,12 @@
   "key": "Contrast",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "conversion report",
+  "files": [
+   "pptx_import/mod.rs"
   ]
  },
  {
@@ -1425,9 +1578,21 @@
   ]
  },
  {
+  "key": "Could not load code colors",
+  "files": [
+   "pptx-capture.js"
+  ]
+ },
+ {
   "key": "Could not load the diagram engine",
   "files": [
    "diagrams.js"
+  ]
+ },
+ {
+  "key": "Could not load the presentation theme",
+  "files": [
+   "pptx-capture.js"
   ]
  },
  {
@@ -1440,6 +1605,12 @@
   "key": "Could not open {name}",
   "files": [
    "store.js"
+  ]
+ },
+ {
+  "key": "Could not prepare the slides for printing.",
+  "files": [
+   "present.js"
   ]
  },
  {
@@ -1464,6 +1635,18 @@
   "key": "Could not save",
   "files": [
    "store.js"
+  ]
+ },
+ {
+  "key": "Could not save the diagram. Your changes are still here; try again.",
+  "files": [
+   "diagram-edit.js"
+  ]
+ },
+ {
+  "key": "Could not save the equation. Your changes are still here; try again.",
+  "files": [
+   "math-editor.js"
   ]
  },
  {
@@ -1497,12 +1680,23 @@
   ]
  },
  {
+  "key": "Creating the PowerPoint file…",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
   "key": "Crop Image",
   "files": [
    "canvas.js",
    "crop.js",
-   "panels.js",
-   "ops.rs"
+   "panels.js"
+  ]
+ },
+ {
+  "key": "CSV data",
+  "files": [
+   "datachart.js"
   ]
  },
  {
@@ -1520,13 +1714,19 @@
  {
   "key": "Cube (convex)",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Current",
   "files": [
    "presenter.html"
+  ]
+ },
+ {
+  "key": "Current data has been edited. The original CSV is preserved.",
+  "files": [
+   "datasource-panel.js"
   ]
  },
  {
@@ -1543,6 +1743,18 @@
   ]
  },
  {
+  "key": "Custom CSS is preserved as a full-slide image; slide content is not editable in PowerPoint.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "custom geometry",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "Customize…",
   "files": [
    "inspector.js"
@@ -1551,15 +1763,38 @@
  {
   "key": "Cut",
   "files": [
-   "canvas.js",
-   "ops.rs"
+   "canvas.js"
+  ]
+ },
+ {
+  "key": "Cycle",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
+  "key": "Cyclic PowerPoint layout relationship",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Cyclic PowerPoint master relationship",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Cyclic PowerPoint theme relationship",
+  "files": [
+   "pptx_import/mod.rs"
   ]
  },
  {
   "key": "Dark",
   "files": [
+   "diagram-panel.js",
    "dialogs.js",
-   "panels.js",
    "themebuilder.js"
   ]
  },
@@ -1585,6 +1820,18 @@
   "key": "Data API key",
   "files": [
    "media.js"
+  ]
+ },
+ {
+  "key": "Data source",
+  "files": [
+   "datasource-panel.js"
+  ]
+ },
+ {
+  "key": "Decision",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -1626,8 +1873,7 @@
  {
   "key": "Delete",
   "files": [
-   "commands.js",
-   "ops.rs"
+   "commands.js"
   ]
  },
  {
@@ -1640,14 +1886,7 @@
   "key": "Delete Slide",
   "files": [
    "commands.js",
-   "navigator.js",
-   "ops.rs"
-  ]
- },
- {
-  "key": "Delete Slides",
-  "files": [
-   "ops.rs"
+   "navigator.js"
   ]
  },
  {
@@ -1660,7 +1899,7 @@
  {
   "key": "Delivery",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -1684,8 +1923,9 @@
  {
   "key": "Diagram",
   "files": [
+   "diagram-panel.js",
+   "element-label.js",
    "inspector.js",
-   "panels.js",
    "toolbar.js"
   ]
  },
@@ -1693,6 +1933,12 @@
   "key": "Diagram (Mermaid)",
   "files": [
    "commands.js"
+  ]
+ },
+ {
+  "key": "Diagram preview",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -1705,7 +1951,13 @@
  {
   "key": "Dim",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "Direction",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -1723,7 +1975,7 @@
  {
   "key": "Dissolve (fade)",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -1880,7 +2132,13 @@
  {
   "key": "Draw Path",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "drawing effects",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -1899,27 +2157,37 @@
   "key": "Duplicate",
   "files": [
    "commands.js",
-   "themebuilder.js",
-   "ops.rs"
+   "themebuilder.js"
   ]
  },
  {
   "key": "Duplicate for Magic Move",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "Duplicate PowerPoint relationship id",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "Duplicate PPTX part",
+  "files": [
+   "pptx_import/archive.rs"
   ]
  },
  {
   "key": "Duplicate Slide",
   "files": [
-   "commands.js",
-   "ops.rs"
+   "commands.js"
   ]
  },
  {
   "key": "Duration",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -1955,7 +2223,7 @@
  {
   "key": "Earlier",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -1967,8 +2235,7 @@
  {
   "key": "Edit",
   "files": [
-   "commands.js",
-   "ops.rs"
+   "commands.js"
   ]
  },
  {
@@ -1982,6 +2249,30 @@
   "files": [
    "canvas.js",
    "panels.js"
+  ]
+ },
+ {
+  "key": "Edit current data as CSV…",
+  "files": [
+   "datasource-panel.js"
+  ]
+ },
+ {
+  "key": "Edit Mermaid source",
+  "files": [
+   "diagram-panel.js"
+  ]
+ },
+ {
+  "key": "Edit original CSV",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "Edit original CSV…",
+  "files": [
+   "datasource-panel.js"
   ]
  },
  {
@@ -2017,13 +2308,7 @@
  {
   "key": "Effect",
   "files": [
-   "inspector.js"
-  ]
- },
- {
-  "key": "element not found",
-  "files": [
-   "ops.rs"
+   "animation-panel.js"
   ]
  },
  {
@@ -2051,9 +2336,33 @@
   ]
  },
  {
+  "key": "embedded object",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "Emphasis",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "Empty PPTX relationship target",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "empty table",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "Encrypted PPTX files are not supported",
+  "files": [
+   "pptx_import/archive.rs"
   ]
  },
  {
@@ -2107,8 +2416,9 @@
  {
   "key": "Equation",
   "files": [
+   "element-label.js",
    "inspector.js",
-   "panels.js",
+   "math-panel.js",
    "toolbar.js"
   ]
  },
@@ -2116,6 +2426,18 @@
   "key": "Equation (LaTeX)",
   "files": [
    "commands.js"
+  ]
+ },
+ {
+  "key": "Equation editor",
+  "files": [
+   "mathlive-editor.js"
+  ]
+ },
+ {
+  "key": "Equation structures",
+  "files": [
+   "mathlive-editor.js"
   ]
  },
  {
@@ -2161,6 +2483,24 @@
   ]
  },
  {
+  "key": "Expanded PowerPoint archive exceeds 256 MB",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "Expanded PowerPoint part is too large",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "Expected a binary presentation",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
   "key": "Export",
   "files": [
    "commands.js",
@@ -2202,6 +2542,25 @@
   "key": "Export as Website Folder (name a new folder, or pick the index.html of an earlier export)",
   "files": [
    "actions.js"
+  ]
+ },
+ {
+  "key": "Export cancelled",
+  "files": [
+   "pptx-layout.js",
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "Export PowerPoint",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
+  "key": "Export PowerPoint…",
+  "files": [
+   "commands.js"
   ]
  },
  {
@@ -2253,38 +2612,57 @@
   ]
  },
  {
+  "key": "External images are not fetched; no embedded image was available.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "external or missing image",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "External PPTX target was not marked external",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
   "key": "Fade down",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Fade from left",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Fade from right",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Fade out",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Fade up",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Fast",
   "files": [
+   "animation-panel.js",
    "inspector.js"
   ]
  },
@@ -2363,13 +2741,13 @@
  {
   "key": "Fit Box to Diagram",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
   "key": "Fit box to equation",
   "files": [
-   "panels.js"
+   "math-panel.js"
   ]
  },
  {
@@ -2464,6 +2842,24 @@
   ]
  },
  {
+  "key": "fonts",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "Fonts are referenced by name. Missing fonts are substituted by the system; embedded PowerPoint font programs are not imported.",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Fonts could not be loaded for export",
+  "files": [
+   "pptx-capture.js"
+  ]
+ },
+ {
   "key": "For a round picture, choose Circle with a square frame.",
   "files": [
    "panels.js"
@@ -2472,7 +2868,7 @@
  {
   "key": "Forest",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
@@ -2507,6 +2903,12 @@
   ]
  },
  {
+  "key": "Fraction",
+  "files": [
+   "mathlive-editor.js"
+  ]
+ },
+ {
   "key": "Frame",
   "files": [
    "inspector.js"
@@ -2535,7 +2937,8 @@
   "files": [
    "chartdata.js",
    "inspector.js",
-   "panels.js"
+   "panels.js",
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -2656,8 +3059,13 @@
  {
   "key": "Group",
   "files": [
-   "commands.js",
-   "ops.rs"
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Group geometry was flattened into editable objects; group membership is not retained.",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -2667,15 +3075,22 @@
   ]
  },
  {
+  "key": "Grouped elements keep their placement, but editing groups are not transferred to PowerPoint.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
   "key": "Groups",
   "files": [
-   "chartdata.js"
+   "chartdata.js",
+   "pptx-export.js"
   ]
  },
  {
   "key": "Grow",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -2809,9 +3224,21 @@
   ]
  },
  {
+  "key": "Hidden slides are not shown in the presentation.",
+  "files": [
+   "transition-preview-panel.js"
+  ]
+ },
+ {
   "key": "Hide Guides",
   "files": [
    "canvas.js"
+  ]
+ },
+ {
+  "key": "Hide math keyboard",
+  "files": [
+   "mathlive-editor.js"
   ]
  },
  {
@@ -2833,6 +3260,12 @@
   ]
  },
  {
+  "key": "Hierarchy",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
   "key": "High",
   "files": [
    "charts.js"
@@ -2847,19 +3280,19 @@
  {
   "key": "Highlight blue",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Highlight green",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Highlight red",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -2884,6 +3317,7 @@
   "key": "Image",
   "files": [
    "actions.js",
+   "element-label.js",
    "inspector.js",
    "media.js",
    "panels.js"
@@ -2908,6 +3342,12 @@
   ]
  },
  {
+  "key": "image crop",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "image fit::Fill",
   "files": [
    "inspector.js",
@@ -2919,6 +3359,12 @@
   "files": [
    "inspector.js",
    "panels.js"
+  ]
+ },
+ {
+  "key": "image format",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -2952,6 +3398,19 @@
   ]
  },
  {
+  "key": "Import PowerPoint",
+  "files": [
+   "pptx-actions.js"
+  ]
+ },
+ {
+  "key": "Import PowerPoint…",
+  "files": [
+   "commands.js",
+   "welcome.js"
+  ]
+ },
+ {
   "key": "Import Theme",
   "files": [
    "themebuilder.js"
@@ -2970,9 +3429,21 @@
   ]
  },
  {
+  "key": "Imported presentation exceeds the 64 MiB native document limit",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
   "key": "Imported {name}",
   "files": [
    "actions.js"
+  ]
+ },
+ {
+  "key": "Importing PowerPoint…",
+  "files": [
+   "pptx-actions.js"
   ]
  },
  {
@@ -3012,76 +3483,26 @@
    "canvas.js",
    "commands.js",
    "inspector.js",
-   "media.js",
-   "ops.rs"
+   "media.js"
   ]
  },
  {
-  "key": "Insert Chart",
+  "key": "Insert as table",
   "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Insert Code",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Insert Diagram",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Insert Equation",
-  "files": [
-   "ops.rs"
+   "datachart.js"
   ]
  },
  {
   "key": "Insert Image",
   "files": [
    "actions.js",
-   "media.js",
-   "ops.rs"
-  ]
- },
- {
-  "key": "Insert Line",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Insert Live Camera",
-  "files": [
-   "ops.rs"
+   "media.js"
   ]
  },
  {
   "key": "Insert Online Video",
   "files": [
    "actions.js"
-  ]
- },
- {
-  "key": "Insert Shape",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Insert Table",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Insert Text",
-  "files": [
-   "ops.rs"
   ]
  },
  {
@@ -3112,20 +3533,19 @@
   "key": "Insert Video",
   "files": [
    "actions.js",
-   "media.js",
-   "ops.rs"
-  ]
- },
- {
-  "key": "Insert Web Page",
-  "files": [
-   "ops.rs"
+   "media.js"
   ]
  },
  {
   "key": "Installing Cadenza {version}…",
   "files": [
    "updates.js"
+  ]
+ },
+ {
+  "key": "Integral",
+  "files": [
+   "mathlive-editor.js"
   ]
  },
  {
@@ -3147,21 +3567,129 @@
   ]
  },
  {
+  "key": "Interpret LaTeX braces (pgfplots)",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "Invalid address",
   "files": [
    "media.rs"
   ]
  },
  {
-  "key": "Invalid diagram",
+  "key": "Invalid chart point count",
   "files": [
-   "panels.js"
+   "pptx_import/charts.rs"
+  ]
+ },
+ {
+  "key": "Invalid chart point index",
+  "files": [
+   "pptx_import/charts.rs"
+  ]
+ },
+ {
+  "key": "Invalid embedded PowerPoint image",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Invalid encoded PPTX target",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "Invalid export image bounds",
+  "files": [
+   "pptx.rs"
   ]
  },
  {
   "key": "Invalid formatting",
   "files": [
    "formatting.rs"
+  ]
+ },
+ {
+  "key": "Invalid or duplicate chart point index",
+  "files": [
+   "pptx_import/charts.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint group geometry",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint layout part",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint master part",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint notes part",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint output",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint relationship",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint relationships",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint slide part",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint slide relationship",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Invalid PowerPoint theme part",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "Invalid PPTX relationship target",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "Invalid presentation snapshot.",
+  "files": [
+   "pptx-export.js"
   ]
  },
  {
@@ -3229,7 +3757,8 @@
  {
   "key": "Label",
   "files": [
-   "panels.js"
+   "panels.js",
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -3260,19 +3789,25 @@
  {
   "key": "Later",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "LaTeX",
+  "files": [
+   "math-panel.js"
   ]
  },
  {
   "key": "LaTeX, e.g. {example}",
   "files": [
-   "panels.js"
+   "math-panel.js"
   ]
  },
  {
   "key": "Learn more",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
@@ -3285,6 +3820,7 @@
   "key": "Left",
   "files": [
    "inspector.js",
+   "math-panel.js",
    "panels.js",
    "themebuilder.js"
   ]
@@ -3299,6 +3835,12 @@
   "key": "Left indent",
   "files": [
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Left to right",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -3329,8 +3871,8 @@
  {
   "key": "Light",
   "files": [
+   "diagram-panel.js",
    "dialogs.js",
-   "panels.js",
    "themebuilder.js"
   ]
  },
@@ -3430,7 +3972,7 @@
   "key": "Live Camera",
   "files": [
    "commands.js",
-   "inspector.js",
+   "element-label.js",
    "panels.js"
   ]
  },
@@ -3438,6 +3980,12 @@
   "key": "Live camera",
   "files": [
    "slideview.js"
+  ]
+ },
+ {
+  "key": "Live camera content is not included in the exported file.",
+  "files": [
+   "pptx-export.js"
   ]
  },
  {
@@ -3453,9 +4001,21 @@
   ]
  },
  {
+  "key": "Loading equation editor…",
+  "files": [
+   "mathlive-editor.js"
+  ]
+ },
+ {
   "key": "Loading system fonts…",
   "files": [
    "controls.js"
+  ]
+ },
+ {
+  "key": "Loading…",
+  "files": [
+   "transition-preview-panel.js"
   ]
  },
  {
@@ -3487,7 +4047,7 @@
  {
   "key": "Look",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
@@ -3548,6 +4108,7 @@
  {
   "key": "Magic Move",
   "files": [
+   "animation-panel.js",
    "inspector.js",
    "navigator.js"
   ]
@@ -3555,7 +4116,7 @@
  {
   "key": "Magic Move (reveal.js auto-animate) smoothly moves and resizes objects that also appear on the previous slide. Tip: duplicate a slide, rearrange it, then turn this on for the copy.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -3570,6 +4131,12 @@
   "files": [
    "commands.js",
    "navigator.js"
+  ]
+ },
+ {
+  "key": "Malformed or unsafe PowerPoint XML",
+  "files": [
+   "pptx_import/archive.rs"
   ]
  },
  {
@@ -3616,6 +4183,12 @@
   ]
  },
  {
+  "key": "Matrix",
+  "files": [
+   "mathlive-editor.js"
+  ]
+ },
+ {
   "key": "Media",
   "files": [
    "toolbar.js"
@@ -3626,6 +4199,12 @@
   "files": [
    "media.js",
    "toolbar.js"
+  ]
+ },
+ {
+  "key": "Media paused in preview",
+  "files": [
+   "transition-preview-panel.js"
   ]
  },
  {
@@ -3644,6 +4223,30 @@
   "key": "Mercator",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Merged cells cannot be represented by a simple editable grid.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "merged table",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "Mermaid",
+  "files": [
+   "diagram-panel.js"
+  ]
+ },
+ {
+  "key": "Mermaid templates",
+  "files": [
+   "diagram-panel.js"
   ]
  },
  {
@@ -3677,9 +4280,57 @@
   ]
  },
  {
+  "key": "mirrored text/shape",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "Mirroring of text or vector shapes is not retained.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "Missing chart point count",
+  "files": [
+   "pptx_import/charts.rs"
+  ]
+ },
+ {
+  "key": "Missing chart point index",
+  "files": [
+   "pptx_import/charts.rs"
+  ]
+ },
+ {
+  "key": "Missing export id",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "Missing geometry or a skewed transform was approximated.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "Missing output path",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
   "key": "Mixed",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Mixed cell fills are retained behind their text; the full cell background and spacing may differ.",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -3691,31 +4342,19 @@
  {
   "key": "Motion Path",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Motion path",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Mouse & presenting",
   "files": [
    "dialogs.js"
-  ]
- },
- {
-  "key": "Move",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Move Slides",
-  "files": [
-   "ops.rs"
   ]
  },
  {
@@ -3745,6 +4384,24 @@
   ]
  },
  {
+  "key": "Native capture returned an invalid background.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "Native capture returned an invalid image.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "Native slide capture is not available on this platform",
+  "files": [
+   "capture.rs"
+  ]
+ },
+ {
   "key": "navigate",
   "files": [
    "presenter.html"
@@ -3765,7 +4422,7 @@
  {
   "key": "Neo",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
@@ -3783,7 +4440,13 @@
  {
   "key": "Neutral",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
+  ]
+ },
+ {
+  "key": "New block",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -3809,8 +4472,7 @@
   "key": "New Slide",
   "files": [
    "commands.js",
-   "navigator.js",
-   "ops.rs"
+   "navigator.js"
   ]
  },
  {
@@ -3864,7 +4526,7 @@
  {
   "key": "No builds on this slide. Select an object and choose a “Build in” effect.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -3905,10 +4567,28 @@
   ]
  },
  {
+  "key": "No supported editable representation or embedded preview was available.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "No supported fallback was present in the file.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "Noncanonical PPTX part path",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
   "key": "None",
   "files": [
+   "animation-panel.js",
    "charts.js",
-   "inspector.js",
    "panels.js",
    "themebuilder.js"
   ]
@@ -3916,6 +4596,7 @@
  {
   "key": "Normal",
   "files": [
+   "animation-panel.js",
    "inspector.js"
   ]
  },
@@ -3923,12 +4604,6 @@
   "key": "North America",
   "files": [
    "charts.js"
-  ]
- },
- {
-  "key": "Not an image",
-  "files": [
-   "ops.rs"
   ]
  },
  {
@@ -3968,18 +4643,6 @@
   ]
  },
  {
-  "key": "nothing to duplicate",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "nothing to move",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
   "key": "Nudge 1 px (Shift: 10 px)",
   "files": [
    "dialogs.js"
@@ -4010,10 +4673,22 @@
   ]
  },
  {
+  "key": "Office equation",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "OK",
   "files": [
    "dialogs.js",
    "updates.js"
+  ]
+ },
+ {
+  "key": "OMML equations have no supported editable or visual fallback.",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -4213,6 +4888,12 @@
   ]
  },
  {
+  "key": "Optional label",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
   "key": "Optional online services for the Media Library. Keys are stored in your system keychain and never saved in presentations.",
   "files": [
    "dialogs.js"
@@ -4237,6 +4918,12 @@
   ]
  },
  {
+  "key": "Original CSV",
+  "files": [
+   "datasource-panel.js"
+  ]
+ },
+ {
   "key": "Original image",
   "files": [
    "crop.js"
@@ -4258,13 +4945,13 @@
  {
   "key": "Out step",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "out: {effect}",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -4300,12 +4987,6 @@
   ]
  },
  {
-  "key": "Paint Format",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
   "key": "Palette",
   "files": [
    "controls.js"
@@ -4315,6 +4996,12 @@
   "key": "Paragraph",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Paragraph spacing, nested list indentation, tabs or vertical text are approximated by Cadenza's text layout.",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -4346,8 +5033,7 @@
   "key": "Paste",
   "files": [
    "canvas.js",
-   "navigator.js",
-   "ops.rs"
+   "navigator.js"
   ]
  },
  {
@@ -4372,12 +5058,6 @@
   "key": "Paste or open data in CSV form and pick the chart to make from it.",
   "files": [
    "panels.js"
-  ]
- },
- {
-  "key": "Paste Slides",
-  "files": [
-   "ops.rs"
   ]
  },
  {
@@ -4497,6 +5177,12 @@
   ]
  },
  {
+  "key": "Plays from the previous visible slide. Media and camera stay paused.",
+  "files": [
+   "transition-preview-panel.js"
+  ]
+ },
+ {
   "key": "Plus",
   "files": [
    "shapes.rs"
@@ -4515,9 +5201,226 @@
   ]
  },
  {
+  "key": "Power",
+  "files": [
+   "mathlive-editor.js"
+  ]
+ },
+ {
   "key": "Powered by {service}",
   "files": [
    "media.js"
+  ]
+ },
+ {
+  "key": "PowerPoint animations/transitions are not retained by this import; slide content remains editable.",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint archive has too many parts",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint chart has too many points",
+  "files": [
+   "pptx_import/charts.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint content types are missing",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint conversion exceeds the materialization limit",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint conversion size overflow",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint export needs the native capture and pinned asset readers.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "PowerPoint export preview",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
+  "key": "PowerPoint exporter could not be loaded.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "PowerPoint exporter did not load.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "PowerPoint file is too large (maximum 256 MB)",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint image exceeds 40 million pixels",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint import details",
+  "files": [
+   "inspector.js",
+   "pptx-dialog.js"
+  ]
+ },
+ {
+  "key": "PowerPoint must have 1–1000 slides",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint needs the original fonts installed; web fonts are not embedded in this export.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "PowerPoint object geometry is outside the supported range",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint part is too large",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint presentation has too many objects",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint presentation relationship is missing",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint relationship has no id",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint relationship has no target",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint size overflow",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint slide drawing tree is missing",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint slide has too many objects",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint slide list is missing",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint slide list repeats a part",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint slide relationship is missing",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint slide size is missing",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint slide size is outside the supported range",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint table is too large",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "PowerPoint XML is nested too deeply",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PPTX relationship escapes the package",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "PPTX XML must be UTF-8",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
+  "key": "Preparing slide {n} of {total}…",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
+  "key": "Preparing the presentation…",
+  "files": [
+   "pptx-dialog.js"
   ]
  },
  {
@@ -4525,6 +5428,7 @@
   "files": [
    "actions.js",
    "inspector.js",
+   "pptx-dialog.js",
    "present.js",
    "presenter.js",
    "store.js"
@@ -4533,7 +5437,13 @@
  {
   "key": "Presentation default",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "Presentation resources did not finish loading.",
+  "files": [
+   "pptx-layout.js"
   ]
  },
  {
@@ -4585,6 +5495,24 @@
   ]
  },
  {
+  "key": "Preview first slide",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
+  "key": "Preview shows the first 20 rows. All rows will be inserted.",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "Preview transition",
+  "files": [
+   "transition-preview-panel.js"
+  ]
+ },
+ {
   "key": "Previous",
   "files": [
    "presenter.html"
@@ -4615,6 +5543,12 @@
   ]
  },
  {
+  "key": "Process",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
   "key": "Progress bar",
   "files": [
    "inspector.js"
@@ -4629,7 +5563,7 @@
  {
   "key": "Push (slide)",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -4682,6 +5616,7 @@
   "files": [
    "commands.js",
    "panels.js",
+   "visual-diagram-editor.js",
    "shapes.rs"
   ]
  },
@@ -4701,19 +5636,19 @@
  {
   "key": "Redraw",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Redux",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
   "key": "Redux (color)",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
@@ -4725,8 +5660,20 @@
  {
   "key": "Remove",
   "files": [
-   "dialogs.js",
-   "inspector.js"
+   "animation-panel.js",
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Remove block",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
+  "key": "Remove connection",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -4798,13 +5745,7 @@
  {
   "key": "Rendering…",
   "files": [
-   "panels.js"
-  ]
- },
- {
-  "key": "Reorder Builds",
-  "files": [
-   "ops.rs"
+   "diagram-panel.js"
   ]
  },
  {
@@ -4817,8 +5758,7 @@
   "key": "Replace All",
   "files": [
    "actions.js",
-   "findreplace.js",
-   "ops.rs"
+   "findreplace.js"
   ]
  },
  {
@@ -4826,18 +5766,6 @@
   "files": [
    "canvas.js",
    "inspector.js"
-  ]
- },
- {
-  "key": "Replace Presentation",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
-  "key": "Replace Text",
-  "files": [
-   "ops.rs"
   ]
  },
  {
@@ -4850,6 +5778,12 @@
   "key": "Replace with",
   "files": [
    "findreplace.js"
+  ]
+ },
+ {
+  "key": "Replace with a template",
+  "files": [
+   "diagram-panel.js"
   ]
  },
  {
@@ -4883,12 +5817,6 @@
   ]
  },
  {
-  "key": "Resize",
-  "files": [
-   "ops.rs"
-  ]
- },
- {
   "key": "Resize crop",
   "files": [
    "crop.js"
@@ -4909,7 +5837,7 @@
  {
   "key": "Reveal (concave)",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -4925,9 +5853,16 @@
   ]
  },
  {
+  "key": "Review these conversion details before relying on the result:",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
   "key": "Right",
   "files": [
    "inspector.js",
+   "math-panel.js",
    "panels.js",
    "themebuilder.js"
   ]
@@ -4942,6 +5877,12 @@
   "key": "Right indent",
   "files": [
    "themebuilder.js"
+  ]
+ },
+ {
+  "key": "Right to left",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -4966,6 +5907,12 @@
   "key": "Rotation",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Rounded rectangle",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -5085,6 +6032,12 @@
   ]
  },
  {
+  "key": "Saved: {path}",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
   "key": "Saving…",
   "files": [
    "present.js",
@@ -5188,6 +6141,12 @@
   ]
  },
  {
+  "key": "Select a block to edit it. Mermaid arranges the diagram automatically.",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
   "key": "Select All",
   "files": [
    "commands.js"
@@ -5203,6 +6162,12 @@
   "key": "Selected crop area",
   "files": [
    "crop.js"
+  ]
+ },
+ {
+  "key": "Semicolon",
+  "files": [
+   "datachart.js"
   ]
  },
  {
@@ -5227,6 +6192,12 @@
   "key": "Send to back",
   "files": [
    "panels.js"
+  ]
+ },
+ {
+  "key": "Separator",
+  "files": [
+   "datachart.js"
   ]
  },
  {
@@ -5276,9 +6247,11 @@
  {
   "key": "Shape",
   "files": [
+   "element-label.js",
    "inspector.js",
    "panels.js",
-   "toolbar.js"
+   "toolbar.js",
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -5349,6 +6322,18 @@
   ]
  },
  {
+  "key": "Show in folder",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
+  "key": "Show math keyboard",
+  "files": [
+   "mathlive-editor.js"
+  ]
+ },
+ {
   "key": "Show or hide the teleprompter (T)",
   "files": [
    "presenter.html"
@@ -5375,20 +6360,21 @@
  {
   "key": "Shrink",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Size",
   "files": [
    "inspector.js",
+   "math-panel.js",
    "panels.js"
   ]
  },
  {
   "key": "Sketch",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
@@ -5432,7 +6418,8 @@
   "files": [
    "commands.js",
    "inspector.js",
-   "panels.js"
+   "panels.js",
+   "pptx-export.js"
   ]
  },
  {
@@ -5444,7 +6431,6 @@
  {
   "key": "slide not found",
   "files": [
-   "ops.rs",
    "textchange.rs"
   ]
  },
@@ -5483,7 +6469,8 @@
   "key": "Slide {n}",
   "files": [
    "findreplace.js",
-   "inspector.js"
+   "inspector.js",
+   "pptx-dialog.js"
   ]
  },
  {
@@ -5508,6 +6495,7 @@
  {
   "key": "Slow",
   "files": [
+   "animation-panel.js",
    "inspector.js"
   ]
  },
@@ -5530,9 +6518,15 @@
   ]
  },
  {
+  "key": "SmartArt or embedded object",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "Smooth curve",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -5566,9 +6560,21 @@
   ]
  },
  {
+  "key": "Some fill, text warp or drawing effects are not supported.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "Some media in the selection is missing. Replace or delete it, then copy again.",
   "files": [
    "clipboard.rs"
+  ]
+ },
+ {
+  "key": "source data",
+  "files": [
+   "pptx-export.js"
   ]
  },
  {
@@ -5634,6 +6640,7 @@
  {
   "key": "Speed",
   "files": [
+   "animation-panel.js",
    "inspector.js"
   ]
  },
@@ -5654,6 +6661,12 @@
   "key": "Square (1080×1080)",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Square root",
+  "files": [
+   "mathlive-editor.js"
   ]
  },
  {
@@ -5701,7 +6714,7 @@
  {
   "key": "Start from a template…",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
@@ -5737,7 +6750,7 @@
  {
   "key": "Step",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -5761,7 +6774,7 @@
  {
   "key": "Strike through",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -5785,6 +6798,7 @@
  {
   "key": "Style",
   "files": [
+   "diagram-panel.js",
    "panels.js"
   ]
  },
@@ -5806,6 +6820,12 @@
   "key": "Subtitle text",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "Sum",
+  "files": [
+   "mathlive-editor.js"
   ]
  },
  {
@@ -5851,9 +6871,16 @@
   ]
  },
  {
+  "key": "Tab",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
   "key": "Table",
   "files": [
    "commands.js",
+   "element-label.js",
    "inspector.js",
    "panels.js",
    "toolbar.js"
@@ -5866,9 +6893,27 @@
   ]
  },
  {
+  "key": "Table from Data",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "table layout",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "table not found",
   "files": [
    "textchange.rs"
+  ]
+ },
+ {
+  "key": "table text contrast",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -5904,15 +6949,10 @@
   ]
  },
  {
-  "key": "Template",
-  "files": [
-   "panels.js"
-  ]
- },
- {
   "key": "Text",
   "files": [
    "commands.js",
+   "element-label.js",
    "inspector.js",
    "panels.js",
    "themebuilder.js",
@@ -5951,9 +6991,21 @@
   ]
  },
  {
+  "key": "text frame insets",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
   "key": "Text in shape",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "text layout",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -5970,33 +7022,63 @@
   ]
  },
  {
+  "key": "Text, shapes, tables and supported charts stay editable. Other objects keep their appearance as images. Live media and presentation effects are exported as static content.",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
+  "key": "The available alternate representation was imported.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "The background fill was replaced by white.",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
+  "key": "The background image format is unsupported.",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
   "key": "The chart appears at step {first}, then one column per step until step {last}.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "The chart appears at step {first}, then one item per step until step {last}.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "The chart appears at step {first}, then one party per step until step {last}.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "The chart appears at step {first}, then one series per step until step {last}.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "The chart appears at step {first}, then one slice per step until step {last}.",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
+  ]
+ },
+ {
+  "key": "The chart type/configuration or its cached data is unsupported; workbook formulas are not evaluated.",
+  "files": [
+   "pptx_import/drawing.rs"
   ]
  },
  {
@@ -6006,9 +7088,76 @@
   ]
  },
  {
+  "key": "The content remains editable; PowerPoint may lay out text, table cells or chart axes differently.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
   "key": "The copied media is no longer available. Copy the content again.",
   "files": [
    "clipboard.rs"
+  ]
+ },
+ {
+  "key": "The diagram preview does not represent its current source. The last available preview is exported; correct the Mermaid source and export again.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "The embedded image format is unsupported or unsafe.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "The embedded object's supplied picture preview was retained; the object itself is not editable.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "The export asset is too large",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "The export contains static slide content; Cadenza transitions, builds and timing are not transferred.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "The export image could not be captured in time",
+  "files": [
+   "capture.rs"
+  ]
+ },
+ {
+  "key": "The export image is incomplete",
+  "files": [
+   "capture.rs"
+  ]
+ },
+ {
+  "key": "The export image is too large",
+  "files": [
+   "capture.rs",
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "The export object is outside the slide",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "The export object was not rendered",
+  "files": [
+   "pptx-capture.js"
   ]
  },
  {
@@ -6036,9 +7185,51 @@
   ]
  },
  {
+  "key": "The first slide has no incoming transition.",
+  "files": [
+   "transition-preview-panel.js"
+  ]
+ },
+ {
+  "key": "The importing window was closed",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
   "key": "The link did not open — check that it is complete and public",
   "files": [
    "media.rs"
+  ]
+ },
+ {
+  "key": "The object changed while its data was open. Your CSV draft is kept here; reopen the editor to apply it to the current object.",
+  "files": [
+   "datachart.js"
+  ]
+ },
+ {
+  "key": "The original CSV is stored in this presentation.",
+  "files": [
+   "datasource-panel.js"
+  ]
+ },
+ {
+  "key": "The original CSV is unavailable for this object.",
+  "files": [
+   "datasource-panel.js"
+  ]
+ },
+ {
+  "key": "The original PowerPoint file is unchanged. Imported objects can be edited and saved as a Cadenza presentation.",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
+  "key": "The original source text is kept in the Cadenza file; this export carries the displayed data only.",
+  "files": [
+   "pptx-export.js"
   ]
  },
  {
@@ -6048,9 +7239,27 @@
   ]
  },
  {
+  "key": "The PowerPoint export library did not finish loading.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "The PowerPoint measuring frame did not finish loading.",
+  "files": [
+   "pptx-layout.js"
+  ]
+ },
+ {
   "key": "The presentation changed while the operation was running.",
   "files": [
    "document.rs"
+  ]
+ },
+ {
+  "key": "The presentation changed. Start the export again.",
+  "files": [
+   "pptx-dialog.js"
   ]
  },
  {
@@ -6060,9 +7269,63 @@
   ]
  },
  {
+  "key": "The presentation fonts did not finish loading for PowerPoint export.",
+  "files": [
+   "pptx-layout.js"
+  ]
+ },
+ {
+  "key": "The presentation has no slides.",
+  "files": [
+   "pptx-dialog.js"
+  ]
+ },
+ {
   "key": "The presentation is missing deck.json",
   "files": [
    "package.rs"
+  ]
+ },
+ {
+  "key": "The presentation stylesheets did not finish loading for PowerPoint export.",
+  "files": [
+   "pptx-layout.js"
+  ]
+ },
+ {
+  "key": "The presentation theme did not finish loading",
+  "files": [
+   "pptx-capture.js"
+  ]
+ },
+ {
+  "key": "The shape geometry cannot be represented faithfully.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "The slide image could not be prepared in time",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "The slide is showing the last rendered diagram. Its drawing does not yet match the current source.",
+  "files": [
+   "diagram-panel.js"
+  ]
+ },
+ {
+  "key": "The table contains no usable cells.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "The table preview appears here when you paste or open data.",
+  "files": [
+   "datachart.js"
   ]
  },
  {
@@ -6072,9 +7335,21 @@
   ]
  },
  {
+  "key": "The theme background style was approximated by its resolved color.",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
   "key": "The update was not installed: some changes could not be kept. Check them, then try again.",
   "files": [
    "updates.js"
+  ]
+ },
+ {
+  "key": "The visual editor could not load. You can still edit the LaTeX source.",
+  "files": [
+   "mathlive-editor.js"
   ]
  },
  {
@@ -6241,6 +7516,7 @@
  {
   "key": "Theme text color",
   "files": [
+   "math-panel.js",
    "panels.js"
   ]
  },
@@ -6248,6 +7524,18 @@
   "key": "Theme: {name}",
   "files": [
    "dialogs.js"
+  ]
+ },
+ {
+  "key": "This appearance is preserved as a static image because its properties do not map faithfully to native PowerPoint objects.",
+  "files": [
+   "pptx-export.js"
+  ]
+ },
+ {
+  "key": "This export is no longer active",
+  "files": [
+   "pptx.rs"
   ]
  },
  {
@@ -6275,6 +7563,12 @@
   ]
  },
  {
+  "key": "This is not an unencrypted PPTX presentation",
+  "files": [
+   "pptx_import/archive.rs"
+  ]
+ },
+ {
   "key": "This link does not show an image. Right-click the image and copy its address, then paste that.",
   "files": [
    "media.rs"
@@ -6284,6 +7578,18 @@
   "key": "This object only supports box formatting",
   "files": [
    "formatting.rs"
+  ]
+ },
+ {
+  "key": "This PowerPoint drawing object is not supported.",
+  "files": [
+   "pptx_import/drawing.rs"
+  ]
+ },
+ {
+  "key": "This source contains LaTeX that the visual editor cannot interpret. Edit it in the LaTeX tab to preserve its contents.",
+  "files": [
+   "mathlive-editor.js"
   ]
  },
  {
@@ -6344,7 +7650,8 @@
    "chartdata.js",
    "inspector.js",
    "panels.js",
-   "themebuilder.js"
+   "themebuilder.js",
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -6373,27 +7680,39 @@
   ]
  },
  {
+  "key": "Top to bottom",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
   "key": "Tracking",
   "files": [
    "themebuilder.js"
   ]
  },
  {
-  "key": "Transform Group",
+  "key": "Transition",
   "files": [
-   "ops.rs"
+   "animation-panel.js"
   ]
  },
  {
-  "key": "Transition",
+  "key": "Transition preview",
   "files": [
-   "inspector.js"
+   "transition-preview-panel.js"
   ]
  },
  {
   "key": "Transitions",
   "files": [
    "inspector.js"
+  ]
+ },
+ {
+  "key": "transitions and builds",
+  "files": [
+   "pptx-export.js"
   ]
  },
  {
@@ -6486,8 +7805,31 @@
  {
   "key": "Ungroup",
   "files": [
-   "commands.js",
-   "ops.rs"
+   "commands.js"
+  ]
+ },
+ {
+  "key": "Unknown export asset",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "Unknown export capture",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "Unknown export object",
+  "files": [
+   "pptx.rs"
+  ]
+ },
+ {
+  "key": "Unknown export slide",
+  "files": [
+   "pptx.rs"
   ]
  },
  {
@@ -6522,11 +7864,23 @@
   ]
  },
  {
+  "key": "Unsupported PowerPoint XML dialect",
+  "files": [
+   "pptx_import/mod.rs"
+  ]
+ },
+ {
   "key": "Untitled",
   "files": [
    "store.js",
    "toolbar.js",
    "welcome.js"
+  ]
+ },
+ {
+  "key": "Untitled block",
+  "files": [
+   "visual-diagram-editor.js"
   ]
  },
  {
@@ -6662,6 +8016,7 @@
   "key": "Video",
   "files": [
    "actions.js",
+   "element-label.js",
    "inspector.js",
    "media.js",
    "panels.js"
@@ -6693,9 +8048,34 @@
   ]
  },
  {
+  "key": "Vimeo may require a paid plan to hide player controls.",
+  "files": [
+   "panels.js"
+  ]
+ },
+ {
   "key": "Vimeo video",
   "files": [
    "slideview.js"
+  ]
+ },
+ {
+  "key": "Visual",
+  "files": [
+   "diagram-panel.js",
+   "math-panel.js"
+  ]
+ },
+ {
+  "key": "Visual diagram templates",
+  "files": [
+   "visual-diagram-editor.js"
+  ]
+ },
+ {
+  "key": "Visual editing supports simple flowcharts. This source uses another diagram type or additional Mermaid syntax. Edit it in Mermaid to preserve every detail.",
+  "files": [
+   "diagram-panel.js"
   ]
  },
  {
@@ -6715,7 +8095,7 @@
   "key": "Web Page",
   "files": [
    "actions.js",
-   "inspector.js",
+   "element-label.js",
    "panels.js"
   ]
  },
@@ -6770,25 +8150,25 @@
  {
   "key": "Wipe from bottom",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Wipe from left",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Wipe from right",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
   "key": "Wipe from top",
   "files": [
-   "inspector.js"
+   "animation-panel.js"
   ]
  },
  {
@@ -6813,13 +8193,13 @@
  {
   "key": "Write LaTeX — rendered with KaTeX. Example:",
   "files": [
-   "panels.js"
+   "math-panel.js"
   ]
  },
  {
   "key": "Write Mermaid syntax: flowcharts, sequence, class, state, ER, Gantt, pie, mindmaps, timelines and more.",
   "files": [
-   "panels.js"
+   "diagram-panel.js"
   ]
  },
  {
@@ -6922,20 +8302,20 @@
  {
   "key": "Zoom",
   "files": [
-   "dialogs.js",
-   "inspector.js"
+   "animation-panel.js",
+   "dialogs.js"
+  ]
+ },
+ {
+  "key": "Zoom in",
+  "files": [
+   "animation-panel.js"
   ]
  },
  {
   "key": "Zoom In",
   "files": [
    "commands.js"
-  ]
- },
- {
-  "key": "Zoom in",
-  "files": [
-   "inspector.js"
   ]
  },
  {

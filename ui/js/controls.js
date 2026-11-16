@@ -61,7 +61,7 @@ export function Hint({ children }) {
 function useFlushWhenFocused(field, flush) {
   const latest = useRef(flush);
   latest.current = flush;
-  useEffect(() => registerFlush(() => (field.current && document.activeElement === field.current ? latest.current(field.current.value) : undefined)), []);
+  useLayoutEffect(() => registerFlush(() => (field.current && document.activeElement === field.current ? latest.current(field.current.value) : undefined)), []);
 }
 
 /**
@@ -222,7 +222,7 @@ export function TextField({ value, onChange, placeholder, multiline, rows = 4, m
   const timer = useRef(null);
   const field = useRef(null);
   const cancel = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!focused) setText(value ?? '');
   }, [value, focused]);
   const flush = (v) => {

@@ -1,0 +1,11 @@
+.data-source { display: grid; gap: 7px; margin-block-end: 8px; }
+.data-source-label { font-weight: 600; }
+.data-source-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.data-source-text { width: 100%; min-height: 112px; max-height: 260px; resize: vertical; white-space: pre; font-size: 11px; }
+.data-source .ihint { margin: 0; }
+.dc-source-hint { margin: 0 0 12px; padding: 10px; background: var(--accent-soft); border-radius: var(--radius); }
+.dc-table-preview { overflow: auto; max-height: 390px; margin-block: 12px; }
+.dc-table-preview table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.dc-table-preview td, .dc-table-preview th { padding: 7px; border: 1px solid var(--border-strong); text-align: start; white-space: pre-wrap; }
+.dc-table-preview th { background: var(--panel-2); }
+.dc-table-summary { padding: 12px; border-block-end: 1px solid var(--border); }

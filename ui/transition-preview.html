@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://asset.localhost data: blob:; font-src 'self' data:; connect-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'">
+<title>Cadenza</title>
+<link rel="stylesheet" href="vendor/reveal/reset.css">
+<link rel="stylesheet" href="vendor/reveal/reveal.css">
+<link rel="stylesheet" id="cz-theme">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="vendor/reveal/plugin/highlight/monokai.css">
+<link rel="stylesheet" href="css/content.css">
+<style id="cz-deck-css"></style>
+<style>
+html, body { height: 100%; margin: 0; overflow: hidden; background: #17181e; }
+.reveal { pointer-events: none; }
+.cz-preview-media { width: 100%; height: 100%; display: grid; place-items: center; background: #292a31; color: #bbb; font: 24px system-ui; }
+.cz-preview-setup *, .cz-preview-setup *::before, .cz-preview-setup *::after { transition: none !important; animation: none !important; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides"></div></div>
+<script src="vendor/reveal/reveal.js"></script>
+<script src="vendor/reveal/plugin/highlight.js"></script>
+<script src="vendor/katex/katex.min.js"></script>
+<script src="js/runtime.js"></script>
+<script type="module" src="js/transition-preview-frame.js"></script>
+</body>
+</html>

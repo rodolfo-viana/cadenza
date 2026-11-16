@@ -38,8 +38,8 @@ pub struct Document {
     /// Monotonic view order, including saves and other changes to UI metadata.
     view_revision: u64,
     last_recovery: u64,
-    /// Restored from a crash: unsaved until the next save.
-    recovered: bool,
+    /// Recovered or imported: unsaved until the first successful save.
+    needs_save: bool,
 }
 
 /// What the UI receives after every change.
@@ -137,7 +137,7 @@ impl Document {
             rendered: HashMap::new(),
             view_revision: 0,
             last_recovery: 0,
-            recovered: false,
+            needs_save: false,
         })
     }
 
@@ -145,6 +145,13 @@ impl Document {
         deck.normalize();
         crate::sanitize::deck(&mut deck);
         Self::with_deck(sessions_root, uuid::Uuid::new_v4().to_string(), deck, None)
+    }
+
+    /// A foreign import has no native path or history, but must prompt to save.
+    pub fn from_import(sessions_root: &Path, deck: Deck) -> anyhow::Result<Self> {
+        let mut doc = Self::new(sessions_root, deck)?;
+        doc.needs_save = true;
+        Ok(doc)
     }
 
     pub fn open(sessions_root: &Path, path: &Path) -> anyhow::Result<Self> {
@@ -171,7 +178,7 @@ impl Document {
         deck.normalize();
         crate::sanitize::deck(&mut deck);
         let mut doc = Self::with_deck(sessions_root, session_id.to_string(), deck, rec.path.clone())?;
-        doc.recovered = true;
+        doc.needs_save = true;
         Ok(doc)
     }
 
@@ -194,7 +201,7 @@ impl Document {
     }
 
     pub fn is_dirty(&self) -> bool {
-        self.recovered || self.deck != self.saved
+        self.needs_save || self.deck != self.saved
     }
 
     pub fn file_name(&self) -> String {
@@ -310,7 +317,7 @@ impl Document {
         package::write(path, &self.deck, &self.assets_dir())?;
         self.path = Some(path.to_path_buf());
         self.saved = self.deck.clone();
-        self.recovered = false;
+        self.needs_save = false;
         self.history.seal();
         let _ = fs::remove_file(self.work_dir.join(RECOVERY_FILE));
         Ok(())

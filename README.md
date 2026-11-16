@@ -18,10 +18,15 @@ See **[live demo](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-n
   shapes, images, video, tables, charts, code, equations and diagrams.
 - Charts edited in a data grid and rendered as crisp SVG: column, bar and area (stacked or not), line, dot plot, streamgraph, pie, donut, treemap, parliament, scatterplot, heatmap, candlestick, Sankey diagram, network graph and maps (the world in the Equal Earth or Mercator projection, a continent, or a country's states or provinces).
 - Charts from data: paste cells from a spreadsheet or open a CSV file, see every chart the data can make, and insert one.
+- Select a chart or table to inspect its original CSV in the inspector. The presentation stores
+  that source alongside the current data; subsequent edits do not overwrite the original.
 - Error bars (±, − and + amounts, or lower and upper ends), value axes with ends of your own, axis titles, reference lines and point shapes.
 - Code blocks with syntax highlighting, line numbers and step-by-step line highlights.
-- LaTeX math with KaTeX, as equation objects or inline in any text: `$e^{i\pi}+1=0$`.
-- [Mermaid](https://mermaid.js.org) diagrams: flowcharts, sequences, timelines, mind maps and more.
+- Equation objects have a visual MathLive editor, an on-screen math keyboard and a LaTeX source
+  tab. KaTeX renders the slides, including inline math in text: `$e^{i\pi}+1=0$`. Both editors work offline.
+- Diagram galleries for processes, cycles, hierarchies and decisions, with editable blocks and
+  connections. The [Mermaid](https://mermaid.js.org) source tab also supports sequences, timelines,
+  mind maps and more; advanced source stays intact when it cannot be edited visually.
 - Rulers, draggable guides, smart guides and a snapping grid.
 - [Find and replace, format painter, visual image cropping and persistent object groups](docs/editing-tools.md)
   in the development branch, with Undo/Redo and saved-file support.
@@ -37,6 +42,7 @@ See **[live demo](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-n
 - Google Fonts: every family is searchable offline, and the fonts you pick are embedded in the
   presentation, so it looks the same on any computer.
 - Builds (step-by-step animations), slide transitions and Magic Move (reveal.js auto-animate).
+- Configure and replay a slide's incoming transition in the same inspector panel, with media paused.
 - Per-presentation custom CSS for anything else.
 
 **Media**
@@ -57,6 +63,9 @@ See **[live demo](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-n
 - Export to a web page, either as a folder for any web server or as a single self-contained `.html`
   file, or print to PDF.
 - Import reveal.js-style Markdown.
+- Import and export PowerPoint `.pptx` files with editable content where supported and explicit
+  conversion reports. Images and placeholders cover different unsupported cases; see the
+  [interoperability limits](docs/interoperability.md) before relying on a round trip.
 - Crash recovery for unsaved work.
 - Updates: when a new version is out, Cadenza offers to download and install it in place of the old
   one, then restarts and reopens your presentations.
@@ -143,6 +152,6 @@ project is organized and how to send changes.
 ## License
 
 Cadenza is released under the [MIT License](LICENSE). It includes reveal.js, KaTeX, Mermaid,
-highlight.js, Preact, htm and Lucide icons, each under its own license; see the `LICENSE` files in
+MathLive, PptxGenJS, highlight.js, Preact, htm and Lucide icons, each under its own license; see the `LICENSE` files in
 [`ui/vendor`](ui/vendor) and [`ui/vendor/licenses`](ui/vendor/licenses). Map charts use boundaries
 from [Natural Earth](https://www.naturalearthdata.com) (public domain).

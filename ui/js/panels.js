@@ -10,8 +10,7 @@ import { formatActive, formatBox, toggleBoxes } from './textformat.js';
 import { canvasApi } from './canvas.js';
 import { cls } from './util.js';
 import { Button } from './ui.js';
-import { renderDiagram, svgAspect, DIAGRAM_TEMPLATES } from './diagrams.js';
-import { opener, invoke } from './api.js';
+import { invoke } from './api.js';
 import { t, N_, language } from './i18n.js';
 import { CHART_ICONS, MAP_AREAS, MARKERS, ERROR_MODES, addChartRow, chartKind, chartRows, deleteChartRow, errorColumns, hasAxes, hasErrorBars, hasMarkers, isSample, linkChart, oneSeries, setChartCell, setChartLabel, switchChart } from './charts.js';
 
@@ -461,6 +460,7 @@ export function VideoPanel({ els }) {
     <${Row}><${Toggle} value=${c('looped')} label=${t('Loop')} onChange=${(v) => set_({ looped: v }, 'loop')} /><//>
     <${Row}><${Toggle} value=${c('muted')} label=${t('Muted')} onChange=${(v) => set_({ muted: v }, 'muted')} /><//>
     <${Row}><${Toggle} value=${c('controls')} label=${t('Show controls')} onChange=${(v) => set_({ controls: v }, 'controls')} /><//>
+    ${els.some((el) => /(?:^|\/)vimeo\.com\//i.test(el.content.src || '')) && html`<${Hint}>${t('Vimeo may require a paid plan to hide player controls.')}</${Hint}>`}
     ${!online &&
     html`<${Row} label=${t('Fit')}>
       <${Segmented}
@@ -580,34 +580,6 @@ export function CodePanel({ els }) {
     <${Hint}>${t('Each “|” is a click during the presentation that highlights those lines.')}</${Hint}>
     <${Row} label=${t('Title')} stack><${TextField} value=${c('title') ?? ''} placeholder=${t('Optional file name or caption')} onChange=${(v) => set_({ title: v }, 'title')} /><//>
     <${Row} label=${t('Corners')}><${Slider} value=${same(els, (e) => e.style.radius) ?? 0} min=${0} max=${60} unit="px" onChange=${(v, live) => patchAll(els, { style: { radius: v } }, live ? 'radius' : null)} /><//>
-  <//>`;
-}
-
-export function MathPanel({ els }) {
-  const single = els.length === 1 ? els[0] : null;
-  const ref = useRef();
-  useFocusPrimary(ref);
-  const c = (k) => same(els, (e) => e.content[k]);
-  const set_ = (patch, key, live) => patchAll(els, { content: patch }, live ? key : null);
-  return html`<${Section} title=${t('Equation')} id="math">
-    <div ref=${ref}>
-      ${single && html`<${TextField} multiline mono rows=${4} live value=${single.content.latex} placeholder=${t('LaTeX, e.g. {example}', { example: '\\frac{a}{b}' })} onChange=${(v, live) => set_({ latex: v }, 'latex', live)} />`}
-    </div>
-    <${Hint}>${t('Write LaTeX — rendered with KaTeX. Example:')} <code>\\int_0^1 x^2\\,dx = \\tfrac13</code></${Hint}>
-    <${Row} label=${t('Size')}><${NumberField} value=${c('fontSize')} min=${6} max=${400} unit="px" onChange=${(v, live) => set_({ fontSize: v }, 'fs', live)} /><//>
-    <${Row} label=${t('Color')}><${ColorField} value=${c('color') ?? ''} noneLabel=${t('Theme text color')} onChange=${(v, live) => set_({ color: v }, 'color', live)} /><//>
-    <${Row}><${Toggle} value=${!!c('fit')} label=${t('Fit box to equation')} onChange=${(v) => set_({ fit: v }, 'fit')} /><//>
-    <${Row} label=${t('Align')}>
-      <${Segmented}
-        value=${c('align')}
-        options=${[
-          { value: 'left', icon: 'text-align-start', title: t('Left') },
-          { value: 'center', icon: 'text-align-center', title: t('Center') },
-          { value: 'right', icon: 'text-align-end', title: t('Right') },
-        ]}
-        onChange=${(v) => set_({ align: v }, 'align')}
-      />
-    <//>
   <//>`;
 }
 
@@ -1079,115 +1051,3 @@ export function slideTitle(s) {
 }
 
 export { patchAll, same, themeInfo, set, currentSlide };
-
-// ---------------------------------------------------------------------------
-// Diagrams (Mermaid)
-// ---------------------------------------------------------------------------
-
-const DIAGRAM_STYLE_OPTIONS = [
-  { value: 'classic', label: N_('Classic') },
-  { value: 'neutral', label: N_('Neutral') },
-  { value: 'forest', label: N_('Forest') },
-  { value: 'neo', label: N_('Neo') },
-  { value: 'redux', label: N_('Redux') },
-  { value: 'redux-color', label: N_('Redux (color)') },
-];
-
-function diagramError(e) {
-  const msg = String(e?.message || e?.str || e || t('Invalid diagram'));
-  return msg.replace(/^Error:\s*/, '').split('\n').slice(0, 6).join('\n');
-}
-
-export function DiagramPanel({ els }) {
-  const el = els[0];
-  const d = el.content;
-  const ref = useRef();
-  useFocusPrimary(ref);
-  const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
-  // Changes not stored yet: a style picked while the new source is still
-  // being drawn is drawn with that source, and an older drawing that
-  // finishes late is dropped.
-  const pending = useRef({});
-  const latest = useRef(0);
-  const update = (patch, live) => {
-    pending.current = { ...pending.current, ...patch };
-    const changes = pending.current;
-    const run = ++latest.current;
-    const target = { docId: state.doc?.docId, slide: state.slideId, id: el.id };
-    const store = (content) => {
-      if (run === latest.current) pending.current = {};
-      const op = { op: 'updateElements', slide: target.slide, updates: [{ id: target.id, patch: { content } }] };
-      return apply(op, { docId: target.docId, coalesce: live ? `diagram:${target.id}` : null });
-    };
-    setBusy(true);
-    // Save and Close wait for the drawing and the change it brings.
-    return trackEdit(
-      (async () => {
-        const next = { ...d, ...changes };
-        try {
-          const svgs = await renderDiagram(next.source, next.style, next.look);
-          if (run !== latest.current) return;
-          setError(null);
-          await store({ ...changes, ...svgs });
-        } catch (e) {
-          if (run !== latest.current) return;
-          setError(diagramError(e));
-          // Keep what was typed even while it does not parse yet.
-          if ('source' in changes) await store({ source: changes.source });
-        } finally {
-          if (run === latest.current) setBusy(false);
-        }
-      })(),
-    );
-  };
-  const fit = () => {
-    const a = svgAspect(d.svgLight || d.svgDark);
-    if (a) patchAll([el], { h: Math.max(20, Math.round(el.w / a)) }, null);
-  };
-  // Over the source field, not above the controls: leaving the field starts
-  // a drawing, and the click that left it (on Look, say) must still find
-  // its button.
-  const rendering = busy && html`<div class="diagram-busy"><span class="spinner small" /> ${t('Rendering…')}</div>`;
-  return html`<${Section} title=${t('Diagram')} id="diagram">
-    <${Row} label=${t('Template')}>
-      <${Select}
-        value=""
-        options=${[{ value: '', label: t('Start from a template…') }, ...DIAGRAM_TEMPLATES.map(([name], i) => ({ value: String(i), label: t(name) }))]}
-        onChange=${(v) => v !== '' && update({ source: DIAGRAM_TEMPLATES[Number(v)][1] })}
-      />
-    <//>
-    <div ref=${ref} class="diagram-source">
-      <${TextField} multiline mono rows=${12} live value=${d.source} onChange=${(v, live) => update({ source: v }, live)} />
-      ${rendering}
-    </div>
-    ${error && html`<pre class="diagram-error">${error}</pre>`}
-    <${Hint}>
-      ${t('Write Mermaid syntax: flowcharts, sequence, class, state, ER, Gantt, pie, mindmaps, timelines and more.')} <a href="#" onClick=${(e) => { e.preventDefault(); opener.openUrl('https://mermaid.js.org/intro/'); }}>${t('Learn more')}</a>
-    </${Hint}>
-    <${Row} label=${t('Style')}><${Select} value=${d.style} options=${DIAGRAM_STYLE_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} onChange=${(v) => update({ style: v })} /><//>
-    <${Row} label=${t('Look')}>
-      <${Segmented}
-        value=${d.look}
-        options=${[
-          { value: 'classic', label: t('Classic') },
-          { value: 'handDrawn', label: t('Sketch') },
-          { value: 'neo', label: t('Neo') },
-        ]}
-        onChange=${(v) => update({ look: v })}
-      />
-    <//>
-    <${Row} label=${t('Colors')}>
-      <${Segmented}
-        value=${d.mode}
-        options=${[
-          { value: 'auto', label: t('Auto') },
-          { value: 'light', label: t('Light') },
-          { value: 'dark', label: t('Dark') },
-        ]}
-        onChange=${(v) => patchAll([el], { content: { mode: v } }, null)}
-      />
-    <//>
-    <div class="row-inline"><${Button} size="sm" icon="ratio" label=${t('Fit Box to Diagram')} onClick=${fit} /></div>
-  <//>`;
-}

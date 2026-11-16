@@ -1,0 +1,220 @@
+<!doctype html>
+<html data-ui="dark">
+<meta charset="utf-8">
+<title>Cadenza diagram regression tests</title>
+<link rel="stylesheet" href="../ui/css/app.css">
+<link rel="stylesheet" href="../ui/css/diagrams.css">
+<style>body { overflow: auto; } #fixture { width: 308px; } #result { white-space: pre-wrap; }</style>
+<pre id="result">Running…</pre>
+<div id="fixture"></div>
+<script src="../ui/vendor/mermaid/mermaid.min.js"></script>
+<script type="module">
+// Real vendored Preact, controls, Mermaid and document queue. Only native Rust
+// transport is replaced. The regular Rust suite covers operation validation.
+const calls = [], history = [], future = [], lines = [];
+let backend, passed = 0, failed = 0;
+const copy = (value) => structuredClone(value);
+function merge(target, patch) {
+  for (const [key, value] of Object.entries(patch)) {
+    if (['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Unsafe test patch');
+    if (value && typeof value === 'object' && !Array.isArray(value)) merge(target[key] ||= {}, value);
+    else target[key] = copy(value);
+  }
+}
+window.__TAURI__ = {
+  core: { invoke: async (name, args) => {
+    calls.push({ name, args: copy(args) });
+    if (name === 'doc_apply') {
+      if (args.track !== false) { history.push(copy(backend.deck)); future.length = 0; }
+      if (args.op.op !== 'updateElements') throw new Error('Unexpected operation');
+      for (const update of args.op.updates) {
+        const el = backend.deck.slides.find((s) => s.id === args.op.slide).elements.find((e) => e.id === update.id);
+        merge(el, update.patch);
+      }
+    } else if (name === 'doc_undo') { future.push(copy(backend.deck)); backend.deck = history.pop(); }
+    else if (name === 'doc_redo') { history.push(copy(backend.deck)); backend.deck = future.pop(); }
+    else throw new Error('Unexpected command: ' + name);
+    backend.revision++; backend.canUndo = !!history.length; backend.canRedo = !!future.length;
+    return copy(backend);
+  } },
+  window: { getCurrentWindow: () => ({ setTitle: async () => {} }) }, event: {}, dialog: {}, opener: {},
+};
+function assert(ok, message = 'Assertion failed') { if (!ok) throw new Error(message); }
+function equal(a, b) { assert(JSON.stringify(a) === JSON.stringify(b), `${JSON.stringify(a)} != ${JSON.stringify(b)}`); }
+async function test(name, fn) { try { await fn(); passed++; lines.push('PASS ' + name); } catch (e) { failed++; lines.push('FAIL ' + name + '\n' + e.stack); } }
+const delay = (ms = 40) => new Promise((resolve) => setTimeout(resolve, ms));
+try {
+  const D = await import('../ui/js/diagrams.js');
+  const V = await import('../ui/js/diagram-visual.js');
+  const P = await import('../ui/js/diagram-panel.js');
+  const S = await import('../ui/js/store.js');
+  const L = await import('../ui/js/lib.js');
+  const fixture = document.getElementById('fixture');
+  const source = (label) => `flowchart LR\n  A[${label}] --> B[Finish]`;
+  const current = () => S.state.doc.deck.slides[0].elements[0].content;
+  const button = (label) => [...fixture.querySelectorAll('button')].find((b) => b.textContent.trim() === label || b.querySelector(':scope > span')?.textContent.trim() === label);
+  const row = (label, occurrence = 0) => [...fixture.querySelectorAll('.irow')].filter((r) => r.querySelector('.irow-label')?.textContent === label)[occurrence];
+  const select = async (label, value) => {
+    const field = row(label).querySelector('select'); field.value = value; field.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+  };
+  const settle = async () => { await delay(); assert(await S.flushEdits(), 'pending edits did not flush'); await delay(); };
+  function Panel() {
+    S.useStore();
+    return L.html`<${P.DiagramPanel} els=${S.state.doc.deck.slides[0].elements} />`;
+  }
+  async function mount(text = source('Original')) {
+    L.render(null, fixture); await delay();
+    history.length = 0; future.length = 0; calls.length = 0;
+    const inputs = { source: text, style: 'classic', look: 'classic' };
+    const svgs = await D.renderDiagram(text);
+    backend = { docId: 'browser-diagrams', revision: 1, path: '/test.cadenza', fileName: 'Test', full: true,
+      themeHref: '', deckCss: '', slides: {}, outcome: {}, canUndo: false, canRedo: false,
+      deck: { title: 'Test', width: 1280, height: 720, settings: {}, slides: [{ id: 'slide', elements: [{
+        id: 'diagram', x: 0, y: 0, w: 500, h: 300, content: { kind: 'diagram', ...inputs, ...svgs, mode: 'auto', renderedFor: copy(inputs) },
+      }] }] },
+    };
+    S.openView(copy(backend)); L.render(L.html`<${Panel} />`, fixture); await delay();
+  }
+
+  await test('all four visual gallery templates render through real Mermaid in both modes', async () => {
+    for (const template of V.visualTemplates()) {
+      const text = V.visualDiagramSource(template.graph);
+      const svgs = await D.renderDiagram(text);
+      for (const svg of Object.values(svgs)) {
+        const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml');
+        assert(!parsed.querySelector('parsererror'), template.id + ' invalid SVG');
+        equal(parsed.querySelectorAll('g.node').length, template.graph.nodes.length);
+        assert(Number(parsed.documentElement.getAttribute('width')) > 0, 'explicit SVG width');
+        assert(Number(parsed.documentElement.getAttribute('height')) > 0, 'explicit SVG height');
+      }
+    }
+  });
+
+  await test('all existing Mermaid diagram families still render and keep their source intact', async () => {
+    for (const [name, text] of D.DIAGRAM_TEMPLATES) {
+      const svgs = await D.renderDiagram(text);
+      assert(svgs.svgLight.includes('<svg') && svgs.svgDark.includes('<svg'), name);
+      if (name !== 'Flowchart') equal(V.parseVisualDiagram(text), null);
+    }
+  });
+
+  await test('special labels render literally without markup or additional graph nodes', async () => {
+    const graph = V.visualTemplates()[0].graph;
+    const label = 'a "quote" [x] {y} & <b> #34; | ; ` \\';
+    graph.nodes[0].label = label; graph.edges[0].label = label;
+    const text = V.visualDiagramSource(graph);
+    equal(V.parseVisualDiagram(text).nodes[0].label, label);
+    const svgs = await D.renderDiagram(text);
+    const parsed = new DOMParser().parseFromString(svgs.svgLight, 'image/svg+xml');
+    equal(parsed.querySelectorAll('g.node').length, graph.nodes.length);
+    assert(!parsed.querySelector('b, script, foreignObject'), 'label became markup');
+    const textOf = (n) => [...n.querySelectorAll('.text-outer-tspan')].map((line) => line.textContent).join(' ').replace(/\s+/g, ' ').trim();
+    const labels = [...parsed.querySelectorAll('g.node')].map(textOf);
+    assert(labels.includes(label), 'literal label changed: ' + JSON.stringify(labels));
+    assert([...parsed.querySelectorAll('g.edgeLabel')].some((n) => textOf(n) === label), 'connection label changed');
+  });
+
+  await test('every available diagram style and look still renders the editable source', async () => {
+    const text = V.visualDiagramSource(V.visualTemplates()[3].graph);
+    for (const style of Object.keys(D.DIAGRAM_STYLES)) {
+      const svgs = await D.renderDiagram(text, style);
+      assert(svgs.svgLight.includes('<svg') && svgs.svgDark.includes('<svg'), style);
+    }
+    for (const look of ['handDrawn', 'neo']) {
+      const svgs = await D.renderDiagram(text, 'classic', look);
+      assert(svgs.svgLight.includes('<svg') && svgs.svgDark.includes('<svg'), look);
+    }
+  });
+
+  await test('opening, selecting nodes and switching modes preserve source bytes and history', async () => {
+    const text = 'graph LR;\n  A[Original]  -->  B[Finish];\n';
+    await mount(text);
+    equal(fixture.querySelectorAll('.diagram-template svg').length, 4);
+    const node = fixture.querySelectorAll('.diagram-visual-node[role=button]')[1];
+    node.focus(); node.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await delay();
+    equal(row('Block').querySelector('select').value, 'B');
+    equal(node.getAttribute('aria-pressed'), 'true');
+    const first = fixture.querySelector('.diagram-visual-node[role=button]');
+    first.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })); await delay();
+    equal(row('Block').querySelector('select').value, 'A');
+    button('Mermaid').click(); await delay(); equal(fixture.querySelector('textarea').value, text);
+    button('Visual').click(); await settle();
+    equal(current().source, text); equal(calls.length, 0); equal(history.length, 0);
+  });
+
+  await test('visual label, shape, direction and connections produce saved Mermaid changes', async () => {
+    await mount();
+    const field = row('Label').querySelector('input'); field.focus(); field.value = 'New "label"';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await settle();
+    equal(V.parseVisualDiagram(current().source).nodes[0].label, 'New "label"');
+    await select('Shape', 'decision'); await select('Direction', 'TB');
+    let graph = V.parseVisualDiagram(current().source);
+    equal(graph.nodes[0].shape, 'decision'); equal(graph.direction, 'TB');
+    button('Add block').click(); await settle();
+    graph = V.parseVisualDiagram(current().source); equal(graph.nodes.length, 3); equal(graph.edges.length, 2);
+    button('Add connection').click(); await settle();
+    graph = V.parseVisualDiagram(current().source); equal(graph.edges.length, 3);
+    await select('To', graph.nodes[1].id);
+    graph = V.parseVisualDiagram(current().source); equal(graph.edges.at(-1).to, graph.nodes[1].id);
+    button('Remove connection').click(); await settle(); equal(V.parseVisualDiagram(current().source).edges.length, 2);
+    button('Remove block').click(); await settle();
+    graph = V.parseVisualDiagram(current().source); equal(graph.nodes.length, 2); equal(graph.edges.length, 1);
+    assert(D.diagramPreviewCurrent(current()));
+  });
+
+  await test('focused visual input is saved without Enter or losing focus', async () => {
+    await mount();
+    const field = row('Label').querySelector('input'); field.focus(); field.value = 'Saved while typing';
+    field.dispatchEvent(new Event('input', { bubbles: true })); await settle();
+    equal(V.parseVisualDiagram(current().source).nodes[0].label, 'Saved while typing');
+  });
+
+  await test('each visual block shape produces a valid saved diagram', async () => {
+    await mount();
+    for (const shape of ['circle', 'rounded', 'decision', 'rectangle']) {
+      await select('Shape', shape);
+      equal(V.parseVisualDiagram(current().source).nodes[0].shape, shape);
+      assert(D.diagramPreviewCurrent(current()));
+    }
+  });
+
+  await test('an explicit visual template replacement is exactly one undoable operation', async () => {
+    await mount(); const before = copy(current());
+    button('Decision').click(); await settle();
+    equal(V.parseVisualDiagram(current().source).nodes[0].shape, 'decision');
+    equal(calls.filter((c) => c.name === 'doc_apply').length, 1);
+    await S.undo(); await delay(); equal(current(), before);
+    await S.redo(); await delay(); equal(V.parseVisualDiagram(current().source).nodes[0].shape, 'decision');
+  });
+
+  await test('unsupported Mermaid stays byte-exact while its visual mode explains the limit', async () => {
+    const text = 'flowchart LR\n  A[Start] --> B[Finish]\n  style A fill:#f99,stroke:#333\n';
+    await mount(text);
+    equal(fixture.querySelector('textarea').value, text);
+    button('Visual').click(); await delay();
+    assert(fixture.textContent.includes('additional Mermaid syntax'));
+    assert(!fixture.querySelector('.visual-diagram-editor'));
+    button('Edit Mermaid source').click(); await settle();
+    equal(fixture.querySelector('textarea').value, text); equal(current().source, text); equal(calls.length, 0);
+  });
+
+  await test('invalid Mermaid remains editable with a visibly stale preview, then recovers', async () => {
+    await mount(); const oldSvg = current().svgLight;
+    button('Mermaid').click(); await delay();
+    const field = fixture.querySelector('textarea'); field.focus(); field.value = 'flowchart LR\n A[';
+    field.dispatchEvent(new Event('input', { bubbles: true })); await settle();
+    assert(current().source === 'flowchart LR\n A[', 'Invalid source lost: ' + JSON.stringify({source: current().source, field: field.value, focused: document.activeElement === field, calls})); equal(current().svgLight, oldSvg);
+    assert(fixture.querySelector('.diagram-error'));
+    assert(fixture.textContent.includes('last rendered diagram'));
+    field.value = source('Recovered'); field.dispatchEvent(new Event('input', { bubbles: true })); await settle();
+    assert(D.diagramPreviewCurrent(current())); assert(!fixture.querySelector('.diagram-error'));
+    button('Visual').click(); await settle(); assert(fixture.querySelector('.visual-diagram-editor'));
+  });
+  L.render(null, fixture);
+} catch (e) { failed++; lines.push(e.stack); }
+document.getElementById('result').textContent = `${passed} passed; ${failed} failed\n` + lines.join('\n');
+document.body.dataset.result = failed ? 'fail' : 'pass';
+</script>
+</html>

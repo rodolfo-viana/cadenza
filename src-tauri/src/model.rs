@@ -43,7 +43,40 @@ pub struct Deck {
     /// A theme made with the Theme Builder, carried inside the presentation
     /// so it renders anywhere. Active when `theme` equals its id.
     pub custom_theme: Option<crate::custom_theme::ThemeDef>,
+    /// Persistent, per-object interoperability losses reported by an importer.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub import_issues: Vec<ImportIssue>,
     pub slides: Vec<Slide>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportIssue {
+    pub code: String,
+    pub severity: IssueSeverity,
+    /// One-based slide number; zero for presentation-wide issues.
+    pub slide: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub element: Option<String>,
+    pub feature: String,
+    pub disposition: IssueDisposition,
+    pub message: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum IssueSeverity {
+    Warning,
+    Error,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum IssueDisposition {
+    Rasterized,
+    Approximated,
+    Placeholder,
+    Omitted,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
@@ -71,6 +104,7 @@ impl Default for Deck {
             web_fonts: Vec::new(),
             guides: Guides::default(),
             custom_theme: None,
+            import_issues: Vec::new(),
             slides: Vec::new(),
         }
     }
@@ -445,6 +479,10 @@ pub struct Element {
     pub build: Build,
     /// Click action during the presentation.
     pub action: Action,
+    /// Historical input for a chart/table. Content remains authoritative;
+    /// editing its cells or series never rewrites this original text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_source: Option<DataSource>,
     pub content: Content,
 }
 
@@ -467,7 +505,40 @@ impl Default for Element {
             style: BoxStyle::default(),
             build: Build::default(),
             action: Action::default(),
+            data_source: None,
             content: Content::Text(TextContent::default()),
+        }
+    }
+}
+
+/// Exact delimited input and the interpretation chosen when generating data.
+/// `name` is a display filename, never a filesystem path.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DataSource {
+    pub text: String,
+    pub name: String,
+    pub delimiter: String,
+    /// "csv" or the explicitly selected "pgfplots" brace/LaTeX extension.
+    pub dialect: String,
+    pub header: bool,
+    pub transpose: bool,
+    pub roles: Vec<String>,
+    /// Current data has subsequently been edited independently of the source.
+    pub edited: bool,
+}
+
+impl Default for DataSource {
+    fn default() -> Self {
+        Self {
+            text: String::new(),
+            name: String::new(),
+            delimiter: ",".into(),
+            dialect: "csv".into(),
+            header: false,
+            transpose: false,
+            roles: vec![],
+            edited: false,
         }
     }
 }
@@ -1084,6 +1155,17 @@ pub struct DiagramContent {
     pub mode: String,
     pub svg_light: String,
     pub svg_dark: String,
+    /// Inputs represented by the SVG cache; absent for legacy documents.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rendered_for: Option<DiagramRenderInputs>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagramRenderInputs {
+    pub source: String,
+    pub style: String,
+    pub look: String,
 }
 
 impl Default for DiagramContent {
@@ -1095,6 +1177,7 @@ impl Default for DiagramContent {
             mode: "auto".into(),
             svg_light: String::new(),
             svg_dark: String::new(),
+            rendered_for: None,
         }
     }
 }

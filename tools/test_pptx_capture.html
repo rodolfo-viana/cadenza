@@ -1,0 +1,59 @@
+<!doctype html><meta charset="utf-8"><title>Cadenza PPTX capture regressions</title>
+<pre id="result">Running…</pre><script type="module">
+let passed=0,failed=0; const lines=[];
+const assert=(x,m='Assertion failed')=>{if(!x)throw new Error(m);};
+async function test(name, fn) {try{await fn();passed++;lines.push('PASS '+name);}catch(e){failed++;lines.push('FAIL '+name+'\n'+e.stack);}document.querySelector('pre').textContent=lines.join('\n');}
+const source=await fetch('../ui/pptx-capture.html').then(r=>r.text());
+const svg='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect width="50" height="50" fill="red"/></svg>');
+const html=`<div class="cz-bg" style="background-image:url('${svg}');background-size:cover"></div><div class="cz-el" data-cz-id="math" style="left:100px;top:100px;width:300px;height:120px"><div class="cz-math" data-latex="x^2+1"></div><svg width="20" height="20"><style>.diagram-color{fill:rgb(1, 2, 3)}</style><rect class="diagram-color" width="20" height="20"/></svg></div><div class="cz-el" data-cz-id="media" style="left:500px;top:100px;width:200px;height:100px"><video autoplay src="https://example.invalid/movie.mp4"></video><iframe src="https://example.invalid/embed"></iframe><div class="cz-camera-box"></div></div>`;
+async function capture(options={}) {
+ const frame=document.createElement('iframe');frame.style='width:640px;height:360px;border:0';
+ frame.srcdoc=source.replace('<head>','<head><base href="'+new URL('../ui/',location.href)+'">').replace(/<script type="module"[^>]*><\/script>/,'');
+ await new Promise((yes,no)=>{frame.onload=yes;frame.onerror=no;setTimeout(()=>no(new Error('Frame did not load')),2000);document.body.append(frame);});
+ const w=frame.contentWindow;let called=0, cameras=0;const errors=[];w.addEventListener('error',e=>errors.push(e.message));w.addEventListener('securitypolicyviolation',e=>errors.push(e.violatedDirective+':'+e.blockedURI));
+ w.navigator.mediaDevices.getUserMedia=()=>{cameras++;throw new Error('Camera must remain off');};
+ const data={width:1280,height:720,html,themeCss:'vendor/reveal/theme/white.css',deckCss:'',codeTheme:'monokai',...options};
+ let timer;
+ const result=await new Promise((yes,no)=>{
+  timer=setTimeout(()=>no(new Error('Capture did not become ready: '+called+' calls; '+errors.join('; '))),3500);
+  w.__TAURI__={core:{invoke:async(name,args)=>{called++;if(name==='pptx_capture_data')return data;if(name==='pptx_capture_ready'){yes(args);return;}throw new Error(name);}}};
+  const script=w.document.createElement('script');script.type='module';script.onload=()=>errors.push('module loaded');script.onerror=()=>errors.push('module load error');script.src=new URL('../ui/js/pptx-capture.js',location.href);w.document.body.append(script);
+ });
+ clearTimeout(timer); return {frame,w,data,result,called,cameras};
+}
+await test('capture waits for local styles/fonts/images and removes media before mounting',async()=>{
+ const c=await capture();try{
+  assert(!c.result.error,c.result.error);assert(c.called===2);assert(c.cameras===0);
+  assert(!c.w.document.querySelector('video,iframe,.cz-camera-box'));
+  assert(c.w.document.querySelectorAll('.cz-preview-media').length===3);
+  assert(c.w.document.querySelector('.katex'));
+  assert(c.w.getComputedStyle(c.w.document.querySelector('[data-cz-id=math]')).color==='rgb(34, 34, 34)','body text inherits the theme rather than viewport black');
+  assert(c.w.getComputedStyle(c.w.document.querySelector('.diagram-color')).fill==='rgb(1, 2, 3)');
+  const bg=c.w.document.querySelector('.cz-bg').getBoundingClientRect();assert(bg.width===640&&bg.height===360,'background fills native stage');
+  assert(c.result.bounds.w===640&&c.result.bounds.h===360&&c.result.bounds.scale===0.5);
+ }finally{c.frame.remove();}
+});
+await test('isolated object retains its placement and hides siblings/background',async()=>{
+ const c=await capture({elementId:'math'});try{
+  assert(!c.result.error,c.result.error);assert(c.w.document.documentElement.classList.contains('isolated'));
+  assert(c.w.getComputedStyle(c.w.document.querySelector('section')).backgroundColor==='rgba(0, 0, 0, 0)');
+  assert(c.w.getComputedStyle(c.w.document.querySelector('.cz-bg')).visibility==='hidden');
+  assert(c.w.getComputedStyle(c.w.document.querySelector('[data-cz-id=media]')).visibility==='hidden');
+  const b=c.result.bounds;assert(b.x===38&&b.w===174&&b.y>=0&&b.y<=38&&b.y+b.h>=122,JSON.stringify(b)); // Math glyphs can extend above the nominal box.
+ }finally{c.frame.remove();}
+});
+await test('isolated rotated artwork includes its transformed bounds and shadow margin',async()=>{
+ const c=await capture({elementId:'rotated',html:'<div class="cz-el" data-cz-id="rotated" style="left:300px;top:250px;width:300px;height:60px"><div class="cz-rot" style="transform:rotate(90deg)"><div class="cz-box" style="background:red;box-shadow:0 14px 36px black"></div></div></div>'});try{
+  assert(!c.result.error,c.result.error);const b=c.result.bounds;
+  // Rotated geometry spans y=130..430 in slide coordinates, not the outer
+  // element's y=250..310. The capture must include it before adding margins.
+  assert(b.y<=65&&b.y+b.h>=215,'rotated object would be cut: '+JSON.stringify(b));
+  assert(b.x<150&&b.x+b.w>300,'shadow allowance surrounds artwork');
+ }finally{c.frame.remove();}
+});
+await test('background-only capture hides objects and missing targets return an error',async()=>{
+ const c=await capture({background:true});try{assert(!c.result.error,c.result.error);assert(c.w.getComputedStyle(c.w.document.querySelector('.cz-el')).visibility==='hidden');assert(c.w.getComputedStyle(c.w.document.querySelector('.cz-bg')).visibility==='visible');}finally{c.frame.remove();}
+ const bad=await capture({elementId:'missing'});try{assert(bad.result.error.includes('not rendered'));}finally{bad.frame.remove();}
+});
+document.querySelector('pre').textContent=lines.join('\n')+`\n${passed} passed, ${failed} failed`;document.body.dataset.result=failed?'fail':'pass';
+</script>

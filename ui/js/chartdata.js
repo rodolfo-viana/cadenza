@@ -45,10 +45,10 @@ export function delimiterOf(text) {
 const plainLatex = (s) => s.replace(/\\[a-zA-Z]+\{([^{}]*)\}/g, '$1').replace(/\\([%&$#_])/g, '$1');
 
 /**
- * Splits delimited text into rows of trimmed cells. "Quotes" and, as in
- * pgfplots tables, {braces} keep separators inside a cell.
+ * Reads ordinary delimited text without assigning meaning to literal braces.
+ * The optional pgfplots dialect supports brace groups and LaTeX commands.
  */
-export function parseRows(text, delimiter = delimiterOf(text)) {
+export function parseRows(text, delimiter = delimiterOf(text), dialect = 'csv') {
   const src = String(text).replace(/^﻿/, '');
   const rows = [];
   let row = [];
@@ -56,15 +56,18 @@ export function parseRows(text, delimiter = delimiterOf(text)) {
   let mode = ''; // '"' inside quotes, '{' inside braces
   let depth = 0;
   let braced = false;
+  let quoted = false;
   const endCell = () => {
-    const v = cell.trim();
+    const v = quoted ? cell : cell.trim();
     row.push(braced ? plainLatex(v) : v);
     cell = '';
     braced = false;
+    quoted = false;
   };
   const endRow = () => {
     endCell();
-    if (row.some((c) => c !== '')) rows.push(row);
+    // Empty delimited cells are a real row of missing values, unlike a blank line.
+    if (row.length > 1 || row.some((c) => c !== '')) rows.push(row);
     row = [];
   };
   for (let i = 0; i < src.length; i++) {
@@ -82,7 +85,8 @@ export function parseRows(text, delimiter = delimiterOf(text)) {
     } else if (c === '"' && !cell.trim()) {
       cell = '';
       mode = '"';
-    } else if (c === '{' && !cell.trim()) {
+      quoted = true;
+    } else if (dialect === 'pgfplots' && c === '{' && !cell.trim()) {
       cell = '';
       mode = '{';
       depth = 1;
@@ -138,9 +142,8 @@ const transposed = (rows) => (rows[0] || []).map((_, j) => rows.map((r) => r[j] 
  * Reads text as a table of columns. `header`: 'auto' (decided from the
  * cells), true or false; `transpose` swaps rows and columns first.
  */
-export function readTable(text, { header = 'auto', transpose = false } = {}) {
-  const delimiter = delimiterOf(text);
-  let grid = parseRows(text, delimiter);
+export function readTable(text, { header = 'auto', transpose = false, delimiter = delimiterOf(text), dialect = 'csv' } = {}) {
+  let grid = parseRows(text, delimiter, dialect);
   if (transpose) grid = transposed(grid);
   if (!grid.length) return { columns: [], rows: 0, header: false, delimiter };
   const isText = (c) => c !== '' && Number.isNaN(parseNumber(c, delimiter));
@@ -169,7 +172,7 @@ export function readTable(text, { header = 'auto', transpose = false } = {}) {
       distinct: new Set(cells.filter((c) => c !== '')).size,
     };
   });
-  return { columns, rows: rows.length, header: named, delimiter };
+  return { columns, rows: rows.length, header: named, delimiter, grid };
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +213,7 @@ export function guessRoles(table) {
   // Labels: the text column with the most different values.
   let label = -1;
   columns.forEach((c, j) => {
-    if (!c.numeric && c.distinct >= 2 && (label < 0 || c.distinct > columns[label].distinct)) label = j;
+    if (!c.numeric && c.distinct >= 1 && (label < 0 || c.distinct > columns[label].distinct)) label = j;
   });
   const numeric = columns.map((c, j) => j).filter((j) => columns[j].numeric);
   const indexes = numeric.filter((j) => isIndex(columns[j], j, rows));
@@ -355,7 +358,7 @@ export function chartLinks(table, roles) {
  * CHART_TYPES), as the content of a chart of that type. Maps are left to
  * the caller: whether the labels name regions is known in Rust.
  */
-export function chartChoices(table, roles, kinds) {
+export function chartChoices(table, roles, kinds, { current = null } = {}) {
   const { labels, series, errorBars } = chartData(table, roles);
   const links = chartLinks(table, roles);
   const n = labels.length;
@@ -370,7 +373,9 @@ export function chartChoices(table, roles, kinds) {
     const v = parseNumber(l, table.delimiter);
     return Number.isFinite(v) ? v : null;
   };
-  const xs = label >= 0 && table.columns[label].numeric ? labels.map(number) : null;
+  // A scatter chart already has its X series. Numeric point labels are
+  // labels, not another inferred axis, when editing that existing model.
+  const xs = current?.chart !== 'scatter' && label >= 0 && table.columns[label].numeric ? labels.map(number) : null;
   const scatter = xs && S >= 1 ? [{ ...series[0], name: table.columns[label].name, values: xs, low: [], high: [] }, ...series] : S >= 2 ? series : null;
   const candles = S === 4 && n > 0 && labels.every((_, i) => {
     const [open, high, low, close] = series.map((s) => s.values[i]);
@@ -405,7 +410,7 @@ export function chartChoices(table, roles, kinds) {
       content: {
         ...base,
         chart: kind,
-        ...(kind === 'scatter' && { series: scatter, labels: xs ? [] : labels }),
+        ...(kind === 'scatter' && { series: scatter, labels: xs || (current?.chart === 'scatter' && !current.labels.length && labels.every((s) => s === '')) ? [] : labels }),
         ...((kind === 'sankey' || kind === 'network') && { links }),
       },
     }));
@@ -417,8 +422,29 @@ export function chartChoices(table, roles, kinds) {
 
 const csvCell = (v) => {
   const s = v === null || v === undefined ? '' : String(v);
-  return /[",\n\r]/.test(s) || s !== s.trim() ? `"${s.replace(/"/g, '""')}"` : s;
+  // A leading brace belongs to the value, not the pgfplots table extension
+  // accepted by parseRows. Quote every delimiter recognized by delimiterOf.
+  return /[",;\t\n\r]/.test(s) || s.startsWith('{') || s !== s.trim() ? `"${s.replace(/"/g, '""')}"` : s;
 };
+
+export const rowsToCsv = (rows) => rows.map((r) => r.map(csvCell).join(',')).join('\n');
+
+const errorColumns = (c) => ({
+  pm: [['high', '±', 'pm']],
+  amounts: [['low', '−', 'minus'], ['high', '+', 'plus']],
+  range: [['low', 'lower', 'low'], ['high', 'upper', 'high']],
+}[c.errorBars] || []);
+
+/**
+ * Existing chart data has known column roles. Passing it through inference
+ * would lose singleton/repeated labels and reinterpret a series named SE.
+ * Keep text and its interpretation together at the editing interface.
+ */
+export function chartInput(c) {
+  const linked = c.chart === 'sankey' || c.chart === 'network';
+  const roles = linked ? ['label', 'group', 'value'] : ['label', ...c.series.flatMap(() => ['value', ...errorColumns(c).map(([, , role]) => role)])];
+  return { text: toCsv(c), header: true, transpose: false, delimiter: ',', dialect: 'csv', roles };
+}
 
 /** A chart's data as CSV: a column of labels, then each series (with its error bars). */
 export function toCsv(c) {
@@ -427,13 +453,13 @@ export function toCsv(c) {
     lines.push([t('From'), t('To'), t('Value')]);
     for (const l of c.links || []) lines.push([l.from, l.to, l.value]);
   } else {
-    const mode = c.errorBars || '';
-    const errs = { pm: [['high', '±']], amounts: [['low', '−'], ['high', '+']], range: [['low', 'lower'], ['high', 'upper']] }[mode] || [];
+    const errs = errorColumns(c);
     const n = Math.max(c.labels.length, ...c.series.map((s) => s.values.length));
     lines.push(['', ...c.series.flatMap((s) => [s.name, ...errs.map(([, suffix]) => `${s.name} ${suffix}`)])]);
     for (let i = 0; i < n; i++) {
-      lines.push([c.labels[i] ?? '', ...c.series.flatMap((s) => [s.values[i] ?? '', ...errs.map(([key]) => s[key]?.[i] ?? '')])]);
+      lines.push([c.labels[i] ?? '', ...c.series.flatMap((s) => [s.values[i] ?? '', ...errs.map(([key]) =>
+        s[key]?.[i] ?? (c.errorBars === 'pm' ? s.low?.[i] : null) ?? '')])]);
     }
   }
-  return lines.map((r) => r.map(csvCell).join(',')).join('\n');
+  return rowsToCsv(lines);
 }

@@ -803,6 +803,7 @@ fn video_element(v: &VideoContent, el: &Element, ctx: &Ctx) -> Option<String> {
             u
         } else {
             let mut u = format!("https://player.vimeo.com/video/{id}?api=1");
+            let _ = write!(u, "&controls={}", u8::from(v.controls));
             if v.muted {
                 u.push_str("&muted=1");
             }
@@ -1370,6 +1371,32 @@ mod tests {
         }));
         let html = sections(&deck, &ctx(Mode::Show));
         assert!(html.contains(r#"src="assets/abc.png""#));
+    }
+
+    #[test]
+    fn vimeo_controls_are_forwarded_without_changing_playback() {
+        for mode in [Mode::Show, Mode::Export] {
+            for flags in 0..16 {
+                let controls = flags & 1 != 0;
+                let muted = flags & 2 != 0;
+                let looped = flags & 4 != 0;
+                let autoplay = flags & 8 != 0;
+                let deck = deck_with(Content::Video(VideoContent {
+                    src: "https://vimeo.com/76979871".into(),
+                    controls,
+                    muted,
+                    looped,
+                    autoplay,
+                    ..Default::default()
+                }));
+                let html = sections(&deck, &ctx(mode));
+                assert!(html.contains(&format!("&amp;controls={}", u8::from(controls))), "{html}");
+                assert_eq!(html.contains("&amp;muted=1"), muted);
+                assert_eq!(html.contains("&amp;loop=1"), looped);
+                assert_eq!(html.contains("data-autoplay"), autoplay);
+                assert!(!html.contains("background=1"));
+            }
+        }
     }
 
     #[test]

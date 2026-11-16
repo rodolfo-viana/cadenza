@@ -148,7 +148,7 @@ export function Navigator() {
       item('slide.new'),
       { label: t('New Slide with Layout'), icon: 'layout-template', children: st.info.layouts.map((l) => ({ label: t(l.name), run: () => A.addSlide(l.id) })) },
       '-',
-      { label: t('Copy'), icon: 'copy', keys: 'Mod+C', run: () => document.execCommand('copy') },
+      { label: t('Copy'), icon: 'copy', keys: 'Mod+C', run: () => A.copySelection() },
       { label: t('Paste'), icon: 'clipboard-paste', keys: 'Mod+V', run: A.pasteFromMenu },
       item('slide.duplicate'),
       item('slide.delete', { danger: true, label: sel.length > 1 ? tn('Delete {n} Slide', 'Delete {n} Slides', sel.length) : t('Delete Slide') }),

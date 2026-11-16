@@ -19,6 +19,39 @@ function deferred() {
 // Copied media stays in the backend; the clipboard names its snapshot.
 const SNAPSHOT = '0123456789abcdef0123456789abcdef';
 
+for (const scope of ['canvas', 'slides']) {
+  for (const cut of [false, true]) {
+    test(`menu clipboard ${cut ? 'cut' : 'copy'} works for ${scope} without a DOM clipboard event`, async () => {
+      const calls = [];
+      const nativeWrite = deferred();
+      const { S, A } = await ui(async (name, args) => {
+        calls.push({ name, args });
+        if (name === 'clipboard_copy') {
+          await nativeWrite.promise;
+          return { ...clone(args.selection), media: SNAPSHOT };
+        }
+        if (name === 'doc_apply') return view('document-a', 2);
+      }, {}, { globals: { document: {
+        title: 'Cadenza', getElementById: () => null,
+        addEventListener() {}, removeEventListener() {},
+        execCommand: () => { throw new Error('WebKit has no editable clipboard focus'); },
+      } } });
+      S.openView(view());
+      S.select(['table-1']);
+      S.set({ focus: scope, selectedSlides: ['slide-1'] });
+      const result = A.copySelection(cut);
+      await tick();
+      assert.equal(calls.filter((c) => c.name === 'clipboard_copy').length, 1);
+      assert.equal(calls.some((c) => c.name === 'doc_apply'), false, 'cut waits for the native write');
+      assert.equal(calls[0].args.selection.type, scope === 'slides' ? 'slides' : 'elements');
+      nativeWrite.resolve();
+      await result;
+      assert.equal(calls.some((c) => c.name === 'doc_apply'), cut);
+      if (cut) assert.equal(calls.find((c) => c.name === 'doc_apply').args.op.op, scope === 'slides' ? 'deleteSlides' : 'cutElements');
+    });
+  }
+}
+
 function view(id = 'document-a', revision = 1) {
   return {
     docId: id, revision, path: '/saved.cadenza', fileName: 'Saved', dirty: false, full: true,
@@ -30,7 +63,7 @@ function view(id = 'document-a', revision = 1) {
   };
 }
 
-async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, quiet = false, api = {}, globals = {} } = {}) {
+async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, quiet = false, api = {}, globals = {}, dynamic = {} } = {}) {
   const context = vm.createContext({
     console: quiet ? { ...console, error() {} } : console, queueMicrotask, clearTimeout, URL,
     setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); if (ms >= 1000) timer.unref(); return timer; },
@@ -50,6 +83,7 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
     'i18n.js': { t: (s) => s, N_: (s) => s, setLanguage: async () => {}, language: () => 'en', isRtl: () => false },
     'controls.js': { parseColor: () => null, toCss: (v) => v, Toggle() {} },
     'icons.js': { Icon() {} },
+    ...dynamic,
   };
   const cache = new Map();
   function module(name) {
@@ -59,7 +93,14 @@ async function ui(invoke, clipboard = {}, { importBytes = () => {}, hooks = {}, 
       ? new vm.SyntheticModule(Object.keys(exports), function () {
           for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
         }, { context, identifier: name })
-      : new vm.SourceTextModule(fs.readFileSync(path.join(root, name), 'utf8'), { context, identifier: name });
+      : new vm.SourceTextModule(fs.readFileSync(path.join(root, name), 'utf8'), {
+          context, identifier: name, importModuleDynamically: async (specifier) => {
+            const loaded = module(path.basename(specifier));
+            if (loaded.status === 'unlinked') await loaded.link((child) => module(path.basename(child)));
+            if (loaded.status === 'linked') await loaded.evaluate();
+            return loaded;
+          },
+        });
     cache.set(name, mod);
     return mod;
   }
@@ -86,6 +127,84 @@ function editTable(S, T) {
   T.beginTableEdit(slideView, S.currentSlide().elements[0]);
   cell.innerHTML = 'Unsaved cell';
 }
+
+for (const action of ['undo', 'redo']) {
+  test(`a delayed ${action} response never replaces a newer document`, async () => {
+    const response = deferred();
+    const calls = [];
+    const { S } = await ui(async (name, args) => {
+      calls.push({ name, args });
+      if (name === `doc_${action}`) return response.promise;
+    });
+    S.openView({ ...view(), canUndo: true, canRedo: true });
+    const pending = S[action]();
+    await tick();
+    S.openView(view('document-b'));
+    response.resolve(view('document-a', 2));
+    await pending;
+    assert.equal(S.state.doc.docId, 'document-b');
+    assert.equal(calls.find((c) => c.name === `doc_${action}`).args.docId, 'document-a');
+  });
+}
+
+test('an HTML export is abandoned when its save dialog belongs to a replaced document', async () => {
+  const dialog = deferred();
+  const calls = [];
+  const { S, A } = await ui(async (name, args) => { calls.push({ name, args }); return '/old.html'; }, {}, {
+    api: { dialog: { save: () => dialog.promise } },
+    dynamic: { 'diagrams.js': { ensureDiagrams: async () => {} } },
+  });
+  S.openView(view());
+  const pending = A.exportHtml(true);
+  await tick();
+  S.openView(view('document-b'));
+  dialog.resolve('/old.html');
+  await pending;
+  assert.equal(calls.some((c) => c.name === 'export_html'), false);
+});
+
+for (const action of ['exportHtml', 'exportPdf']) {
+  test(`${action} abandons a replaced document during diagram preparation and otherwise passes its identity`, async () => {
+    for (const replace of [true, false]) {
+      const prepared = deferred();
+      const calls = [];
+      const { S, A } = await ui(async (name, args) => { calls.push({ name, args }); return '/old.html'; }, {}, {
+        api: { dialog: { save: async () => '/old.html' } },
+        dynamic: { 'diagrams.js': { ensureDiagrams: () => prepared.promise } },
+      });
+      S.openView(view());
+      const pending = A[action](true);
+      await tick();
+      if (replace) S.openView(view('document-b'));
+      prepared.resolve();
+      await pending;
+      const command = calls.find((c) => c.name === (action === 'exportHtml' ? 'export_html' : 'export_pdf'));
+      assert.equal(!!command, !replace);
+      if (command) assert.equal(command.args.docId, 'document-a');
+    }
+  });
+}
+
+test('a delayed Markdown import never ingests its old document into a replacement', async () => {
+  const imported = deferred();
+  const calls = [];
+  const { S, A } = await ui(async (name, args) => {
+    calls.push({ name, args });
+    if (name === 'import_markdown') return imported.promise;
+  }, {}, { api: { dialog: { open: async () => '/input.md' } } });
+  const original = view();
+  Object.assign(original.deck.slides[0], { notes: '', background: { kind: 'theme' } });
+  S.openView(original);
+  const pending = A.importMarkdown();
+  await tick();
+  S.state.modal.props.resolve('append');
+  await tick();
+  S.openView(view('document-b'));
+  imported.resolve(view('document-a', 2));
+  await pending;
+  assert.equal(S.state.doc.docId, 'document-b');
+  assert.equal(calls.find((c) => c.name === 'import_markdown').args.docId, 'document-a');
+});
 
 function editText(S, T) {
   const node = {
@@ -853,7 +972,7 @@ test('data in CSV form is read with its quotes, braces, separators and decimal c
   const D = await chartdata();
   eq((D.parseRows('a,"b, c","say ""hi"""\n\n1,2,3\r\n')), [['a', 'b, c', 'say "hi"'], ['1', '2', '3']]);
   // pgfplots tables: braces keep commas, LaTeX commands become text.
-  eq((D.parseRows('label,gain\n{regressão, banco (r5x)},3.04\n{\\emph{plug-in} (q9x)},0.85')), [
+  eq((D.parseRows('label,gain\n{regressão, banco (r5x)},3.04\n{\\emph{plug-in} (q9x)},0.85', ',', 'pgfplots')), [
     ['label', 'gain'], ['regressão, banco (r5x)', '3.04'], ['plug-in (q9x)', '0.85'],
   ]);
   assert.equal(D.delimiterOf('a;b;c\n1,5;2,5;3'), ';');
@@ -883,7 +1002,7 @@ test('the columns of real data get their roles and make the charts they can', as
   const groups = D.readTable(`idx,group,r9decx,r9decxminus,r9decxplus,meta,metaminus,metaplus,uniform,uniformminus,uniformplus
 0.0000,{completo},0.0628,0.2085,0.1691,0.5286,0.5365,0.6413,-0.7036,0.2896,0.2679
 1.0000,{ausências},0.0852,0.1844,0.1736,0.5821,0.3277,0.4347,-0.6199,0.2623,0.2557
-2.0000,{local uniforme},0.0483,0.2108,0.1706,0.5264,0.5335,0.6406,-0.6996,0.2964,0.2724`);
+2.0000,{local uniforme},0.0483,0.2108,0.1706,0.5264,0.5335,0.6406,-0.6996,0.2964,0.2724`, { dialect: 'pgfplots' });
   const roles = D.guessRoles(groups);
   eq(roles, ['ignore', 'label', 'value', 'minus', 'plus', 'value', 'minus', 'plus', 'value', 'minus', 'plus']);
   const data = D.chartData(groups, roles);
@@ -900,7 +1019,7 @@ test('the columns of real data get their roles and make the charts they can', as
 0.0000,{1ª rodada},{fusao},1.4397,0.3262,0.3587
 1.0000,{plug-in (q9x)},{fusao},0.8504,0.3562,0.3849
 2.0000,{r9decx},{escolhida},3.8060,0.4536,0.4764
-3.0000,{regra},{regra},5.7045,0.6967,0.6736`);
+3.0000,{regra},{regra},5.7045,0.6967,0.6736`, { dialect: 'pgfplots' });
   const gainRoles = D.guessRoles(gain);
   eq(gainRoles, ['ignore', 'label', 'group', 'value', 'minus', 'plus']);
   const split = D.chartData(gain, gainRoles);
@@ -912,7 +1031,7 @@ test('the columns of real data get their roles and make the charts they can', as
   assert.ok(choices.some((c) => c.kind === 'sankey'), 'labels flow into their groups');
 
   // A column with one value throughout says nothing; the other names the rows.
-  const family = D.readTable('modality,family,joint,r9decx,rule\n{T1ce},{ruído},0.8549,0.8536,0.7656\n{T1ce},{ganho},0.7075,0.7336,0.7857');
+  const family = D.readTable('modality,family,joint,r9decx,rule\n{T1ce},{ruído},0.8549,0.8536,0.7656\n{T1ce},{ganho},0.7075,0.7336,0.7857', { dialect: 'pgfplots' });
   eq(D.guessRoles(family), ['ignore', 'label', 'value', 'value', 'value']);
 
   // Lower and upper ends, and ± given beside them, become ends.
@@ -1080,7 +1199,7 @@ async function control(name, props) {
     },
     useRef: (current) => slot(() => ({ current })),
     useMemo: (f) => f(),
-    useLayoutEffect() {},
+    useLayoutEffect(fn, deps) { return lib.useEffect(fn, deps); },
     useEffect(fn, deps) {
       const s = slot(() => ({ deps: null }));
       if (!s.deps || deps.some((d, k) => d !== s.deps[k])) {

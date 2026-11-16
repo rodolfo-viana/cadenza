@@ -1,0 +1,25 @@
+/* MathLive edits equations; slide equations keep the existing KaTeX styles. */
+.math-editor { min-width: 0; }
+.mathlive-field math-field {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--input);
+  color: var(--text);
+  font-size: 24px;
+  user-select: text;
+  -webkit-user-select: text;
+  --caret-color: var(--accent);
+  --selection-background-color: var(--accent-soft);
+  --contains-highlight-background-color: var(--accent-soft);
+}
+.mathlive-field math-field:focus-within { border-color: var(--accent); }
+.mathlive-field math-field::part(virtual-keyboard-toggle) { display: none; }
+.math-inserts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 8px; }
+.math-inserts .btn { justify-content: center; }
+.math-editor-error { color: var(--danger); font-size: 12px; white-space: pre-wrap; }
+body { --keyboard-zindex: 1500; }

@@ -14,6 +14,7 @@ import { MediaLibrary, KeyPrompt } from './media.js';
 import { CropDialog } from './crop.js';
 import { ThemeBuilder } from './themebuilder.js';
 import { ChartData } from './datachart.js';
+import { PptxExport, PptxImportReport } from './pptx-dialog.js';
 import { UpdateDialog, checkForUpdates } from './updates.js';
 import { t, N_, LANGUAGES } from './i18n.js';
 
@@ -21,7 +22,7 @@ export function ModalHost() {
   const st = useStore();
   const m = st.modal;
   if (!m) return null;
-  const C = { crop: CropDialog, unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder, chartData: ChartData, update: UpdateDialog }[m.type];
+  const C = { crop: CropDialog, unsaved: Unsaved, prompt: Prompt, choice: Choice, settings: Settings, shortcuts: Shortcuts, about: About, palette: Palette, media: MediaLibrary, themeBuilder: ThemeBuilder, chartData: ChartData, update: UpdateDialog, pptxExport: PptxExport, pptxImportReport: PptxImportReport }[m.type];
   return C ? html`<${C} ...${m.props} />` : null;
 }
 

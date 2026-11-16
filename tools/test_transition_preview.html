@@ -1,0 +1,89 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cadenza transition preview regression tests</title>
+<pre id="result">Running…</pre>
+<script type="module">
+import { previewPair, previewConfig, inertPreview } from '../ui/js/transition-preview.js';
+let passed=0, failed=0;
+const lines=[];
+function assert(value, message='Assertion failed') { if (!value) throw new Error(message); }
+function equal(a,b) { assert(JSON.stringify(a)===JSON.stringify(b), `${JSON.stringify(a)} != ${JSON.stringify(b)}`); }
+async function test(name,fn) { try { await fn(); passed++; lines.push('PASS '+name); } catch(e) { failed++; lines.push('FAIL '+name+'\n'+e.stack); } document.getElementById('result').textContent=lines.join('\n'); }
+const data={width:1280,height:720,themeCss:'vendor/reveal/theme/black.css',deckCss:'',needs:{},
+ config:{width:1280,height:720,center:false,transition:'fade',transitionSpeed:'slow',backgroundTransition:'slide',autoAnimate:true,autoSlide:300},
+ slides:[{id:'a',h:0,v:0},{id:'b',h:0,v:1},{id:'c',h:1,v:0}],
+ sections:`<section><section id="a" data-transition="zoom" data-auto-animate data-autoslide="20"><div class="cz-el" data-id="same" style="position:absolute;left:10px;top:20px;width:80px;height:40px"><div class="fragment cz-path" style="offset-path:path('M 0 0 L 100 50')">A</div></div></section><section id="b" data-transition="fade" data-transition-speed="fast" data-auto-animate data-background-color="#123456"><div class="cz-el" data-id="same" style="position:absolute;left:200px;top:120px;width:160px;height:80px">B</div><p class="fragment">Incoming build</p></section></section><section id="c" data-background-video="https://example.invalid/bg.mp4"><iframe src="https://example.invalid/embed"></iframe><video autoplay src="https://example.invalid/a.mp4"></video><div class="cz-camera-box"><video class="cz-camera"></video></div><img src="https://example.invalid/image.png" onerror="throw 1"><a href="https://example.invalid">link</a></section>`};
+await test('pair follows visible order and preserves vertical transitions and metadata',()=>{
+ const pair=previewPair(data,'b'); equal(pair.target,{h:0,v:1}); assert(pair.hasPrevious);
+ equal([...pair.fragment.firstChild.children].map(s=>s.id),['a','b']);
+ assert(pair.fragment.querySelector('#a').dataset.transition==='zoom');
+ assert(pair.fragment.querySelector('#b').dataset.transitionSpeed==='fast');
+ assert(pair.fragment.querySelector('#b').hasAttribute('data-auto-animate'));
+});
+await test('cross-group transition is horizontal and first slide has no incoming transition',()=>{
+ const pair=previewPair(data,'c'); equal(pair.target,{h:1,v:0}); equal([...pair.fragment.children].map(s=>s.id),['b','c']);
+ const first=previewPair(data,'a'); assert(!first.hasPrevious); equal(first.target,{h:0,v:0});
+ let rejected=false; try { previewPair(data,'hidden'); } catch { rejected=true; } assert(rejected);
+});
+await test('live media, remote resources, links and per-slide timers removed before mounting',()=>{
+ const pair=previewPair(data,'c','Paused');
+ assert(!pair.fragment.querySelector('video,iframe,audio,[data-background-video],[data-autoslide],[onerror],a[href],img[src]'));
+ equal(pair.fragment.querySelectorAll('.cz-preview-media').length,3);
+ assert(data.sections.includes('autoplay')); // source untouched
+});
+await test('inert SVG retains local drawing references/styles while links and external images are removed',()=>{
+ const root=document.createElement('template');root.innerHTML='<style>body{display:none}</style><svg><style>.node{fill:red}</style><defs><path id="p" d="M0 0L10 10"/></defs><use href="#p"/><image href="https://example.invalid/a.png"/><a href="#p"><text>link</text></a></svg>';
+ inertPreview(root.content,'Media');assert(root.content.querySelectorAll('style').length===1);assert(root.content.querySelector('use').getAttribute('href')==='#p');assert(!root.content.querySelector('image').hasAttribute('href'));assert(!root.content.querySelector('a').hasAttribute('href'));
+});
+await test('preview keeps effects/speed/Magic Move but stops all autonomous controls',()=>{
+ const cfg=previewConfig(data.config);
+ equal([cfg.transition,cfg.transitionSpeed,cfg.backgroundTransition,cfg.autoAnimate],['fade','slow','slide',true]);
+ equal([cfg.autoSlide,cfg.autoPlayMedia,cfg.keyboard,cfg.touch,cfg.hash],[0,false,false,false,false]);
+ equal(data.config.autoSlide,300);
+});
+await test('real Reveal runtime reaches incoming slide with shared-object matcher and reset fragments',async()=>{
+ const frame=document.createElement('iframe'); frame.style='width:512px;height:288px'; frame.src='../ui/transition-preview.html';
+ await new Promise((resolve,reject)=>{ frame.onload=resolve; frame.onerror=reject; document.body.append(frame); });
+ const w=frame.contentWindow;
+ let camera=0,play=0; w.navigator.mediaDevices.getUserMedia=()=>{camera++; return Promise.reject(new Error('Camera called'));};
+ w.HTMLMediaElement.prototype.play=()=>{play++; return Promise.resolve();};
+ await Promise.race([w.CadenzaTransitionPreview.load(data,'b','Paused'),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Preview timed out: '+JSON.stringify({ready:w.Reveal.isReady(),slide:w.Reveal.getCurrentSlide()?.id,fonts:w.document.fonts.status}))),3000))]);
+ equal(w.Reveal.getCurrentSlide().id,'b'); equal(w.Reveal.getIndices().v,1);
+ equal(w.Reveal.getConfig().transition,'fade'); equal(w.Reveal.getConfig().transitionSpeed,'slow');
+ equal(w.Reveal.getConfig().autoSlide,0); assert(typeof w.Reveal.getConfig().autoAnimateMatcher==='function');
+ assert(w.document.querySelector('#a .cz-path').classList.contains('visible'));
+ assert(!w.document.querySelector('#b .fragment').classList.contains('visible'));
+ equal([camera,play],[0,0]); frame.remove();
+});
+// Exercise the actual Preact panel and native-transport boundary. Only IPC is
+// stubbed; lifecycle cancellation and button actions run as in the editor.
+const requests=[], nativeCalls=[];
+window.__TAURI__={core:{invoke:(name)=>{ nativeCalls.push(name); return new Promise((resolve,reject)=>requests.push({resolve,reject})); }},window:{getCurrentWindow:()=>({setTitle:async()=>{}})},event:{},dialog:{},clipboardManager:{}};
+const {html,render}=await import('../ui/js/lib.js');
+const {state}=await import('../ui/js/store.js');
+const {TransitionPreview}=await import('../ui/js/transition-preview-panel.js');
+const fixture=document.createElement('div');document.body.append(fixture);
+const pause=()=>new Promise(resolve=>setTimeout(resolve,80));
+function mount(slide,docId='doc-a',revision=1) { state.doc={docId,revision,deck:{slides:[slide]}};state.slideId=slide.id;render(html`<${TransitionPreview} slide=${slide} />`,fixture); }
+await test('panel ignores a response from a previously selected slide',async()=>{
+ mount({id:'b',hidden:false});await pause();fixture.querySelector('button').click();await pause();
+ mount({id:'c',hidden:false});await pause();requests.shift().resolve(data);await pause();
+ assert(!fixture.querySelector('iframe')); assert(!fixture.querySelector('[role=alert]'));
+});
+await test('panel ignores responses after document replacement or unmount',async()=>{
+ fixture.querySelector('button').click();await pause();mount({id:'c',hidden:false},'doc-b');await pause();requests.shift().resolve(data);await pause();assert(!fixture.querySelector('iframe'));
+ fixture.querySelector('button').click();await pause();render(null,fixture);requests.shift().resolve(data);await pause();assert(!fixture.querySelector('iframe'));
+});
+await test('hidden slides cannot be previewed and transport failure is visible and retryable',async()=>{
+ mount({id:'hidden',hidden:true});await pause();assert(fixture.querySelector('button').disabled);
+ mount({id:'b',hidden:false});await pause();fixture.querySelector('button').click();await pause();requests.shift().reject(new Error('Native preview unavailable'));await pause();
+ assert(fixture.querySelector('[role=alert]').textContent.includes('Native preview unavailable'));assert(!fixture.querySelector('button').disabled);
+});
+await test('successful panel preview is read-only and disposed when the document changes',async()=>{
+ fixture.querySelector('button').click();await pause();requests.shift().resolve(data);await pause();assert(fixture.querySelector('iframe'), fixture.textContent);
+ mount({id:'b',hidden:false},'doc-a',2);await pause();assert(!fixture.querySelector('iframe'));
+ assert(nativeCalls.length>=5 && nativeCalls.every(name=>name==='present_data'));render(null,fixture);fixture.remove();
+});
+document.getElementById('result').textContent=lines.join('\n')+`\n${passed} passed, ${failed} failed`;
+document.body.dataset.result=failed?'fail':'pass';
+</script>

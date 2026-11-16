@@ -1,0 +1,46 @@
+/* Visual diagram controls inherit the inspector's light/dark color tokens. */
+.diagram-editor { min-width: 0; }
+.diagram-visual-canvas {
+  display: block;
+  width: 100%;
+  min-height: 110px;
+  max-height: 230px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.diagram-visual-edge { color: var(--text-2); }
+.diagram-visual-edge text { fill: currentColor; font-size: 11px; }
+.diagram-visual-node { color: var(--text); outline: none; }
+.diagram-visual-node[role=button] { cursor: pointer; }
+.diagram-visual-node rect, .diagram-visual-node polygon, .diagram-visual-node circle {
+  fill: var(--panel);
+  stroke: var(--border);
+  stroke-width: 2px;
+}
+.diagram-visual-node text { fill: currentColor; font: 12px var(--font); pointer-events: none; }
+.diagram-visual-node.selected rect, .diagram-visual-node.selected polygon, .diagram-visual-node.selected circle,
+.diagram-visual-node:focus-visible rect, .diagram-visual-node:focus-visible polygon, .diagram-visual-node:focus-visible circle {
+  stroke: var(--accent);
+  stroke-width: 3px;
+}
+.diagram-subheading { margin: 14px 0 8px; font-size: 12px; font-weight: 600; }
+.diagram-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-block-end: 10px; }
+.diagram-template {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--panel);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.diagram-template:hover, .diagram-template:focus-visible { border-color: var(--accent); background: var(--accent-soft); }
+.diagram-thumbnail { width: 100%; height: 54px; }
+.diagram-render-status { display: flex; align-items: center; gap: 6px; margin-block: 8px; font-size: 11px; color: var(--text-2); }
+.visual-diagram-editor > .row-inline { flex-wrap: wrap; }
