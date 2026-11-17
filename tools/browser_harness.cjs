@@ -51,9 +51,9 @@ async function until(check, message) {
       for (const task of pending.values()) { clearTimeout(task.timer); task.reject(new Error('Browser connection closed')); }
       pending.clear();
     });
-    call = (method, params = {}) => new Promise((resolve, reject) => {
+    call = (method, params = {}, timeout = 5000) => new Promise((resolve, reject) => {
       const id = ++sequence;
-      const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out`)); }, 5000);
+      const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out`)); }, timeout);
       pending.set(id, { resolve, reject, timer });
       socket.send(JSON.stringify({ id, method, params }));
     });
@@ -66,7 +66,9 @@ async function until(check, message) {
     await call('Log.enable');
     await call('Runtime.enable');
     await call('Page.bringToFront');
-    await call('Page.navigate', { url });
+    // A cold Windows runner can take more than five seconds to commit the
+    // navigation. Keep its loading deadline separate from test completion.
+    await call('Page.navigate', { url }, 30000);
     try {
       await until(async () => ['pass', 'fail'].includes(await evaluate('document.body?.dataset.result')), 'Browser harness did not finish within 30 seconds');
       if (await evaluate('document.body?.dataset.result') === 'fail' && browserErrors.length) console.error(browserErrors.join('\n'));

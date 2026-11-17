@@ -113,18 +113,29 @@
     return Promise.all(videos.map(function (v) {
       return new Promise(function (resolve) {
         var done = false;
+        var frameRequest;
+        var seekComplete = false;
         var finish = function () {
           if (done) return;
           done = true;
           clearTimeout(timer);
-          v.removeEventListener('seeked', draw);
+          if (frameRequest !== undefined) v.cancelVideoFrameCallback(frameRequest);
+          v.removeEventListener('seeked', sought);
           v.removeEventListener('loadedmetadata', seek);
           v.removeEventListener('error', finish);
           resolve();
         };
-        var timer = setTimeout(finish, 5000);
+        var timer = setTimeout(function () {
+          // WebKit can omit frame callbacks for paused, offscreen videos in
+          // the paginated document. At the deadline use its decoded frame,
+          // but never replace media whose seek or decoding is still pending.
+          if (seekComplete && !v.seeking && v.readyState >= 2 && v.videoWidth > 0 && v.videoHeight > 0) draw();
+          else finish();
+        }, 5000);
         var draw = function () {
           if (done) return;
+          if (frameRequest !== undefined) v.cancelVideoFrameCallback(frameRequest);
+          frameRequest = undefined;
           try {
             var c = document.createElement('canvas');
             c.width = v.videoWidth;
@@ -139,11 +150,22 @@
           finish();
         };
         v.muted = true;
-        v.addEventListener('seeked', draw, { once: true });
+        // seeked/readyState can precede the decoder's first compositable
+        // frame. Drawing then silently produced a transparent canvas in
+        // Chromium. Keep the video alive until a frame has been presented.
+        var observesFrames = typeof v.requestVideoFrameCallback === 'function';
+        var sought = function () {
+          seekComplete = true;
+          if (!observesFrames) draw();
+        };
+        v.addEventListener('seeked', sought, { once: true });
         v.addEventListener('error', finish, { once: true });
         var seek = function () {
           if (done) return;
-          try { v.currentTime = Math.min(0.1, (v.duration || 1) / 2); }
+          try {
+            if (observesFrames) frameRequest = v.requestVideoFrameCallback(draw);
+            v.currentTime = Math.min(0.1, (v.duration || 1) / 2);
+          }
           catch (e) { finish(); }
         };
         if (v.readyState >= 1) seek();

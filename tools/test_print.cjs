@@ -96,6 +96,14 @@ function nearBox(actual, expected, label) {
     await call('Page.enable');
     await call('Page.addScriptToEvaluateOnNewDocument', { source: `
       window.printVideoTrace = [];
+      window.printVideoFrames = [];
+      const requestFrame = HTMLVideoElement.prototype.requestVideoFrameCallback;
+      if (requestFrame) HTMLVideoElement.prototype.requestVideoFrameCallback = function(callback) {
+        return requestFrame.call(this, (now, metadata) => {
+          window.printVideoFrames.push({ mediaTime: metadata.mediaTime, presentedFrames: metadata.presentedFrames });
+          callback(now, metadata);
+        });
+      };
       const draw = CanvasRenderingContext2D.prototype.drawImage;
       CanvasRenderingContext2D.prototype.drawImage = function(source, ...args) {
         if (source instanceof HTMLVideoElement) window.printVideoTrace.push({
@@ -119,7 +127,7 @@ function nearBox(actual, expected, label) {
     // canvas rendering and conceal the compositor failure being investigated.
     const trace = await evaluate(`(() => {
       const canvas = document.querySelector('.cz-video-box canvas');
-      return { draws: window.printVideoTrace, center: canvas && [...canvas.getContext('2d').getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data] };
+      return { frames: window.printVideoFrames, draws: window.printVideoTrace, center: canvas && [...canvas.getContext('2d').getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data] };
     })()`);
     fs.writeFileSync(path.join(output, 'video-trace.json'), JSON.stringify(trace, null, 2));
     cp.execFileSync('pdftoppm', ['-r', '96', pdfPath, path.join(output, 'page')]);

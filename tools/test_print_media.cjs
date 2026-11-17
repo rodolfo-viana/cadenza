@@ -62,6 +62,53 @@ test('a decoded frame preserves CSS sizing separately from bitmap resolution', a
   assert.equal(c.className, v.className); assert.equal(c.source, v); assert(v.paused);
   assert.equal(v.count(), 0); assert.equal(h.timers.size, 0);
 });
+test('printing waits for a presented video frame even when seeked has already fired', async () => {
+  let frame;
+  const v = video({ readyState: 1,
+    requestVideoFrameCallback(fn) { frame = fn; return 17; },
+    cancelVideoFrameCallback() {},
+  }), h = harness([v]);
+  let prepared = false;
+  const ready = h.print.prepareMedia().then(() => { prepared = true; });
+  v.dispatch('seeked'); await Promise.resolve();
+  assert.equal(v.replacement, undefined, 'seek completion is not a presented frame');
+  assert.equal(prepared, false); assert.equal(typeof frame, 'function');
+  frame(); await ready;
+  assert(v.replacement); assert.equal(v.replacement.source, v);
+  assert.equal(v.count(), 0); assert.equal(h.timers.size, 0);
+});
+test('an unavailable presented frame is cancelled and cannot mutate a finished print', async () => {
+  let frame, cancelled;
+  const v = video({ readyState: 1,
+    requestVideoFrameCallback(fn) { frame = fn; return 23; },
+    cancelVideoFrameCallback(id) { cancelled = id; },
+  }), h = harness([v]);
+  const ready = h.print.prepareMedia();
+  h.fireTimers(); await ready;
+  assert.equal(cancelled, 23); assert.equal(v.replacement, undefined);
+  frame(); assert.equal(v.replacement, undefined); assert.equal(v.count(), 0);
+});
+test('paused offscreen video without frame callbacks uses its completed decoded seek at the deadline', async () => {
+  let frame, cancelled;
+  const v = video({ readyState: 4,
+    requestVideoFrameCallback(fn) { frame = fn; return 31; },
+    cancelVideoFrameCallback(id) { cancelled = id; },
+  }), h = harness([v]);
+  const ready = h.print.prepareMedia();
+  v.dispatch('seeked'); assert.equal(v.replacement, undefined);
+  h.fireTimers(); await ready;
+  assert(v.replacement); assert.equal(cancelled, 31);
+  const captured = v.replacement;
+  frame(); assert.equal(v.replacement, captured); assert.equal(v.count(), 0);
+});
+test('the frame deadline preserves a video whose decoding or seek is still pending', async () => {
+  for (const state of [{ readyState: 1 }, { readyState: 4, seeking: true }, { readyState: 4, videoWidth: 0 }]) {
+    const v = video({ ...state, requestVideoFrameCallback() { return 37; }, cancelVideoFrameCallback() {} });
+    const h = harness([v]), ready = h.print.prepareMedia();
+    v.dispatch('seeked'); h.fireTimers(); await ready;
+    assert.equal(v.replacement, undefined); assert.equal(v.count(), 0);
+  }
+});
 for (const outcome of ['timeout', 'error', 'draw error', 'seek error', 'load error']) {
   test(`${outcome} preserves the video and forbids late mutation after printing becomes ready`, async () => {
     const v = video(); if (outcome === 'seek error') Object.defineProperty(v, 'currentTime', { set() { throw Error('seek failed'); } });

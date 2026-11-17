@@ -54,7 +54,7 @@ def main() -> None:
             result = subprocess.run(
                 [node, str(root / "tools" / "browser_harness.cjs"), browser,
                  f"http://127.0.0.1:{server.server_port}/tools/{args.page}", profile],
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=75, check=False,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=105, check=False,
             )
             report = re.search(r'<pre id="result">(.*?)</pre>', result.stdout, re.S)
             print(html.unescape(report.group(1)) if report else "Browser did not finish the test harness.")
