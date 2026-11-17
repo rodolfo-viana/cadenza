@@ -66,7 +66,7 @@ jobs:
 
       - name: Browser regression tests
         run: |
-          for page in test_editing.html test_diagrams.html test_math_editor.html test_transition_preview.html test_pptx_capture.html; do
+          for page in test_editing.html test_diagrams.html test_math_editor.html test_transition_preview.html test_pptx_capture.html test_present.html; do
             python3 tools/test_browser.py --browser google-chrome --page "$page"
           done
 
@@ -115,3 +115,22 @@ jobs:
       - name: Windows Rust tests
         working-directory: src-tauri
         run: cargo test --lib --locked
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Windows UI modules and tests
+        run: |
+          node tools/check_js.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --experimental-vm-modules --test tools/test_ui.cjs tools/test_data_source.cjs tools/test_diagram_visual.cjs tools/test_diagram_edits.cjs tools/test_math_edits.cjs tools/test_print_media.cjs tools/test_pptx_actions.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Windows browser regression tests
+        run: |
+          $edge = "${env:ProgramFiles(x86)}/Microsoft/Edge/Application/msedge.exe"
+          foreach ($page in @('test_editing.html', 'test_diagrams.html', 'test_math_editor.html', 'test_transition_preview.html', 'test_pptx_capture.html', 'test_present.html')) {
+            python tools/test_browser.py --browser $edge --page $page
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }

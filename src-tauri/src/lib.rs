@@ -490,20 +490,16 @@ fn doc_seal(window: Window, state: State<AppState>, doc_id: Option<String>) -> C
 }
 
 #[tauri::command]
-async fn doc_save(window: Window, state: State<'_, AppState>, path: Option<String>) -> CmdResult<DocView> {
+async fn doc_save(window: Window, state: State<'_, AppState>, path: Option<String>, doc_id: String) -> CmdResult<DocView> {
     let label = window.label().to_string();
-    let target = {
-        let docs = state.docs.lock().map_err(err)?;
-        let doc = docs.get(&label).ok_or("No presentation is open")?;
-        match path.map(PathBuf::from).or_else(|| doc.path.clone()) {
-            Some(p) => p,
-            None => return Err("NEEDS_PATH".into()),
-        }
-    };
-    let target = presentation_path(target);
-    let view = state.with_doc(&label, |doc| {
+    let (view, target) = state.with_doc_id(&label, &doc_id, |doc| {
+        let target = path
+            .map(PathBuf::from)
+            .or_else(|| doc.path.clone())
+            .ok_or_else(|| anyhow::anyhow!("NEEDS_PATH"))?;
+        let target = presentation_path(target);
         doc.save(&target).map_err(|e| localize_missing_media(window.app_handle(), &state, e))?;
-        Ok(doc.view(false, None))
+        Ok((doc.view(false, None), target))
     })?;
     state.remember_recent(&target);
     Ok(view)
@@ -546,8 +542,11 @@ fn doc_checkpoint(window: Window, state: State<AppState>) -> CmdResult<()> {
 }
 
 #[tauri::command]
-fn doc_close(window: Window, state: State<AppState>) -> CmdResult<()> {
+fn doc_close(window: Window, state: State<AppState>, doc_id: Option<String>) -> CmdResult<()> {
     let mut docs = state.docs.lock().map_err(err)?;
+    if let Some(doc) = docs.get(window.label()) {
+        doc.ensure_id(doc_id.as_deref().unwrap_or("")).map_err(err)?;
+    }
     if let Some(doc) = docs.remove(window.label()) {
         doc.dispose();
     }
@@ -1322,19 +1321,28 @@ fn present_data(window: Window, state: State<AppState>, doc_id: Option<String>) 
 
 /// Async, like every command that opens windows (see `export_pdf`).
 #[tauri::command]
-async fn present_start(app: AppHandle, window: Window, state: State<'_, AppState>, from_slide: Option<String>, presenter: Option<bool>) -> CmdResult<()> {
+async fn present_start(
+    app: AppHandle,
+    window: Window,
+    state: State<'_, AppState>,
+    from_slide: Option<String>,
+    presenter: Option<bool>,
+    doc_id: String,
+) -> CmdResult<()> {
     let owner = window.label().to_string();
     // The teleprompter lives in the presenter display.
     let presenter = presenter.unwrap_or_else(|| state.settings.lock().map(|s| s.presenter_view || s.teleprompter.enabled).unwrap_or(true));
     let (h, v) = {
         let docs = state.docs.lock().map_err(err)?;
         let doc = docs.get(&owner).ok_or("No presentation is open")?;
+        doc.ensure_id(&doc_id).map_err(err)?;
         if render::visible_groups(&doc.deck).is_empty() {
             return Err("All slides are skipped — there is nothing to present.".into());
         }
         from_slide.as_deref().and_then(|id| render::slide_indices(&doc.deck, id)).unwrap_or((0, 0))
     };
     close_and_wait(&app, &[&format!("present-{owner}"), &format!("presenter-{owner}")]).await;
+    state.with_doc_id(&owner, &doc_id, |_| Ok(()))?;
 
     let monitors = window.available_monitors().map_err(err)?;
     let current = window.current_monitor().map_err(err)?.or_else(|| monitors.first().cloned());
@@ -1347,7 +1355,11 @@ async fn present_start(app: AppHandle, window: Window, state: State<'_, AppState
     };
 
     let present_label = format!("present-{owner}");
-    let url = format!("present.html?doc={}&h={h}&v={v}", util::encode_uri_component(&owner));
+    let url = format!(
+        "present.html?doc={}&docId={}&h={h}&v={v}",
+        util::encode_uri_component(&owner),
+        util::encode_uri_component(&doc_id)
+    );
     let w = window_builder(&app, &present_label, WebviewUrl::App(url.into()))
         .title("Cadenza — Presentation")
         .visible(false)
@@ -1366,7 +1378,11 @@ async fn present_start(app: AppHandle, window: Window, state: State<'_, AppState
 
     if presenter {
         let pl = format!("presenter-{owner}");
-        let url = format!("presenter.html?doc={}", util::encode_uri_component(&owner));
+        let url = format!(
+            "presenter.html?doc={}&docId={}",
+            util::encode_uri_component(&owner),
+            util::encode_uri_component(&doc_id)
+        );
         let p = window_builder(&app, &pl, WebviewUrl::App(url.into()))
             .title("Cadenza — Presenter")
             .inner_size(1280.0, 800.0)

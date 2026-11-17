@@ -506,16 +506,18 @@ function suggestedName() {
 
 /** Saves; returns true on success. */
 export async function save({ as = false } = {}) {
-  if (!state.doc) return false;
-  if (!(await flushEdits())) return false;
+  const docId = state.doc?.docId;
+  if (!docId || !(await flushEdits()) || state.doc?.docId !== docId) return false;
   let path = as ? null : state.doc.path;
   if (!path) {
     path = await dialog.save({ title: as ? t('Save Presentation As') : t('Save Presentation'), defaultPath: suggestedName(), filters: presentationFilter() });
-    if (!path) return false;
+    if (!path || state.doc?.docId !== docId) return false;
   }
   try {
     set({ busy: t('Saving…') });
-    ingest(await invoke('doc_save', { path }), { navigate: false });
+    const view = await invoke('doc_save', { path, docId });
+    if (state.doc?.docId !== docId) return false;
+    ingest(view, { navigate: false });
     toast(t('Saved'));
     refreshRecent();
     return true;
@@ -529,25 +531,30 @@ export async function save({ as = false } = {}) {
 
 /** Asks what to do with unsaved changes. Returns false to cancel. */
 export async function confirmDiscard() {
-  if (!(await flushEdits())) return false;
+  const docId = state.doc?.docId;
+  if (!(await flushEdits()) || state.doc?.docId !== docId) return false;
   if (!state.doc?.dirty) return true;
   const choice = await ask('unsaved', { name: displayName() });
+  if (state.doc?.docId !== docId) return false;
   if (choice === 'save') return save();
   return choice === 'discard';
 }
 
 export async function closeDocument() {
-  if (!(await confirmDiscard())) return;
+  const docId = state.doc?.docId;
+  if (!(await confirmDiscard()) || state.doc?.docId !== docId) return false;
   try {
-    await invoke('doc_close');
+    await invoke('doc_close', { docId: docId ?? null });
+    if (state.doc?.docId !== docId) return false;
   } catch (e) {
     toast(String(e), 'error');
-    return;
+    return false;
   }
   set({ doc: null, slideId: null, selection: [], selectedSlides: [], editing: null, editingTable: null });
   updateWindowTitle();
   refreshRecent();
   refreshRecoverable();
+  return true;
 }
 
 export async function recover(sessionId) {
@@ -603,13 +610,14 @@ export function applyUiTheme() {
 // ---------------------------------------------------------------------------
 
 export async function play(fromCurrent = false) {
-  if (!state.doc) return;
-  if (!(await flushEdits())) return;
+  const docId = state.doc?.docId;
+  if (!docId || !(await flushEdits()) || state.doc?.docId !== docId) return;
   set({ editing: null, menu: null });
   try {
     // A diagram drawn a moment ago has its picture by then.
     await import('./diagrams.js').then((m) => m.ensureDiagrams());
-    await invoke('present_start', { fromSlide: fromCurrent ? state.slideId : null, presenter: null });
+    if (state.doc?.docId !== docId) return;
+    await invoke('present_start', { fromSlide: fromCurrent ? state.slideId : null, presenter: null, docId });
   } catch (e) {
     toast(String(e), 'error');
   }
@@ -667,7 +675,9 @@ export async function boot() {
     const ok = await flushEdits();
     events.emit('cz-flush-done', { token: e.payload?.token, label, ok });
   });
-  events.listen('cz-present-started', () => set({ presenting: true }));
+  events.listen('cz-present-started', (e) => {
+    if (e.payload?.doc === currentWindow().label) set({ presenting: true });
+  });
   events.listen('cz-present-ended', (e) => {
     set({ presenting: false });
     const slide = e.payload?.slide;

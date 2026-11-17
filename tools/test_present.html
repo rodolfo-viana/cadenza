@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cadenza presentation regression tests</title>
+<pre id="result">Running…</pre>
+<script type="module">
+// Real bundled Reveal and presentation controller; preview mode avoids native
+// windows and camera access. No transport or navigation implementation is mocked.
+let passed = 0, failed = 0;
+const lines = [];
+const equal = (actual, expected) => {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`${JSON.stringify(actual)} != ${JSON.stringify(expected)}`);
+};
+async function test(name, run) {
+  try { await run(); passed++; lines.push('PASS ' + name); }
+  catch (e) { failed++; lines.push('FAIL ' + name + '\n' + e.stack); }
+  document.getElementById('result').textContent = lines.join('\n');
+}
+const frame = document.createElement('iframe');
+frame.style = 'width:640px;height:360px';
+frame.src = '../ui/present.html?preview';
+await new Promise((resolve, reject) => { frame.onload = resolve; frame.onerror = reject; document.body.append(frame); });
+const w = frame.contentWindow;
+const data = {
+  title: 'Navigation', needs: {}, themeCss: 'vendor/reveal/theme/black.css', deckCss: '',
+  config: { width: 1280, height: 720, center: false, transition: 'none', hash: false },
+  sections: '<section id="first">First</section><section><section id="stack-top">Top</section><section id="last">Last<span class="fragment">Build</span></section></section>',
+};
+await w.CadenzaPresent.boot(data);
+await test('next and previous traverse horizontal and vertical slides and builds', () => {
+  w.CadenzaPresent.handleCommand({ cmd: 'next' }); equal(w.Reveal.getCurrentSlide().id, 'stack-top');
+  w.CadenzaPresent.handleCommand({ cmd: 'next' }); equal(w.Reveal.getCurrentSlide().id, 'last');
+  w.CadenzaPresent.handleCommand({ cmd: 'next' }); equal(w.Reveal.availableFragments().next, false);
+  w.CadenzaPresent.handleCommand({ cmd: 'prev' }); equal(w.Reveal.availableFragments().next, true);
+  w.CadenzaPresent.handleCommand({ cmd: 'prev' }); equal(w.Reveal.getCurrentSlide().id, 'stack-top');
+});
+await test('first resets the slide and fragment position', () => {
+  w.CadenzaPresent.handleCommand({ cmd: 'first' }); equal(w.Reveal.getCurrentSlide().id, 'first');
+  equal(w.Reveal.getIndices().h, 0);
+});
+await test('last reaches the final vertical slide and shows its final build', () => {
+  w.CadenzaPresent.handleCommand({ cmd: 'last' });
+  equal(w.Reveal.getCurrentSlide().id, 'last');
+  equal(w.Reveal.availableFragments().next, false);
+});
+await test('goto preserves explicit vertical and fragment indices', () => {
+  w.CadenzaPresent.handleCommand({ cmd: 'goto', h: 1, v: 1, f: -1 });
+  equal(w.Reveal.getCurrentSlide().id, 'last'); equal(w.Reveal.availableFragments().next, true);
+});
+await test('pause and overview commands toggle without moving slides', () => {
+  w.CadenzaPresent.handleCommand({ cmd: 'pause' }); equal(w.Reveal.isPaused(), true);
+  w.CadenzaPresent.handleCommand({ cmd: 'pause' }); equal(w.Reveal.isPaused(), false);
+  w.Reveal.configure({ overview: true });
+  w.CadenzaPresent.handleCommand({ cmd: 'overview' }); equal(w.Reveal.isOverview(), true);
+  w.CadenzaPresent.handleCommand({ cmd: 'overview' }); equal(w.Reveal.isOverview(), false);
+  equal(w.Reveal.getCurrentSlide().id, 'last');
+});
+frame.remove();
+document.getElementById('result').textContent = lines.join('\n') + `\n${passed} passed, ${failed} failed`;
+document.body.dataset.result = failed ? 'fail' : 'pass';
+</script>

@@ -3,7 +3,7 @@
 import { html, render } from './lib.js';
 import { App } from './app.js';
 import { invoke, currentWindow, currentWebview } from './api.js';
-import { state, set, boot, toast, confirmDiscard, openPath, stepSlide } from './store.js';
+import { state, set, boot, toast, closeDocument, openPath, stepSlide } from './store.js';
 import { commandForKey } from './commands.js';
 import * as A from './actions.js';
 import { canvasApi, finishPath, cancelPath } from './canvas.js';
@@ -264,9 +264,8 @@ currentWindow()
     if (closing) return;
     event.preventDefault();
     if (!(await endAllEditing())) return;
-    if (await confirmDiscard()) {
+    if (await closeDocument()) {
       try {
-        await invoke('doc_close');
         closing = true;
         await currentWindow().destroy();
       } catch (e) {

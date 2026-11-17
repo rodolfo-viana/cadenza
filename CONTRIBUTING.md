@@ -171,13 +171,15 @@ into every language, but please say so in the description. To add a language, ad
   python3 tools/test_browser.py --page test_math_editor.html
   python3 tools/test_browser.py --page test_transition_preview.html
   python3 tools/test_browser.py --page test_pptx_capture.html
+  python3 tools/test_browser.py --page test_present.html
   python3 tools/test_i18n.py
   python3 tools/i18n.py check --allow-missing
   ```
 
   GitHub Actions runs these on every push to main and every pull request
   (`.github/workflows/checks.yml`), where any Clippy warning fails. A separate Windows job runs
-  Clippy and the Rust tests so `cfg(windows)` code is checked before a release.
+  Clippy, Rust tests, UI module tests and browser harnesses in Edge so Windows
+  code and browser behavior are checked before a release.
 
 Changes to image/video rendering or export also need the real PDF regression. Install Chromium,
 Node 22 or newer and Poppler (`poppler-utils` on Debian/Ubuntu), then run:

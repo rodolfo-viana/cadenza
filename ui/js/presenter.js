@@ -187,7 +187,7 @@
     else frame.addEventListener('load', go, { once: true });
   }
 
-  tauri.core.invoke('present_data').then(function (d) {
+  tauri.core.invoke('present_data', { docId: new URLSearchParams(location.search).get('docId') || null }).then(function (d) {
     data = d;
     document.documentElement.style.setProperty('--ratio', d.width + ' / ' + d.height);
     import('./i18n.js').then(function (m) {

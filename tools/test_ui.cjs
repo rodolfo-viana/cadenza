@@ -217,6 +217,96 @@ function editText(S, T) {
   return node;
 }
 
+test('Save As never writes a replacement document to the previous document path', async () => {
+  const chosen = deferred();
+  const calls = [];
+  const { S } = await ui(async (name, args) => {
+    calls.push({ name, args });
+    if (name === 'doc_save') return view('document-b', 2);
+    return [];
+  }, {}, { api: { dialog: { save: () => chosen.promise } } });
+  S.openView(view());
+  const saving = S.save({ as: true });
+  await tick();
+  S.openView(view('document-b'));
+  chosen.resolve('/document-a.cadenza');
+  assert.equal(await saving, false);
+  assert.equal(calls.some((c) => c.name === 'doc_save'), false);
+  assert.equal(S.state.doc.docId, 'document-b');
+});
+
+test('a delayed save response never reopens a replaced document', async () => {
+  const saved = deferred();
+  const calls = [];
+  const { S } = await ui(async (name, args) => {
+    calls.push({ name, args });
+    return name === 'doc_save' ? saved.promise : [];
+  });
+  S.openView(view());
+  const saving = S.save();
+  await tick();
+  S.openView(view('document-b'));
+  saved.resolve(view('document-a', 2));
+  assert.equal(await saving, false);
+  assert.equal(S.state.doc.docId, 'document-b');
+  assert.equal(calls.find((c) => c.name === 'doc_save').args.docId, 'document-a');
+});
+
+for (const choice of ['save', 'discard']) {
+  test(`a stale ${choice} confirmation never closes a replacement document`, async () => {
+    const calls = [];
+    const { S } = await ui(async (name, args) => {
+      calls.push({ name, args });
+      return name === 'doc_save' ? view('document-b', 2) : [];
+    });
+    S.openView({ ...view(), dirty: true });
+    const closing = S.closeDocument();
+    await tick();
+    const resolve = S.state.modal.props.resolve;
+    S.openView(view('document-b'));
+    resolve(choice);
+    await closing;
+    assert.equal(S.state.doc?.docId, 'document-b');
+    assert.equal(calls.some((c) => ['doc_close', 'doc_save'].includes(c.name)), false);
+  });
+}
+
+test('a delayed close acknowledgement never clears a newer document', async () => {
+  const closed = deferred();
+  const calls = [];
+  const { S } = await ui(async (name, args) => {
+    calls.push({ name, args });
+    return name === 'doc_close' ? closed.promise : [];
+  });
+  S.openView(view());
+  const closing = S.closeDocument();
+  await tick();
+  S.openView(view('document-b'));
+  closed.resolve();
+  await closing;
+  assert.equal(S.state.doc?.docId, 'document-b');
+  assert.equal(calls.find((c) => c.name === 'doc_close').args.docId, 'document-a');
+});
+
+for (const replace of [false, true]) {
+  test(`starting a show ${replace ? 'abandons a replacement' : 'binds the current document'} after diagram preparation`, async () => {
+    const prepared = deferred();
+    const calls = [];
+    const { S } = await ui(async (name, args) => { calls.push({ name, args }); }, {}, {
+      dynamic: { 'diagrams.js': { ensureDiagrams: () => prepared.promise } },
+    });
+    S.openView(view());
+    const playing = S.play(true);
+    await tick();
+    if (replace) S.openView(view('document-b'));
+    prepared.resolve();
+    await playing;
+    const start = calls.find((c) => c.name === 'present_start');
+    assert.equal(!!start, !replace);
+    if (start) assert.equal(start.args.docId, 'document-a');
+  });
+}
+
 for (const choice of ['cancel', 'save', 'discard']) {
   test(`closing with an uncommitted table edit honors ${choice}`, async () => {
     const backend = view();
@@ -626,6 +716,30 @@ test('an update waits for edits in every editor window', async () => {
     assert.equal(await S.flushAllWindows(50), answer === true, `answer: ${answer}`);
     assert(!listeners.has('cz-flush-done'));
   }
+});
+
+test('presentation-start events belong only to their editor window', async () => {
+  const listeners = new Map();
+  const { S } = await ui(async (name) => {
+    if (name === 'app_info') return { settings: { language: 'en' } };
+    if (name === 'doc_state') return { view: view() };
+    return [];
+  }, {}, {
+    api: {
+      currentWindow: () => ({ label: 'editor-1', setTitle: async () => {} }),
+      events: { listen: async (name, fn) => listeners.set(name, fn) },
+    },
+    globals: {
+      setInterval: () => 0,
+      matchMedia: () => ({ matches: false, addEventListener() {} }),
+      document: { documentElement: { dataset: {} }, getElementById: () => null },
+    },
+  });
+  await S.boot();
+  listeners.get('cz-present-started')({ payload: { doc: 'editor-2' } });
+  assert.equal(S.state.presenting, false);
+  listeners.get('cz-present-started')({ payload: { doc: 'editor-1' } });
+  assert.equal(S.state.presenting, true);
 });
 
 test('out-of-order incremental views refresh missing renderings and ignore stale data', async () => {

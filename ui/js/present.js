@@ -87,7 +87,7 @@
       case 'next': Reveal.next(); break;
       case 'prev': Reveal.prev(); break;
       case 'first': Reveal.slide(0, 0, -1); break;
-      case 'last': Reveal.slide(Number.MAX_SAFE_INTEGER, 0); break;
+      case 'last': Reveal.slide(Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER); break;
       case 'goto': Reveal.slide(cmd.h, cmd.v || 0, cmd.f); break;
       case 'pause': Reveal.togglePause(); break;
       case 'overview': Reveal.toggleOverview(); break;
