@@ -45,6 +45,13 @@ try {
   const field = () => fixture.querySelector('math-field');
   const button = (label) => [...fixture.querySelectorAll('button')].find((b) => b.textContent.trim() === label);
   const settled = async () => { await delay(); assert(await S.flushEdits(), 'flush failed'); await delay(); };
+  await test('KaTeX never inherits permission to render unsafe links from an options prototype', async () => {
+    const options = Object.create({ trust: true });
+    options.throwOnError = false;
+    const rendered = window.katex.renderToString('\\href{javascript:alert(1)}{x}', options);
+    assert(!rendered.includes('href="javascript:'), 'inherited trust enabled an unsafe link');
+    assert(window.katex.renderToString('x^2').includes('katex'), 'ordinary math must still render');
+  });
   function Panel() { S.useStore(); return L.html`<${P.MathPanel} els=${S.state.doc.deck.slides[0].elements} />`; }
   async function mount(latex = 'x + 1', count = 1, wait = true) {
     L.render(null, fixture); await delay(); failWrite = false; transportGate = null;
