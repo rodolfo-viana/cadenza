@@ -14,7 +14,7 @@ Cadenza currently creates slides from 12 built-in layouts. A slide remembers its
 
 ## Format painter
 
-Implemented in the development branch. See [Editing tools](docs/editing-tools.md) for copied properties and keyboard shortcuts.
+Available in version 0.3.6. See [Editing tools](docs/editing-tools.md) for copied properties and keyboard shortcuts.
 
 - [x] Copy and apply text or object formatting without replacing content, geometry, links or animations.
 - [x] Define clearly which properties are copied for text selections, text boxes and other object types.

@@ -2,6 +2,39 @@
 
 Notable changes to Cadenza. Each version's section is also shown on its GitHub release page.
 
+## 0.3.6 — 2026-11-17
+
+Cadenza 0.3.6 adds PowerPoint import/export and new editing tools for text, images, diagrams and equations, with fixes verified in the native Linux and Windows applications.
+
+### New
+
+- Import and export PowerPoint `.pptx` presentations, retaining editable content where supported and showing explicit conversion reports for approximated, rasterized or omitted features. Keep a `.cadenza` copy for full-fidelity editing.
+- Find and replace across slide text, shape text and table cells, optionally including speaker notes, with one-step Undo for Replace All.
+- Copy formatting between objects or selected characters with Format Painter, including a Keep applying mode.
+- Crop images visually with free or fixed aspect ratios while retaining the original asset; group objects for persistent move, resize and rotation with individual member editing.
+- Edit equations visually with MathLive and an on-screen math keyboard, or continue using LaTeX source. Both editing and rendering work offline.
+- Build diagrams from editable blocks and connections, with galleries for common structures and a Mermaid source tab that preserves advanced or invalid source.
+- Inspect and reapply the original CSV stored with charts and tables without overwriting it when editing displayed data.
+- Configure and replay a slide's incoming transition directly in the inspector.
+
+### Fixes
+
+- Save, close and presentation requests now remain tied to the document that initiated them, including while a dialog, rendering operation or native response is pending.
+- Closing a window uses the same checked document-closing flow as closing a presentation.
+- Starting a presentation no longer marks other editor windows as presenting, and Last reaches the final vertical subslide and its final build.
+- Format Painter preserves transparent/default fills across text and shapes.
+- PDF export waits for a decoded video frame before replacing the video with a still, including when WebKit omits frame callbacks for offscreen media.
+- Harden browser regression transports and assertions against prototype pollution and misleading HTML or URLs.
+
+### Security
+
+- Update Rust dependencies and the KaTeX/Mermaid distributions for known security advisories, including their bundled DOMPurify. Record remaining upstream GTK and maintenance advisories in [the dependency review](https://github.com/rodolfo-viana/cadenza/blob/v0.3.6/docs/security-review-0.3.6.md).
+
+### Verification
+
+- Expand regression coverage for editing, diagrams, equations, transitions, PDF/PPTX conversion and presentation navigation. Windows CI now runs the JavaScript and Edge browser suites as well as Rust checks.
+- Verify native saving, reopening, crash recovery, presentation and HTML/PDF/PPTX exports on Linux and Windows. PowerPoint conversion remains subject to the documented interoperability limits.
+
 ## 0.3.5 — 2026-11-14
 
 The Theme Builder now has separate Theme, Typography, Paragraphs, Lists and Colors sections, with previews of paragraphs and all nine list levels.

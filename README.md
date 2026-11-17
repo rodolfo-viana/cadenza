@@ -29,7 +29,7 @@ See **[live demo](https://rodolfo-viana.github.io/cadenza/attention-is-all-you-n
   mind maps and more; advanced source stays intact when it cannot be edited visually.
 - Rulers, draggable guides, smart guides and a snapping grid.
 - [Find and replace, format painter, visual image cropping and persistent object groups](docs/editing-tools.md)
-  in the development branch, with Undo/Redo and saved-file support.
+  in version 0.3.6, with Undo/Redo and saved-file support.
 - Undo/redo for everything, a command palette (Ctrl+K) and keyboard shortcuts for all
   common actions.
 

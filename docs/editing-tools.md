@@ -1,6 +1,6 @@
 # Find, paint, crop and group
 
-These editing tools are available in the development branch. Each committed action uses the document's Undo/Redo history. They do not require online services.
+These editing tools are available in version 0.3.6. Each committed action uses the document's Undo/Redo history. They do not require online services.
 
 ## Find and replace
 
