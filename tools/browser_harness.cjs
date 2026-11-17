@@ -7,6 +7,7 @@ assert(browser && url && profile, 'Expected browser, harness URL and isolated pr
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const child = cp.spawn(browser, ['--headless', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
 let launchError, stderr = '', socket, call;
+const browserErrors = [];
 child.on('error', error => { launchError = error; });
 child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-4000); });
 async function until(check, message) {
@@ -40,6 +41,8 @@ async function until(check, message) {
     const pending = new Map();
     socket.addEventListener('message', event => {
       const message = JSON.parse(event.data), task = pending.get(message.id);
+      if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') browserErrors.push(message.params.entry.text);
+      if (message.method === 'Runtime.exceptionThrown') browserErrors.push(message.params.exceptionDetails.exception?.description || message.params.exceptionDetails.text);
       if (!task) return;
       pending.delete(message.id); clearTimeout(task.timer);
       message.error ? task.reject(new Error(JSON.stringify(message.error))) : task.resolve(message.result);
@@ -60,10 +63,13 @@ async function until(check, message) {
       return result.result.value;
     };
     await call('Page.enable');
+    await call('Log.enable');
+    await call('Runtime.enable');
     await call('Page.bringToFront');
     await call('Page.navigate', { url });
     try {
       await until(async () => ['pass', 'fail'].includes(await evaluate('document.body?.dataset.result')), 'Browser harness did not finish within 30 seconds');
+      if (await evaluate('document.body?.dataset.result') === 'fail' && browserErrors.length) console.error(browserErrors.join('\n'));
     } finally {
       process.stdout.write(await evaluate('document.documentElement.outerHTML'));
       printed = true;
@@ -71,6 +77,7 @@ async function until(check, message) {
   } catch (error) {
     if (!printed) process.stdout.write('<pre id="result">Browser did not finish the test harness.</pre>');
     console.error(error);
+    if (browserErrors.length) console.error(browserErrors.join('\n'));
     if (stderr) console.error(stderr);
     process.exitCode = 1;
   } finally {

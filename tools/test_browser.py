@@ -30,6 +30,14 @@ def main() -> None:
         parser.error("--page must name an existing HTML file in tools/")
 
     class QuietHandler(http.server.SimpleHTTPRequestHandler):
+        # Windows' MIME registry can classify .mjs as a non-JavaScript file.
+        # ES modules require a JavaScript MIME type in every browser.
+        extensions_map = {
+            **http.server.SimpleHTTPRequestHandler.extensions_map,
+            ".js": "text/javascript",
+            ".mjs": "text/javascript",
+        }
+
         def log_message(self, *args: object) -> None:
             pass
 
