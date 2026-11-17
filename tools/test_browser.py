@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the editing regression harness in a fresh headless Chromium profile."""
+"""Run a browser regression harness to completion in a fresh Chromium profile."""
 import argparse
 import functools
 import html
@@ -22,6 +22,9 @@ def main() -> None:
     )
     if not browser:
         parser.error("Chromium or Google Chrome is required; use --browser to select it")
+    node = shutil.which("node")
+    if not node:
+        parser.error("Node.js 22 or newer is required")
     root = pathlib.Path(__file__).resolve().parent.parent
     if pathlib.Path(args.page).name != args.page or not (root / "tools" / args.page).is_file():
         parser.error("--page must name an existing HTML file in tools/")
@@ -41,10 +44,9 @@ def main() -> None:
     try:
         with tempfile.TemporaryDirectory(prefix="cadenza-browser-test-", dir=cache) as profile:
             result = subprocess.run(
-                [browser, "--headless", "--no-sandbox", "--disable-gpu", f"--user-data-dir={profile}",
-                 "--virtual-time-budget=8000", "--dump-dom",
-                 f"http://127.0.0.1:{server.server_port}/tools/{args.page}"],
-                capture_output=True, text=True, timeout=45, check=False,
+                [node, str(root / "tools" / "browser_harness.cjs"), browser,
+                 f"http://127.0.0.1:{server.server_port}/tools/{args.page}", profile],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=75, check=False,
             )
             report = re.search(r'<pre id="result">(.*?)</pre>', result.stdout, re.S)
             print(html.unescape(report.group(1)) if report else "Browser did not finish the test harness.")

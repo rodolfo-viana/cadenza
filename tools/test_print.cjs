@@ -92,6 +92,19 @@ function nearBox(actual, expected, label) {
       const result = await call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
       assert(!result.exceptionDetails, JSON.stringify(result.exceptionDetails)); return result.result.value;
     };
+    fs.writeFileSync(path.join(output, 'browser.json'), JSON.stringify(await call('Browser.getVersion'), null, 2));
+    await call('Page.enable');
+    await call('Page.addScriptToEvaluateOnNewDocument', { source: `
+      window.printVideoTrace = [];
+      const draw = CanvasRenderingContext2D.prototype.drawImage;
+      CanvasRenderingContext2D.prototype.drawImage = function(source, ...args) {
+        if (source instanceof HTMLVideoElement) window.printVideoTrace.push({
+          readyState: source.readyState, currentTime: source.currentTime, seeking: source.seeking,
+          width: source.videoWidth, height: source.videoHeight
+        });
+        return draw.call(this, source, ...args);
+      };
+    ` });
     await call('Network.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/157.0 Safari/537.36' });
     await call('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/print-fixture.html?print-pdf` });
     await until(() => evaluate("!!document.querySelector('.cz-print-bar') && document.querySelectorAll('.pdf-page').length === 15"), 'Print preparation did not finish');
@@ -102,6 +115,13 @@ function nearBox(actual, expected, label) {
     for (const key of ['x', 'y', 'width', 'height']) assert.equal(geometry.video[key], geometry.box[key], `Video ${key} must match its authored box`);
     const pdf = await call('Page.printToPDF', { printBackground: true, preferCSSPageSize: true, paperWidth: data.width / 96, paperHeight: data.height / 96, marginTop: 0, marginBottom: 0, marginLeft: 0, marginRight: 0 });
     const pdfPath = path.join(output, 'print.pdf'); fs.writeFileSync(pdfPath, Buffer.from(pdf.data, 'base64'));
+    // Read pixels only after printing: a pre-print read can flush pending
+    // canvas rendering and conceal the compositor failure being investigated.
+    const trace = await evaluate(`(() => {
+      const canvas = document.querySelector('.cz-video-box canvas');
+      return { draws: window.printVideoTrace, center: canvas && [...canvas.getContext('2d').getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data] };
+    })()`);
+    fs.writeFileSync(path.join(output, 'video-trace.json'), JSON.stringify(trace, null, 2));
     cp.execFileSync('pdftoppm', ['-r', '96', pdfPath, path.join(output, 'page')]);
     const video = ppm(path.join(output, 'page-09.ppm'));
     assert.deepEqual([video.width, video.height], [1280, 720]);
@@ -125,6 +145,7 @@ function nearBox(actual, expected, label) {
     assert(Math.max(...corner)-Math.min(...corner) > 5, 'Rounded corner remains clipped to the slide background');
     nearBox(pixels(ppm(path.join(output, 'page-14.ppm')), keptColor).box, [304,108,976,612], 'Raster image crop');
     const frame = pixels(video, (r, g, b) => r < 70 && g > 150 && g < 180 && b > 190);
+    fs.writeFileSync(path.join(output, 'video-pdf.json'), JSON.stringify({ center: at(video, 640, 360), matchedPixels: frame.count, bounds: frame.box }, null, 2));
     nearBox(frame.box, [256, 144, 1024, 576], 'Video PDF placement');
     console.log(`PASS: production print boot, decoded video, authored frame geometry and PDF crop/video pixels. Artifacts: ${output}`);
   } finally {

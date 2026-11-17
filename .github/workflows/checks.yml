@@ -90,6 +90,19 @@ jobs:
       - name: Translations
         run: python3 tools/i18n.py check --allow-missing
 
+      - name: Retain export regression evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: export-regression-evidence
+          path: |
+            ${{ runner.temp }}/print-data.json
+            ${{ runner.temp }}/pptx-snapshot.json
+            ${{ runner.temp }}/cadenza-print-results/
+            ${{ runner.temp }}/cadenza-pptx-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   windows:
     # Compile and exercise cfg(windows) code on PRs, not only release tags.
     # This does not replace testing the running WebView2 application.
