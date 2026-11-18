@@ -1,4 +1,4 @@
-use super::archive::{child, desc, named, num, rel_attr};
+use super::archive::{attr, child, desc, named, num, rel_attr};
 use super::n_;
 use super::text::{self, Theme};
 use super::{Importer, charts};
@@ -50,7 +50,7 @@ fn geometry(n: Node<'_, '_>, inherited: &[Node<'_, '_>], parent: Matrix) -> (Ele
     let (w, h) = pair(xfrm.and_then(|n| child(n, "ext")), "cx", "cy", (320. * EMU, 120. * EMU));
     let angle = xfrm.map(|n| num(n, "rot", 0.) / 60000.).unwrap_or(0.);
     let flip = |key| {
-        if xfrm.is_some_and(|n| matches!(n.attribute(key), Some("1" | "true"))) {
+        if xfrm.is_some_and(|n| matches!(attr(n, key), Some("1" | "true"))) {
             -1.
         } else {
             1.
@@ -72,7 +72,7 @@ fn geometry(n: Node<'_, '_>, inherited: &[Node<'_, '_>], parent: Matrix) -> (Ele
         rotation: b.atan2(a).to_degrees(),
         ..Element::default()
     };
-    el.name = desc(n, "cNvPr").and_then(|n| n.attribute("name")).unwrap_or_default().into();
+    el.name = desc(n, "cNvPr").and_then(|n| attr(n, "name")).unwrap_or_default().into();
     (el, a * d - b * c < 0., (a * c + b * d).abs() > 1e-9 || xfrm.is_none())
 }
 
@@ -148,7 +148,7 @@ fn style(el: &mut Element, sources: &[Node<'_, '_>], theme: &Theme, scale: f64) 
         } else {
             num(line, "w", 12700.) / EMU * scale
         };
-        el.style.border_style = match child(line, "prstDash").and_then(|n| n.attribute("val")) {
+        el.style.border_style = match child(line, "prstDash").and_then(|n| attr(n, "val")) {
             Some("dash" | "lgDash") => "dashed",
             Some("dot" | "sysDot") => "dotted",
             _ => "solid",
@@ -161,17 +161,17 @@ fn ph<'a, 'i>(n: Node<'a, 'i>) -> Option<Node<'a, 'i>> {
     desc(n, "ph")
 }
 fn ph_kind<'a, 'i>(n: Node<'a, 'i>) -> &'a str {
-    match n.attribute("type").unwrap_or("body") {
+    match attr(n, "type").unwrap_or("body") {
         "ctrTitle" => "title",
         kind => kind,
     }
 }
 fn match_placeholder<'a, 'i>(n: Node<'_, '_>, tree: Node<'a, 'i>) -> Option<Node<'a, 'i>> {
     let key = ph(n)?;
-    let idx = key.attribute("idx").unwrap_or("0");
+    let idx = attr(key, "idx").unwrap_or("0");
     let kind = ph_kind(key);
     tree.children()
-        .find(|s| ph(*s).is_some_and(|p| p.attribute("idx").unwrap_or("0") == idx && ph_kind(p) == kind))
+        .find(|s| ph(*s).is_some_and(|p| attr(p, "idx").unwrap_or("0") == idx && ph_kind(p) == kind))
         .or_else(|| tree.children().find(|s| ph(*s).is_some_and(|p| ph_kind(p) == kind)))
 }
 
@@ -249,7 +249,7 @@ fn draw_nodes(
             anyhow::ensure!(cw > 0. && ch > 0., n_("Invalid PowerPoint group geometry"));
             let angle = x.map(|n| num(n, "rot", 0.) / 60000.).unwrap_or(0.);
             let flip = |k| {
-                if x.is_some_and(|n| matches!(n.attribute(k), Some("1" | "true"))) {
+                if x.is_some_and(|n| matches!(attr(n, k), Some("1" | "true"))) {
                     -1.
                 } else {
                     1.
@@ -335,7 +335,7 @@ fn draw_nodes(
             let geom = sources
                 .iter()
                 .find_map(|s| child(*s, "spPr").and_then(|s| child(s, "prstGeom")))
-                .and_then(|n| n.attribute("prst"))
+                .and_then(|n| attr(n, "prst"))
                 .or_else(|| named(n, "cxnSp").then_some("line"));
             let custom = sources.iter().any(|s| child(*s, "spPr").and_then(|s| child(s, "custGeom")).is_some());
             let rich = text::rich_text(n, &inherited_shapes, defaults, theme, scale, &rels, &mut importer.budget)?;
@@ -349,13 +349,13 @@ fn draw_nodes(
                 ));
                 continue;
             }
-            let is_text = desc(n, "cNvSpPr").is_some_and(|p| matches!(p.attribute("txBox"), Some("1" | "true"))) || geom.is_none();
+            let is_text = desc(n, "cNvSpPr").is_some_and(|p| matches!(attr(p, "txBox"), Some("1" | "true"))) || geom.is_none();
             if child(n, "txBody").is_some() {
                 let props: Vec<_> = sources.iter().filter_map(|s| child(*s, "txBody").and_then(|b| child(b, "bodyPr"))).collect();
                 let insets = [("lIns", 91440.), ("rIns", 91440.), ("tIns", 45720.), ("bIns", 45720.)].map(|(name, default)| {
                     props
                         .iter()
-                        .find_map(|n| n.attribute(name))
+                        .find_map(|n| attr(*n, name))
                         .and_then(|v| v.parse::<f64>().ok())
                         .filter(|v| v.is_finite())
                         .unwrap_or(default)
@@ -381,7 +381,7 @@ fn draw_nodes(
                     sources
                         .iter()
                         .find_map(|s| child(*s, "spPr").and_then(|p| child(p, "ln")).and_then(|l| child(l, name)))
-                        .and_then(|n| n.attribute("type"))
+                        .and_then(|n| attr(n, "type"))
                         .map(|v| match v {
                             "triangle" | "arrow" | "stealth" => "arrow",
                             "oval" => "dot",
@@ -431,8 +431,8 @@ fn draw_nodes(
             if n.descendants().any(|v| {
                 v.is_element()
                     && (matches!(v.tag_name().name(), "lnSpc" | "spcBef" | "spcAft" | "tabLst")
-                        || v.attribute("lvl").is_some_and(|v| v != "0")
-                        || v.attribute("vert").is_some_and(|v| v != "horz"))
+                        || attr(v, "lvl").is_some_and(|v| v != "0")
+                        || attr(v, "vert").is_some_and(|v| v != "horz"))
             }) {
                 importer.issue(
                     slide,
@@ -496,7 +496,7 @@ fn draw_nodes(
                 .clamp(0., 1.);
             el.content = Content::Image(ImageContent {
                 src: relation.target.clone(),
-                alt: desc(n, "cNvPr").and_then(|n| n.attribute("descr")).unwrap_or_default().into(),
+                alt: desc(n, "cNvPr").and_then(|n| attr(n, "descr")).unwrap_or_default().into(),
                 fit: "fill".into(),
                 natural_width: width,
                 natural_height: height,
@@ -595,10 +595,9 @@ fn parse_table(
 ) -> anyhow::Result<()> {
     if table.descendants().any(|n| {
         n.is_element()
-            && ["rowSpan", "gridSpan", "hMerge", "vMerge"].iter().any(|k| {
-                n.attribute(*k)
-                    .is_some_and(|v| v != "1" && v != "0" || (*k == "hMerge" || *k == "vMerge") && v == "1")
-            })
+            && ["rowSpan", "gridSpan", "hMerge", "vMerge"]
+                .iter()
+                .any(|k| attr(n, k).is_some_and(|v| v != "1" && v != "0" || (*k == "hMerge" || *k == "vMerge") && v == "1"))
     }) {
         *el = placeholder(
             importer,
@@ -649,7 +648,7 @@ fn parse_table(
         importer.budget.array::<String>(width - row.len())?;
         row.resize(width, String::new());
     }
-    let header = child(table, "tblPr").is_some_and(|n| n.attribute("firstRow") == Some("1"));
+    let header = child(table, "tblPr").is_some_and(|n| attr(n, "firstRow") == Some("1"));
     if contrast_adjusted {
         importer.issue(
             slide,

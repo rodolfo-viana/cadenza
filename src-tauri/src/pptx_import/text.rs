@@ -1,5 +1,5 @@
 use super::MaterializationBudget;
-use super::archive::{Rel, child, desc, named, num, rel_attr};
+use super::archive::{Rel, attr, child, desc, named, num, rel_attr};
 use crate::model::{RichText, TextStyle};
 use crate::util::esc;
 use roxmltree::Node;
@@ -42,17 +42,17 @@ impl Theme {
         if let Some(scheme) = desc(root, "clrScheme") {
             for n in scheme.children().filter(Node::is_element) {
                 if let Some(color) = n.children().find(Node::is_element)
-                    && let Some(v) = color.attribute("val").filter(|s| s.len() == 6).or_else(|| color.attribute("lastClr"))
+                    && let Some(v) = attr(color, "val").filter(|s| s.len() == 6).or_else(|| attr(color, "lastClr"))
                 {
                     t.colors.insert(n.tag_name().name().into(), v.into());
                 }
             }
         }
         if let Some(n) = desc(root, "majorFont").and_then(|n| child(n, "latin")) {
-            t.major = n.attribute("typeface").unwrap_or("Arial").into();
+            t.major = attr(n, "typeface").unwrap_or("Arial").into();
         }
         if let Some(n) = desc(root, "minorFont").and_then(|n| child(n, "latin")) {
-            t.minor = n.attribute("typeface").unwrap_or("Arial").into();
+            t.minor = attr(n, "typeface").unwrap_or("Arial").into();
         }
         t
     }
@@ -68,17 +68,17 @@ impl Theme {
 
 pub fn color(n: Node<'_, '_>, theme: &Theme) -> Option<String> {
     let value = match n.tag_name().name() {
-        "srgbClr" => n.attribute("val")?.to_owned(),
-        "sysClr" => n.attribute("lastClr")?.to_owned(),
+        "srgbClr" => attr(n, "val")?.to_owned(),
+        "sysClr" => attr(n, "lastClr")?.to_owned(),
         "schemeClr" => {
-            let key = match n.attribute("val")? {
+            let key = match attr(n, "val")? {
                 "tx1" => "dk1",
                 "tx2" => "dk2",
                 "bg1" => "lt1",
                 "bg2" => "lt2",
                 x => x,
             };
-            theme.colors.get(n.attribute("val")?).or_else(|| theme.colors.get(key))?.clone()
+            theme.colors.get(attr(n, "val")?).or_else(|| theme.colors.get(key))?.clone()
         }
         _ => return None,
     };
@@ -132,7 +132,7 @@ pub fn fill(n: Node<'_, '_>, theme: &Theme) -> Option<String> {
 }
 
 fn inherited<'a, 'i>(sources: &[Node<'a, 'i>], key: &str) -> Option<&'a str> {
-    sources.iter().find_map(|s| s.attribute(key))
+    sources.iter().find_map(|s| attr(*s, key))
 }
 fn flags(sources: &[Node<'_, '_>], key: &str) -> bool {
     matches!(inherited(sources, key), Some("1" | "true"))
@@ -194,7 +194,7 @@ pub fn rich_text(
     rels: &[Rel],
     budget: &mut MaterializationBudget,
 ) -> anyhow::Result<RichText> {
-    let role = desc(shape, "ph").and_then(|n| n.attribute("type")).unwrap_or("body");
+    let role = desc(shape, "ph").and_then(|n| attr(n, "type")).unwrap_or("body");
     let title = matches!(role, "title" | "ctrTitle");
     let defaults = defaults.and_then(|n| {
         if named(n, "txStyles") {
@@ -266,7 +266,7 @@ pub fn rich_text(
         if let Some(end) = child(p, "endParaRPr") {
             runs_default.push(end);
         }
-        let bullet = pstyles.iter().find_map(|p| child(*p, "buChar").and_then(|n| n.attribute("char")));
+        let bullet = pstyles.iter().find_map(|p| child(*p, "buChar").and_then(|n| attr(n, "char")));
         let numbered = pstyles.iter().any(|p| child(*p, "buAutoNum").is_some());
         let no_bullet = pstyles.first().is_some_and(|p| child(*p, "buNone").is_some());
         let list = !no_bullet && (bullet.is_some() || numbered);
@@ -291,7 +291,7 @@ pub fn rich_text(
                 .clamp(1., 1600.);
             let face = sources
                 .iter()
-                .find_map(|s| child(*s, "latin").and_then(|n| n.attribute("typeface")))
+                .find_map(|s| child(*s, "latin").and_then(|n| attr(n, "typeface")))
                 .map(|f| theme.font(f))
                 .unwrap_or(&style.font_family);
             let ink = sources.iter().find_map(|s| fill(*s, theme)).unwrap_or_else(|| style.color.clone());
