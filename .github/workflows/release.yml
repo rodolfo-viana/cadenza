@@ -85,11 +85,12 @@ jobs:
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 7
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
           # GStreamer plugins that the AppImage bundles so video and audio play.
-          sudo apt-get install -y gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
+          sudo python3 tools/ci_install_deps.py \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
 
       # Pinned to v1 (on the action's master branch), which takes the
       # toolchain as an input; @stable would pick it from the ref instead.

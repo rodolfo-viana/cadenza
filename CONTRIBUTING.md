@@ -167,6 +167,7 @@ into every language, but please say so in the description. To add a language, ad
     tools/test_diagram_visual.cjs tools/test_diagram_edits.cjs \
     tools/test_math_edits.cjs tools/test_print_media.cjs tools/test_pptx_actions.cjs
   python3 tools/test_browser_runner.py
+  python3 tools/test_ci_install_deps.py
   python3 tools/test_browser.py --page test_editing.html
   python3 tools/test_browser.py --page test_diagrams.html
   python3 tools/test_browser.py --page test_math_editor.html
@@ -191,6 +192,17 @@ into every language, but please say so in the description. To add a language, ad
   Edge is tested locally only: on Windows, pass
   `--browser "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"` to each
   browser harness command above. CI does not launch Edge.
+
+  Linux dependency steps share `tools/ci_install_deps.py`. It uses Ubuntu's signed
+  global archives over HTTPS, trying `archive.ubuntu.com` first and
+  `security.ubuntu.com` as fallback, with 120 seconds per update/download attempt.
+  All packages are downloaded before installation; configuration runs once with
+  `--no-download`, a 120-second budget and a 360-second overall deadline (plus up
+  to five seconds to stop workers). The workflow step has a seven-minute backstop.
+  Failed downloads or installation fail the job. The installer supports the
+  Ubuntu 24.04 check runners and Ubuntu 22.04 release runner, preserves recommended
+  packages and signature checks, and uses a temporary Ubuntu-only source list.
+  Its tests simulate errors and slow transfers without sudo or real package changes.
 
 Changes to image/video rendering or export also need the real PDF regression. Install Chromium,
 Node 22 or newer and Poppler (`poppler-utils` on Debian/Ubuntu), then run:
