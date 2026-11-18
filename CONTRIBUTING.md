@@ -166,6 +166,7 @@ into every language, but please say so in the description. To add a language, ad
   node --experimental-vm-modules --test tools/test_ui.cjs tools/test_data_source.cjs \
     tools/test_diagram_visual.cjs tools/test_diagram_edits.cjs \
     tools/test_math_edits.cjs tools/test_print_media.cjs tools/test_pptx_actions.cjs
+  python3 tools/test_browser_runner.py
   python3 tools/test_browser.py --page test_editing.html
   python3 tools/test_browser.py --page test_diagrams.html
   python3 tools/test_browser.py --page test_math_editor.html
@@ -178,8 +179,18 @@ into every language, but please say so in the description. To add a language, ad
 
   GitHub Actions runs these on every push to main and every pull request
   (`.github/workflows/checks.yml`), where any Clippy warning fails. A separate Windows job runs
-  Clippy, Rust tests, UI module tests and browser harnesses in Edge so Windows
-  code and browser behavior are checked before a release.
+  Clippy, Rust tests, UI module tests and browser supervisor fault-injection tests.
+  Dedicated browser jobs run the six harnesses in Chrome on both Linux and Windows;
+  they start independently of the Rust build. A Linux export job checks PDF rendering,
+  PowerPoint export and WebKitGTK measurement using fixtures from the Rust build in
+  the same workflow run.
+  Browser failures retain the HTML result and phase diagnostics as CI artifacts.
+  PDF and PowerPoint export drivers share the same bounded browser lifecycle and
+  retain `browser.log` in their artifact directories, including startup failures.
+  Locally, use `--output-dir /tmp/browser-results` to retain the same evidence.
+  Edge is tested locally only: on Windows, pass
+  `--browser "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"` to each
+  browser harness command above. CI does not launch Edge.
 
 Changes to image/video rendering or export also need the real PDF regression. Install Chromium,
 Node 22 or newer and Poppler (`poppler-utils` on Debian/Ubuntu), then run:
