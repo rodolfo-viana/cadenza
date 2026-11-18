@@ -4,28 +4,34 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), cp = require('node:child_process');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// test_browser.py owns the process group on POSIX, including any descendants
-// left by a crashed browser. On Windows, terminate the browser tree while its
-// root is still alive; merely closing the CDP socket does not close Chromium.
-async function stopBrowser(child) {
+function exited(child) {
+  return !child.pid || child.exitCode !== null || child.signalCode !== null;
+}
+
+function waitForExit(child, timeout) {
+  if (exited(child)) return Promise.resolve(true);
+  return new Promise(resolve => {
+    const finished = () => { clearTimeout(timer); resolve(true); };
+    const timer = setTimeout(() => { child.removeListener('exit', finished); resolve(false); }, timeout);
+    child.once('exit', finished);
+  });
+}
+
+// Prefer Chromium's normal shutdown: force-killing sandboxed Edge workers can
+// race their own exit. The Python supervisor owns the POSIX process group.
+async function stopBrowser(child, graceful) {
   try {
-    if (child.pid && process.platform === 'win32' && child.exitCode === null) {
-      const error = await new Promise(resolve => cp.execFile('taskkill', ['/PID', String(child.pid), '/T', '/F'],
+    if (exited(child) || (graceful && await waitForExit(child, 5000))) return;
+    let killError;
+    if (process.platform === 'win32') {
+      killError = await new Promise(resolve => cp.execFile('taskkill', ['/PID', String(child.pid), '/T', '/F'],
         { timeout: 5000, windowsHide: true }, resolve));
-      if (error && child.exitCode === null && child.signalCode === null) {
-        console.error('Could not terminate the browser process tree:', error);
-        process.exitCode = 1;
-        child.kill();
-      }
-    } else {
-      child.kill('SIGKILL');
     }
-    // TerminateProcess/taskkill can return before Windows releases resources.
-    if (child.pid && child.exitCode === null && child.signalCode === null) {
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Browser did not exit after termination')), 5000);
-        child.once('exit', () => { clearTimeout(timer); resolve(); });
-      });
+    if (!exited(child)) child.kill('SIGKILL');
+    // taskkill can report an already-exiting worker as an error. Verify the
+    // actual process exit; profile cleanup separately verifies handle release.
+    if (!await waitForExit(child, 5000)) {
+      throw new Error('Browser did not exit after termination', { cause: killError });
     }
   } finally {
     // Descendants may inherit stderr. Do not wait for their pipe to close.
@@ -136,10 +142,13 @@ async function runBrowser(command, url, profile, { startupMs = 30000, connectMs 
     process.exitCode = 1;
   } finally {
     phase('stopping');
+    const graceful = !!call && socket.readyState === WebSocket.OPEN;
+    // Chromium often closes the connection before acknowledging Browser.close.
+    try { if (graceful) await call('Browser.close'); } catch {}
     for (const task of pending.values()) clearTimeout(task.timer);
     pending.clear();
     socket?.close();
-    await stopBrowser(child);
+    await stopBrowser(child, graceful);
     phase('stopped');
   }
 }
