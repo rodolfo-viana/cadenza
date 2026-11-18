@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run a browser regression harness to completion in a fresh Chromium profile."""
 import argparse
+import contextlib
 import functools
 import html
 import http.server
@@ -12,6 +13,8 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
+from collections.abc import Iterator
 
 
 def run_harness(command: list[str], timeout: float = 105) -> subprocess.CompletedProcess[str]:
@@ -58,6 +61,26 @@ def passed(result: subprocess.CompletedProcess[str]) -> bool:
     return result.returncode == 0 and bool(re.search(r'<body\b[^>]*data-result="pass"', result.stdout))
 
 
+@contextlib.contextmanager
+def browser_profile(cache: pathlib.Path, cleanup_timeout: float = 5) -> Iterator[str]:
+    """Remove the isolated profile once Windows has released its file handles."""
+    directory = tempfile.TemporaryDirectory(prefix="cadenza-browser-test-", dir=cache)
+    try:
+        yield directory.name
+    finally:
+        deadline = time.monotonic() + cleanup_timeout
+        while True:
+            try:
+                directory.cleanup()
+                break
+            except PermissionError:
+                # Termination is asynchronous on Windows, including pending I/O.
+                # Retry cleanup only; never retry assertions or ignore a stuck lock.
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.1)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--browser", help="Path to Chromium or Google Chrome")
@@ -97,7 +120,7 @@ def main() -> None:
     cache = pathlib.Path.home() / ("snap/chromium/common" if executable.parent == pathlib.Path("/snap/bin") else ".cache")
     cache.mkdir(parents=True, exist_ok=True)
     try:
-        with tempfile.TemporaryDirectory(prefix="cadenza-browser-test-", dir=cache) as profile:
+        with browser_profile(cache) as profile:
             result = run_harness(
                 [node, str(root / "tools" / "browser_harness.cjs"), browser,
                  f"http://127.0.0.1:{server.server_port}/tools/{args.page}", profile],

@@ -20,6 +20,13 @@ async function stopBrowser(child) {
     } else {
       child.kill('SIGKILL');
     }
+    // TerminateProcess/taskkill can return before Windows releases resources.
+    if (child.pid && child.exitCode === null && child.signalCode === null) {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Browser did not exit after termination')), 5000);
+        child.once('exit', () => { clearTimeout(timer); resolve(); });
+      });
+    }
   } finally {
     // Descendants may inherit stderr. Do not wait for their pipe to close.
     child.stderr?.destroy();

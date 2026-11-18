@@ -6,13 +6,15 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 
-from test_browser import passed, run_harness
+from test_browser import browser_profile, passed, run_harness
 
 NODE = shutil.which("node")
-HARNESS = pathlib.Path(__file__).with_name("browser_harness.cjs")
+HARNESS = pathlib.Path(__file__).resolve().with_name("browser_harness.cjs")
 FAKE_BROWSER = r"""
 const fs = require('node:fs'), http = require('node:http'), path = require('node:path'), cp = require('node:child_process');
 const mode = process.argv[2];
@@ -48,6 +50,12 @@ def alive(pid: int) -> bool:
 
 @unittest.skipUnless(NODE, "Node.js 22 or newer is required")
 class BrowserRunnerTests(unittest.TestCase):
+    def assert_terminated(self, pid: int) -> None:
+        deadline = time.monotonic() + 2
+        while alive(pid) and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertFalse(alive(pid), f"Descendant {pid} survived process-tree cleanup")
+
     def test_stalled_websocket_fails_and_cleans_descendants(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -59,7 +67,7 @@ class BrowserRunnerTests(unittest.TestCase):
             self.assertIn("WebSocket handshake timed out", result.stderr)
             self.assertIn("[browser] stopped", result.stderr)
             self.assertNotIn("supervisor timed out", result.stderr)
-            self.assertFalse(alive(int((root / "descendant.pid").read_text())))
+            self.assert_terminated(int((root / "descendant.pid").read_text()))
 
     def test_early_browser_exit_fails_without_waiting_for_startup_deadline(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -87,7 +95,33 @@ setInterval(() => {}, 1000);
             self.assertIn("partial result", result.stdout)
             self.assertIn("driver stuck during cleanup", result.stderr)
             self.assertIn("supervisor timed out", result.stderr)
-            self.assertFalse(alive(int(pid_file.read_text())))
+            self.assert_terminated(int(pid_file.read_text()))
+
+    @unittest.skipUnless(os.name == "nt", "Windows prevents deleting an open file")
+    def test_profile_waits_for_delayed_file_release(self) -> None:
+        self.check_profile_lock(release_after=1, cleanup_timeout=5)
+
+    @unittest.skipUnless(os.name == "nt", "Windows prevents deleting an open file")
+    def test_profile_still_fails_if_file_remains_locked(self) -> None:
+        with self.assertRaises(PermissionError):
+            self.check_profile_lock(release_after=30, cleanup_timeout=0.1)
+
+    def check_profile_lock(self, release_after: float, cleanup_timeout: float) -> None:
+        with tempfile.TemporaryDirectory() as cache:
+            locker = None
+            try:
+                with browser_profile(pathlib.Path(cache), cleanup_timeout) as profile:
+                    script = "import sys,time; f=open(sys.argv[1], 'w'); print('locked', flush=True); time.sleep(float(sys.argv[2])); f.close()"
+                    locker = subprocess.Popen([sys.executable, "-c", script, str(pathlib.Path(profile) / "data_0"), str(release_after)],
+                                              stdout=subprocess.PIPE, text=True)
+                    self.assertEqual(locker.stdout.readline().strip(), "locked")
+                    # The same profile is cleaned on context exit, while the file
+                    # is held by another process as with Edge's cache workers.
+            finally:
+                if locker:
+                    locker.kill()
+                    locker.wait(timeout=5)
+                    locker.stdout.close()
 
     def test_pass_requires_both_exit_status_and_page_result(self) -> None:
         for code, body, expected in (
