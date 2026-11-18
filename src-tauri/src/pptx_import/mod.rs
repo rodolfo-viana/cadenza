@@ -8,7 +8,7 @@ mod text;
 
 use crate::model::*;
 use anyhow::{Context, ensure};
-use archive::{Archive, child, desc, named, num, rel_attr};
+use archive::{Archive, attr, child, desc, named, num, rel_attr};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use text::Theme;
@@ -241,7 +241,7 @@ fn parse_with_budget(path: &Path, staging_assets: &Path, allocation_limit: usize
             .or_else(|| child(pres.root_element(), "defaultTextStyle"));
         let mut slide = Slide {
             id: importer.slide_ids[part].clone(),
-            hidden: matches!(slide_root.attribute("show"), Some("0" | "false")),
+            hidden: matches!(attr(slide_root, "show"), Some("0" | "false")),
             background: Background {
                 kind: "color".into(),
                 color: "#ffffff".into(),
@@ -298,7 +298,7 @@ fn parse_with_budget(path: &Path, staging_assets: &Path, allocation_limit: usize
                 break;
             }
         }
-        if !matches!(slide_root.attribute("showMasterSp"), Some("0" | "false")) {
+        if !matches!(attr(slide_root, "showMasterSp"), Some("0" | "false")) {
             if let Some((tree, path)) = mtree.zip(master_path.as_ref()) {
                 drawing::tree(
                     &mut importer,
@@ -348,7 +348,7 @@ fn parse_with_budget(path: &Path, staging_assets: &Path, allocation_limit: usize
             for shape in notes
                 .descendants()
                 .filter(|n| named(*n, "sp"))
-                .filter(|n| desc(*n, "ph").and_then(|p| p.attribute("type")).is_none_or(|t| t == "body"))
+                .filter(|n| desc(*n, "ph").and_then(|p| attr(p, "type")).is_none_or(|t| t == "body"))
             {
                 for paragraph in shape.descendants().filter(|p| named(*p, "p")) {
                     importer.budget.array::<String>(1)?;

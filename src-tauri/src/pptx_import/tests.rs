@@ -83,6 +83,32 @@ fn ordered_editable_foreign_slides_persist_and_import_dirty() {
 }
 
 #[test]
+fn namespaced_extension_attributes_do_not_override_ooxml_attributes() {
+    let mut parts = fixture();
+    let rels = String::from_utf8(parts["_rels/.rels"].clone())
+        .unwrap()
+        .replace("<Relationships ", "<Relationships xmlns:custom=\"urn:custom\" ")
+        .replace(" Target=", " custom:Target=\"missing.xml\" Target=");
+    parts.insert("_rels/.rels".into(), rels.into_bytes());
+    let source = String::from_utf8(parts["ppt/slides/slide7.xml"].clone())
+        .unwrap()
+        .replace("<p:sld ", "<p:sld xmlns:custom=\"urn:custom\" ")
+        .replace("<a:off x=", "<a:off custom:x=\"0\" x=");
+    parts.insert("ppt/slides/slide7.xml".into(), source.into_bytes());
+    let (_, result) = parse_fixture(parts);
+    let el = &result.deck.slides[0].elements[0];
+    assert_eq!((el.x, el.y), (100., 100.));
+    assert!(el.content.text().unwrap().html.contains("First"));
+}
+
+#[test]
+fn deeply_nested_xml_is_rejected_without_recursive_parser_overflow() {
+    let xml = format!("{}{}", "<x>".repeat(20_000), "</x>".repeat(20_000));
+    let error = archive::parse_xml(xml.as_bytes()).unwrap_err();
+    assert!(error.to_string().contains("nested too deeply"), "{error}");
+}
+
+#[test]
 fn inherits_layout_geometry_master_font_theme_color_and_artwork() {
     let mut parts = fixture();
     let title = r#"<p:sp><p:nvSpPr><p:cNvPr id="1" name="Title"/><p:cNvSpPr/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Inherited</a:t></a:r></a:p></p:txBody></p:sp>"#;

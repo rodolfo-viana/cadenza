@@ -1,4 +1,4 @@
-use super::archive::{child, desc, named, num};
+use super::archive::{attr, child, desc, named, num};
 use super::text::{Theme, fill};
 use super::{MaterializationBudget, n_};
 use crate::model::{ChartContent, Series};
@@ -9,7 +9,7 @@ use roxmltree::Node;
 fn points<'a, 'i>(node: Node<'a, 'i>, budget: &mut MaterializationBudget) -> anyhow::Result<Vec<Option<&'a str>>> {
     let count = desc(node, "ptCount")
         .map(|n| {
-            n.attribute("val")
+            attr(n, "val")
                 .context(n_("Missing chart point count"))?
                 .parse::<usize>()
                 .context(n_("Invalid chart point count"))
@@ -17,8 +17,7 @@ fn points<'a, 'i>(node: Node<'a, 'i>, budget: &mut MaterializationBudget) -> any
         .transpose()?
         .unwrap_or(0);
     let index = |n: Node<'_, '_>| -> anyhow::Result<usize> {
-        let i = n
-            .attribute("idx")
+        let i = attr(n, "idx")
             .context(n_("Missing chart point index"))?
             .parse::<usize>()
             .context(n_("Invalid chart point index"))?;
@@ -65,12 +64,12 @@ pub fn parse(root: Node<'_, '_>, theme: &Theme, budget: &mut MaterializationBudg
         return Ok(None);
     }
     let chart = types[0];
-    let grouping = child(chart, "grouping").and_then(|n| n.attribute("val")).unwrap_or("standard");
+    let grouping = child(chart, "grouping").and_then(|n| attr(n, "val")).unwrap_or("standard");
     if grouping == "percentStacked" {
         return Ok(None);
     }
     let kind = match chart.tag_name().name() {
-        "barChart" => match (child(chart, "barDir").and_then(|n| n.attribute("val")).unwrap_or("col"), grouping == "stacked") {
+        "barChart" => match (child(chart, "barDir").and_then(|n| attr(n, "val")).unwrap_or("col"), grouping == "stacked") {
             ("bar", true) => "stacked-bar",
             ("bar", false) => "bar",
             (_, true) => "stacked-column",

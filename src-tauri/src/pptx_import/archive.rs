@@ -129,11 +129,11 @@ impl Archive {
                 n.tag_name().name() == "Relationship" && n.tag_name().namespace() == ns,
                 n_("Invalid PowerPoint relationship")
             );
-            let id = n.attribute("Id").context(n_("PowerPoint relationship has no id"))?.to_owned();
+            let id = attr(n, "Id").context(n_("PowerPoint relationship has no id"))?.to_owned();
             ensure!(seen.insert(id.clone()), n_("Duplicate PowerPoint relationship id"));
-            let raw = n.attribute("Target").context(n_("PowerPoint relationship has no target"))?;
-            let external = n.attribute("TargetMode") == Some("External");
-            let relationship_type = n.attribute("Type").unwrap_or_default();
+            let raw = attr(n, "Target").context(n_("PowerPoint relationship has no target"))?;
+            let external = attr(n, "TargetMode") == Some("External");
+            let relationship_type = attr(n, "Type").unwrap_or_default();
             let standard = relationship_type.starts_with("http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
                 || relationship_type.starts_with("http://purl.oclc.org/ooxml/officeDocument/relationships/");
             rels.push(Rel {
@@ -162,6 +162,7 @@ pub fn parse_xml(bytes: &[u8]) -> anyhow::Result<Document<'_>> {
         ParsingOptions {
             allow_dtd: false,
             nodes_limit: 200_000,
+            entity_resolver: None,
         },
     )
     .context(n_("Malformed or unsafe PowerPoint XML"))?;
@@ -193,13 +194,15 @@ pub fn child<'a, 'i>(n: Node<'a, 'i>, name: &str) -> Option<Node<'a, 'i>> {
 pub fn desc<'a, 'i>(n: Node<'a, 'i>, name: &str) -> Option<Node<'a, 'i>> {
     n.descendants().find(|n| named(*n, name))
 }
+/// OOXML attributes without a prefix must not match extension namespaces.
+/// roxmltree 0.21's string lookup matches only the local name.
+pub fn attr<'a>(node: Node<'a, '_>, name: &str) -> Option<&'a str> {
+    node.attributes().find(|a| a.namespace().is_none() && a.name() == name).map(|a| a.value())
+}
 pub fn rel_attr<'a>(n: Node<'a, '_>, name: &str) -> Option<&'a str> {
     n.attribute((R, name))
         .or_else(|| n.attribute(("http://purl.oclc.org/ooxml/officeDocument/relationships", name)))
 }
 pub fn num(n: Node<'_, '_>, key: &str, default: f64) -> f64 {
-    n.attribute(key)
-        .and_then(|v| v.parse::<f64>().ok())
-        .filter(|v| v.is_finite())
-        .unwrap_or(default)
+    attr(n, key).and_then(|v| v.parse::<f64>().ok()).filter(|v| v.is_finite()).unwrap_or(default)
 }
