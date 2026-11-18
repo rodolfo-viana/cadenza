@@ -185,6 +185,8 @@ into every language, but please say so in the description. To add a language, ad
   PowerPoint export and WebKitGTK measurement using fixtures from the Rust build in
   the same workflow run.
   Browser failures retain the HTML result and phase diagnostics as CI artifacts.
+  PDF and PowerPoint export drivers share the same bounded browser lifecycle and
+  retain `browser.log` in their artifact directories, including startup failures.
   Locally, use `--output-dir /tmp/browser-results` to retain the same evidence.
   Edge is tested locally only: on Windows, pass
   `--browser "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"` to each
