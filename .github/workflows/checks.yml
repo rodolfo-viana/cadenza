@@ -2,7 +2,8 @@ name: Checks
 
 # Runs the checks CONTRIBUTING.md asks for before a pull request: Rust
 # formatting, Clippy (warnings fail) and unit tests, the UI module checks and
-# tests, and the translation catalogs.
+# tests, and the translation catalogs. Browser and export regressions run
+# in dedicated Linux/Windows jobs, using fixtures from this same workflow.
 on:
   push:
     branches: [main]
@@ -25,7 +26,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev poppler-utils python3-gi gir1.2-webkit2-4.1 xvfb
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev
 
       # Pinned to v1 (on the action's master branch), which takes the
       # toolchain as an input; @stable would pick it from the ref instead.
@@ -64,24 +65,22 @@ jobs:
           tools/test_diagram_visual.cjs tools/test_diagram_edits.cjs
           tools/test_math_edits.cjs tools/test_print_media.cjs tools/test_pptx_actions.cjs
 
-      - name: Browser regression tests
-        run: |
-          for page in test_editing.html test_diagrams.html test_math_editor.html test_transition_preview.html test_pptx_capture.html test_present.html; do
-            python3 tools/test_browser.py --browser google-chrome --page "$page"
-          done
+      - name: Browser supervisor tests
+        run: python3 tools/test_browser_runner.py
 
-      - name: PDF rendering regression
+      - name: Generate export fixtures
         run: |
-          cargo run --manifest-path src-tauri/Cargo.toml --locked --example print_fixture > "$RUNNER_TEMP/print-data.json"
-          node tools/test_print.cjs "$RUNNER_TEMP/print-data.json" "$RUNNER_TEMP/cadenza-print-results" google-chrome
+          mkdir -p "$RUNNER_TEMP/export-fixtures"
+          cargo run --manifest-path src-tauri/Cargo.toml --locked --example print_fixture > "$RUNNER_TEMP/export-fixtures/print-data.json"
+          cargo run --manifest-path src-tauri/Cargo.toml --locked --example pptx_fixture > "$RUNNER_TEMP/export-fixtures/pptx-snapshot.json"
 
-      - name: PowerPoint export regression
-        run: |
-          cargo run --manifest-path src-tauri/Cargo.toml --locked --example pptx_fixture > "$RUNNER_TEMP/pptx-snapshot.json"
-          node tools/test_pptx_export.cjs "$RUNNER_TEMP/pptx-snapshot.json" "$RUNNER_TEMP/cadenza-pptx-results" google-chrome
-
-      - name: PowerPoint WebKitGTK measurement regression
-        run: /usr/bin/python3 tools/test_pptx_webkit.py "$RUNNER_TEMP/pptx-snapshot.json"
+      - name: Share export fixtures with browser checks
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: export-fixtures
+          path: ${{ runner.temp }}/export-fixtures/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Translation extraction tests
         run: python3 tools/test_i18n.py
@@ -89,19 +88,6 @@ jobs:
       # Strings not translated yet show in English, so they don't fail it.
       - name: Translations
         run: python3 tools/i18n.py check --allow-missing
-
-      - name: Retain export regression evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: export-regression-evidence
-          path: |
-            ${{ runner.temp }}/print-data.json
-            ${{ runner.temp }}/pptx-snapshot.json
-            ${{ runner.temp }}/cadenza-print-results/
-            ${{ runner.temp }}/cadenza-pptx-results/
-          if-no-files-found: ignore
-          retention-days: 7
 
   windows:
     # Compile and exercise cfg(windows) code on PRs, not only release tags.
@@ -140,10 +126,76 @@ jobs:
           node --experimental-vm-modules --test tools/test_ui.cjs tools/test_data_source.cjs tools/test_diagram_visual.cjs tools/test_diagram_edits.cjs tools/test_math_edits.cjs tools/test_print_media.cjs tools/test_pptx_actions.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Windows browser regression tests
+      - name: Windows browser supervisor tests
+        run: python tools/test_browser_runner.py
+
+  browser:
+    name: Browser (${{ matrix.os }})
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install Linux rendering dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils python3-gi gir1.2-webkit2-4.1 xvfb
+
+      - name: Download this run's export fixtures
+        if: runner.os == 'Linux'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: export-fixtures
+          path: ${{ runner.temp }}/export-fixtures
+
+      - name: Chrome regression tests
+        if: runner.os == 'Linux'
+        run: |
+          for page in test_editing.html test_diagrams.html test_math_editor.html test_transition_preview.html test_pptx_capture.html test_present.html; do
+            python3 tools/test_browser.py --browser google-chrome --page "$page" --output-dir "$RUNNER_TEMP/browser-results"
+          done
+
+      - name: Edge regression tests
+        if: runner.os == 'Windows'
         run: |
           $edge = "${env:ProgramFiles(x86)}/Microsoft/Edge/Application/msedge.exe"
           foreach ($page in @('test_editing.html', 'test_diagrams.html', 'test_math_editor.html', 'test_transition_preview.html', 'test_pptx_capture.html', 'test_present.html')) {
-            python tools/test_browser.py --browser $edge --page $page
+            python tools/test_browser.py --browser $edge --page $page --output-dir "$env:RUNNER_TEMP/browser-results"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
+
+      - name: PDF rendering regression
+        if: runner.os == 'Linux'
+        run: node tools/test_print.cjs "$RUNNER_TEMP/export-fixtures/print-data.json" "$RUNNER_TEMP/cadenza-print-results" google-chrome
+
+      - name: PowerPoint export regression
+        if: runner.os == 'Linux'
+        run: node tools/test_pptx_export.cjs "$RUNNER_TEMP/export-fixtures/pptx-snapshot.json" "$RUNNER_TEMP/cadenza-pptx-results" google-chrome
+
+      - name: PowerPoint WebKitGTK measurement regression
+        if: runner.os == 'Linux'
+        run: /usr/bin/python3 tools/test_pptx_webkit.py "$RUNNER_TEMP/export-fixtures/pptx-snapshot.json"
+
+      - name: Retain browser and export evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-evidence-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/browser-results/
+            ${{ runner.temp }}/cadenza-print-results/
+            ${{ runner.temp }}/cadenza-pptx-results/
+          if-no-files-found: ignore
+          retention-days: 7
