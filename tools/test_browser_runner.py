@@ -79,6 +79,24 @@ class BrowserRunnerTests(unittest.TestCase):
             self.assertIn("Browser exited before completing the harness (7)", result.stderr)
             self.assertNotIn("supervisor timed out", result.stderr)
 
+    def test_export_session_retains_diagnostics_and_cleans_its_own_process_group(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            fake = root / "fake.cjs"
+            fake.write_text(FAKE_BROWSER, encoding="utf-8")
+            log_file = root / "browser.log"
+            script = """
+const [h, c, p, logFile] = JSON.parse(process.argv[1]);
+require(h).withBrowser(c, p, async () => {}, {connectMs:300, ownProcessGroup:true, logFile})
+  .catch(error => { console.error(error); process.exitCode = 1; });
+"""
+            result = run_harness([NODE, "-e", script, json.dumps([str(HARNESS), [NODE, str(fake), "hang"], directory, str(log_file)])], timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("WebSocket handshake timed out", log_file.read_text())
+            self.assertIn("[browser] stopped", log_file.read_text())
+            self.assertNotIn("supervisor timed out", result.stderr)
+            self.assert_terminated(int((root / "descendant.pid").read_text()))
+
     def test_supervisor_timeout_preserves_partial_output_and_rejects_pass(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             pid_file = pathlib.Path(directory) / "descendant.pid"

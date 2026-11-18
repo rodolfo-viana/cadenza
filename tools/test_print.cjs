@@ -6,6 +6,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
 const http = require('node:http'), cp = require('node:child_process');
+const { withBrowser } = require('./browser_harness.cjs');
 const root = path.resolve(__dirname, '..');
 const data = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const output = process.argv[3] || fs.mkdtempSync(path.join(os.tmpdir(), 'cadenza-print-result-'));
@@ -69,29 +70,8 @@ function nearBox(actual, expected, label) {
   const cache = browser.startsWith('/snap/') ? path.join(os.homedir(), 'snap/chromium/common') : os.tmpdir();
   fs.mkdirSync(cache, { recursive: true });
   const profile = fs.mkdtempSync(path.join(cache, 'cadenza-print-test-'));
-  const browserProcess = cp.spawn(browser, ['--headless', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
-  let socket, call;
-  try {
-    const port = await until(() => { try { return fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]; } catch { return null; } }, 'Chromium did not start');
-    const tabs = await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(10000) }).then(response => response.json());
-    socket = new WebSocket(tabs[0].webSocketDebuggerUrl);
-    await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }); });
-    let sequence = 0; const pending = new Map();
-    socket.addEventListener('message', event => {
-      const message = JSON.parse(event.data); if (!message.id) return;
-      const handlers = pending.get(message.id); if (!handlers) return;
-      pending.delete(message.id); clearTimeout(handlers.timer); message.error ? handlers.reject(new Error(JSON.stringify(message.error))) : handlers.resolve(message.result);
-    });
-    socket.addEventListener('close', () => { for (const task of pending.values()) { clearTimeout(task.timer); task.reject(new Error('Chromium connection closed')); } pending.clear(); });
-    call = (method, params = {}) => new Promise((resolve, reject) => {
-      const id = ++sequence;
-      const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method} timed out`)); }, 15000);
-      pending.set(id, { resolve, reject, timer }); socket.send(JSON.stringify({ id, method, params }));
-    });
-    const evaluate = async expression => {
-      const result = await call('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
-      assert(!result.exceptionDetails, JSON.stringify(result.exceptionDetails)); return result.result.value;
-    };
+  const checkPrint = async ({ call, evaluate: evaluateExpression }) => {
+    const evaluate = expression => evaluateExpression(expression, { awaitPromise: true });
     fs.writeFileSync(path.join(output, 'browser.json'), JSON.stringify(await call('Browser.getVersion'), null, 2));
     await call('Page.enable');
     await call('Page.addScriptToEvaluateOnNewDocument', { source: `
@@ -156,9 +136,12 @@ function nearBox(actual, expected, label) {
     fs.writeFileSync(path.join(output, 'video-pdf.json'), JSON.stringify({ center: at(video, 640, 360), matchedPixels: frame.count, bounds: frame.box }, null, 2));
     nearBox(frame.box, [256, 144, 1024, 576], 'Video PDF placement');
     console.log(`PASS: production print boot, decoded video, authored frame geometry and PDF crop/video pixels. Artifacts: ${output}`);
+  };
+  try {
+    await withBrowser([browser], profile, checkPrint, {
+      commandMs: 15000, logFile: path.join(output, 'browser.log'), ownProcessGroup: true,
+    });
   } finally {
-    try { if (call) await call('Browser.close'); } catch {}
-    socket?.close(); try { browserProcess.kill(); } catch {}
     server.close(); await delay(200); fs.rmSync(profile, { recursive: true, force: true });
   }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });
